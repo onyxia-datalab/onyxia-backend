@@ -1,0 +1,26 @@
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/*
+Dockerfile.cross
+*.tgz
+
+# Test binary, built with `go test -c`
+*.test
+
+# Env
+env.yaml
+
+# Go workspace file
+go.work
+
+# editor and IDE paraphernalia
+.idea
+.vscode
+*.swp
+*.swo
+*~
