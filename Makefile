@@ -41,21 +41,25 @@ help:
 
 # --- DEP MANAGEMENT ----------------------------------------------------------
 
+.PHONY: install
 ## install: Install dependencies using Go modules
 install:
 	@echo "📦 Installing dependencies..."
 	go mod tidy
 
+.PHONY: verify
 ## verify: Verify module dependencies
 verify:
 	@echo "🔍 Verifying dependencies..."
 	go mod verify
 
+.PHONY: generate
 ## generate: Run go generate on all packages
 generate:
 	@echo "⚡ Running go generate..."
 	go generate ./...
 
+.PHONY: fmt
 ## fmt: Format all Go code
 fmt:
 	@echo "🖌️  Formatting code..."
@@ -63,6 +67,7 @@ fmt:
 
 # --- LINT / TEST -------------------------------------------------------------
 
+.PHONY: lint
 ## lint: Run static analysis (auto-install golangci-lint if missing or outdated)
 lint:
 	@echo "🔍 Running golangci-lint..."
@@ -82,6 +87,7 @@ lint:
 	fi
 	@$(GOBIN)/golangci-lint run --timeout=1m ./...
 
+.PHONY: test
 ## test: Run all unit tests
 test:
 	@echo "✅ Running tests..."
@@ -89,6 +95,7 @@ test:
 
 # --- BUILD -------------------------------------------------------------------
 
+.PHONY: build
 ## build: Build all binaries
 build:
 	@echo "🔨 Building binaries..."
@@ -98,11 +105,13 @@ build:
 		go build $(LDFLAGS) -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
 
+.PHONY: run-%
 ## run-<api>: Run specific API (example: make run-onboarding)
 run-%:
 	@echo "🚀 Running onyxia-$*..."
 	go run ./cmd/onyxia-$*/main.go
 
+.PHONY: clean
 ## clean: Clean all build artifacts
 clean:
 	@echo "🧹 Cleaning..."
@@ -111,6 +120,7 @@ clean:
 
 # --- DOCKER ------------------------------------------------------------------
 
+.PHONY: docker-setup-builder
 ## docker-setup-builder: Setup Docker Buildx for multiarch
 docker-setup-builder:
 ifeq ($(MULTIARCH), 1)
@@ -118,6 +128,7 @@ ifeq ($(MULTIARCH), 1)
 	docker buildx create --use --name multiarch-builder || true
 endif
 
+.PHONY: docker-build-%
 ## docker-build-<api>: Build Docker image for API (example: make docker-build-onboarding)
 docker-build-%: docker-setup-builder
 	@echo "🐳 Building Docker image for onyxia-$*..."
@@ -129,10 +140,20 @@ docker-build-%: docker-setup-builder
 		$(if $(filter 1,$(MULTIARCH)),,--load) \
 		$(if $(PUSH),--push,) .
 
+.PHONY: docker-push-%
 ## docker-push-<api>: Push Docker image to registry
 docker-push-%:
 	@$(MAKE) docker-build-$* PUSH=1
 
+.PHONY: docker-pull-%
 ## docker-run-<api>: Run Docker container
 docker-run-%:
 	@docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$*:latest
+
+.PHONY: docker-clean
+docker-clean:
+	@echo "🗑️  Removing local docker images..."
+	@for bin in $(BINARIES); do \
+		docker rmi -f $(DOCKER_REGISTRY)/$$bin:$(DOCKER_VERSION) || true; \
+		docker rmi -f $(DOCKER_REGISTRY)/$$bin:latest || true; \
+	done
