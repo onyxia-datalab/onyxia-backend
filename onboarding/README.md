@@ -1,4 +1,4 @@
-# Onyxia Onboarding Service
+# Onyxia Onboarding
 
 <p align="center">
     <a href="https://github.com/onyxia-datalab/onyxia-onboarding/actions/workflows/release.yml">
