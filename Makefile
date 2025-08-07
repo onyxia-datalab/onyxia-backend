@@ -1,0 +1,138 @@
+# Project-wide metadata
+VERSION := $(shell git describe --tags --always 2>/dev/null || echo "v0.0.0")
+BUILD := $(shell git rev-parse --short HEAD)
+DOCKER_REGISTRY := inseefrlab
+DOCKER_VERSION := $(shell echo $(VERSION) | sed 's/^v//')
+
+BINARIES := onyxia-onboarding onyxia-runtime onyxia-bootstrap
+GOBIN := $(shell pwd)/bin
+
+# Linker flags
+LDFLAGS = -ldflags "-X=main.Version=$(VERSION) -X=main.Build=$(BUILD)"
+
+# Docker arch handling
+UNAME_M := $(shell uname -m)
+
+ifeq ($(UNAME_M), x86_64)
+	LOCAL_PLATFORM := linux/amd64
+else ifeq ($(UNAME_M), aarch64)
+	LOCAL_PLATFORM := linux/arm64
+else ifeq ($(UNAME_M), arm64)
+	LOCAL_PLATFORM := linux/arm64
+else
+	LOCAL_PLATFORM := linux/amd64
+endif
+
+MULTIARCH ?= 0
+DOCKER_PLATFORMS := $(LOCAL_PLATFORM)
+ifeq ($(MULTIARCH), 1)
+	DOCKER_PLATFORMS := linux/amd64,linux/arm64
+endif
+
+# --- HELP ---------------------------------------------------------------------
+
+.PHONY: help
+help:
+	@echo
+	@echo "🛠️  Available make commands:"
+	@echo
+	@grep -E '^##' $(MAKEFILE_LIST) | sed 's/^## //g' | column -t -s ':' | sed 's/^/ /'
+	@echo
+
+# --- DEP MANAGEMENT ----------------------------------------------------------
+
+## install: Install dependencies using Go modules
+install:
+	@echo "📦 Installing dependencies..."
+	go mod tidy
+
+## verify: Verify module dependencies
+verify:
+	@echo "🔍 Verifying dependencies..."
+	go mod verify
+
+## generate: Run go generate on all packages
+generate:
+	@echo "⚡ Running go generate..."
+	go generate ./...
+
+## fmt: Format all Go code
+fmt:
+	@echo "🖌️  Formatting code..."
+	go fmt ./...
+
+# --- LINT / TEST -------------------------------------------------------------
+
+## lint: Run static analysis (auto-install golangci-lint if missing or outdated)
+lint:
+	@echo "🔍 Running golangci-lint..."
+	@mkdir -p $(GOBIN)
+	@LATEST=$$(curl -s https://api.github.com/repos/golangci/golangci-lint/releases/latest | grep tag_name | cut -d '"' -f4 | sed 's/^v//'); \
+	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
+		echo "📥 Installing golangci-lint $$LATEST..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) $$LATEST; \
+	else \
+		CURRENT=$$($(GOBIN)/golangci-lint --version | head -n1 | awk '{print $$4}'); \
+		if [ "$$CURRENT" != "$$LATEST" ]; then \
+			echo "📥 Updating golangci-lint from $$CURRENT to $$LATEST..."; \
+			curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) $$LATEST; \
+		else \
+			echo "✅ golangci-lint is up to date ($$CURRENT)"; \
+		fi; \
+	fi
+	@$(GOBIN)/golangci-lint run --timeout=1m ./...
+
+## test: Run all unit tests
+test:
+	@echo "✅ Running tests..."
+	go test ./... -v
+
+# --- BUILD -------------------------------------------------------------------
+
+## build: Build all binaries
+build:
+	@echo "🔨 Building binaries..."
+	@mkdir -p $(GOBIN)
+	@for bin in $(BINARIES); do \
+		echo "📦 Building $$bin..."; \
+		go build $(LDFLAGS) -o $(GOBIN)/$$bin ./cmd/$$bin; \
+	done
+
+## run-<api>: Run specific API (example: make run-onboarding)
+run-%:
+	@echo "🚀 Running onyxia-$*..."
+	go run ./cmd/onyxia-$*/main.go
+
+## clean: Clean all build artifacts
+clean:
+	@echo "🧹 Cleaning..."
+	@rm -rf $(GOBIN)
+	go clean
+
+# --- DOCKER ------------------------------------------------------------------
+
+## docker-setup-builder: Setup Docker Buildx for multiarch
+docker-setup-builder:
+ifeq ($(MULTIARCH), 1)
+	@echo "🔧 Setting up Buildx..."
+	docker buildx create --use --name multiarch-builder || true
+endif
+
+## docker-build-<api>: Build Docker image for API (example: make docker-build-onboarding)
+docker-build-%: docker-setup-builder
+	@echo "🐳 Building Docker image for onyxia-$*..."
+	@docker buildx build \
+		--platform $(DOCKER_PLATFORMS) \
+		--tag $(DOCKER_REGISTRY)/onyxia-$*:$(DOCKER_VERSION) \
+		--tag $(DOCKER_REGISTRY)/onyxia-$*:latest \
+		-f $*/Dockerfile \
+		$(if $(filter 1,$(MULTIARCH)),,--load) \
+		$(if $(PUSH),--push,) .
+
+## docker-push-<api>: Push Docker image to registry
+docker-push-%:
+	@$(MAKE) docker-build-$* PUSH=1
+
+## docker-run-<api>: Run Docker container
+docker-run-%:
+	@docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$*:latest

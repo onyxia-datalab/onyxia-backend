@@ -11,8 +11,8 @@ import (
 	"github.com/go-chi/httplog/v3"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/onyxia-datalabonyxia-datalab/onyxia-backend/onboarding/api/route"
-	"github.com/onyxia-datalabonyxia-datalab/onyxia-backend/onboarding/bootstrap"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/route"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
 )
 
 func main() {

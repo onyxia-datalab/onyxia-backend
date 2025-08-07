@@ -12,8 +12,8 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY cmd/main.go cmd/main.go
-COPY internal/ internal/
+COPY cmd/onyxia-onboarding/main.go ./cmd/onyxia-onboarding/main.go
+COPY onboarding/ ./onboarding/
 
 # Build
 RUN --mount=target=. \
