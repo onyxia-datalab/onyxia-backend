@@ -4,7 +4,7 @@ BUILD := $(shell git rev-parse --short HEAD)
 DOCKER_REGISTRY := inseefrlab
 DOCKER_VERSION := $(shell echo $(VERSION) | sed 's/^v//')
 
-BINARIES := onyxia-onboarding onyxia-runtime onyxia-bootstrap
+BINARIES := onyxia-onboarding onyxia-services
 GOBIN := $(shell pwd)/bin
 
 # Linker flags

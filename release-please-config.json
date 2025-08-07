@@ -14,6 +14,20 @@
       "include-v-in-tag": true,
       "initial-version": "0.1.12",
       "include-component-in-tag": true
+    },
+    "services": {
+      "path": "services",
+      "release-type": "go",
+      "package-name": "services",
+      "component": "services",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "draft": false,
+      "prerelease": false,
+      "include-v-in-tag": true,
+      "initial-version": "0.0.0",
+      "include-component-in-tag": true
     }
   }
 }
