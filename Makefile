@@ -75,12 +75,12 @@ lint:
 	@LATEST=$$(curl -s https://api.github.com/repos/golangci/golangci-lint/releases/latest | grep tag_name | cut -d '"' -f4 | sed 's/^v//'); \
 	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
 		echo "📥 Installing golangci-lint $$LATEST..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) $$LATEST; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v$$LATEST; \
 	else \
 		CURRENT=$$($(GOBIN)/golangci-lint --version | head -n1 | awk '{print $$4}'); \
 		if [ "$$CURRENT" != "$$LATEST" ]; then \
 			echo "📥 Updating golangci-lint from $$CURRENT to $$LATEST..."; \
-			curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) $$LATEST; \
+			curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v$$LATEST; \
 		else \
 			echo "✅ golangci-lint is up to date ($$CURRENT)"; \
 		fi; \
