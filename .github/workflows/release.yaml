@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
     steps:
       - uses: actions/create-github-app-token@v2
         id: app-token
@@ -51,4 +52,8 @@ jobs:
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: make docker-push MULTIARCH=1
+        run: |
+          for component in ${{ fromJSON(needs.release-please.outputs.paths_released) }}; do
+            echo "🚀 Building $component"
+            make docker-push-$component MULTIARCH=1
+          done
