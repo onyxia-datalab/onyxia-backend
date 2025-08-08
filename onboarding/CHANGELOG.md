@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/onyxia-datalab/onyxia-backend/compare/onboarding-v0.1.12...onboarding-v0.1.13) (2025-08-08)
+
+
+### Features
+
+* adapt ci/cd with monorepo ([bc0aa6c](https://github.com/onyxia-datalab/onyxia-backend/commit/bc0aa6cb99cb92db3bf2efb04372003f772c0913))
+
 ## [0.1.12](https://github.com/onyxia-datalab/onyxia-backend/compare/onboarding-v0.1.11...onboarding-v0.1.12) (2025-08-08)
 
 
