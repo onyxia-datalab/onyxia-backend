@@ -1,5 +1,5 @@
 FROM --platform=$BUILDPLATFORM golang:1.24 AS builder
-ARG TARGETOS TARGETARCH
+ARG TARGETOS TARGETARCH VERSION BUILD_SHA
 
 WORKDIR /src
 
@@ -16,10 +16,11 @@ COPY cmd/onyxia-onboarding/main.go ./cmd/onyxia-onboarding/main.go
 COPY onboarding/ ./onboarding/
 
 # Build
-RUN --mount=target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -o /out/app cmd/main.go
+    GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 \
+    go build -trimpath -ldflags "-s -w -X=main.Version=${VERSION} -X=main.Build=${BUILD_SHA}" \
+    -o /out/app ./cmd/onyxia-onboarding/main.go
 
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
