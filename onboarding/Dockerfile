@@ -1,0 +1,29 @@
+FROM --platform=$BUILDPLATFORM golang:1.24 AS builder
+ARG TARGETOS TARGETARCH
+
+WORKDIR /src
+
+# Copy the Go Modules manifests
+COPY go.mod go.mod
+COPY go.sum go.sum
+
+# cache deps before building and copying source so that we don't need to re-download as much
+# and so that source changes don't invalidate our downloaded layer
+RUN go mod download
+
+# Copy the go source
+COPY cmd/onyxia-onboarding/main.go ./cmd/onyxia-onboarding/main.go
+COPY onboarding/ ./onboarding/
+
+# Build
+RUN --mount=target=. \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 go build -o /out/app cmd/main.go
+
+FROM gcr.io/distroless/static:nonroot
+WORKDIR /
+COPY --from=builder --chmod=0755 /out/app /
+USER 65532:65532
+
+ENTRYPOINT ["/app"]
