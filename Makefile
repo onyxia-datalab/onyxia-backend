@@ -1,14 +1,9 @@
 # Project-wide metadata
-VERSION := $(shell git describe --tags --always 2>/dev/null || echo "v0.0.0")
 BUILD := $(shell git rev-parse --short HEAD)
 DOCKER_REGISTRY := inseefrlab
-DOCKER_VERSION := $(shell echo $(VERSION) | sed 's/^v//')
 
 BINARIES := onyxia-onboarding onyxia-services
 GOBIN := $(shell pwd)/bin
-
-# Linker flags
-LDFLAGS = -ldflags "-X=main.Version=$(VERSION) -X=main.Build=$(BUILD)"
 
 # Docker arch handling
 UNAME_M := $(shell uname -m)
@@ -28,6 +23,13 @@ DOCKER_PLATFORMS := $(LOCAL_PLATFORM)
 ifeq ($(MULTIARCH), 1)
 	DOCKER_PLATFORMS := linux/amd64,linux/arm64
 endif
+
+
+# ================== FUNCTIONS ==================
+# get_version(<component>):
+# - always read the last tag <comp>-vX.Y.Z and return X.Y.Z
+get_version = $(strip $(shell comp=$$(printf '%s' '$(1)' | tr '[:upper:]' '[:lower:]'); tag=$$(git tag -l "$${comp}-v*" | sort -V | tail -n1); if [ -n "$$tag" ]; then printf '%s' "$$(printf '%s' "$$tag" | sed -E "s/^$${comp}-v//")"; fi))
+
 
 # --- HELP ---------------------------------------------------------------------
 
@@ -101,8 +103,10 @@ build:
 	@echo "🔨 Building binaries..."
 	@mkdir -p $(GOBIN)
 	@for bin in $(BINARIES); do \
-		echo "📦 Building $$bin..."; \
-		go build $(LDFLAGS) -o $(GOBIN)/$$bin ./cmd/$$bin; \
+		comp=$${bin#onyxia-}; \
+		version='$(call get_version,$$comp)'; \
+		echo "📦 Building $$bin (version: $$version)..."; \
+		go build -ldflags "-X=main.Version=$$version -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
 
 .PHONY: run-%
@@ -132,10 +136,13 @@ endif
 ## docker-build-<api>: Build Docker image for API (example: make docker-build-onboarding)
 docker-build-%: docker-setup-builder
 	@echo "🐳 Building Docker image for onyxia-$*..."
-	@docker buildx build \
+	@VERSION=$(call get_version,$*); \
+	docker buildx build \
 		--platform $(DOCKER_PLATFORMS) \
-		--tag $(DOCKER_REGISTRY)/onyxia-$*:$(DOCKER_VERSION) \
+		--tag $(DOCKER_REGISTRY)/onyxia-$*:$$VERSION \
 		--tag $(DOCKER_REGISTRY)/onyxia-$*:latest \
+		--build-arg VERSION="$$VERSION" \
+		--build-arg BUILD_SHA="$(BUILD)" \
 		-f $*/Dockerfile \
 		$(if $(filter 1,$(MULTIARCH)),,--load) \
 		$(if $(PUSH),--push,) .
@@ -145,15 +152,14 @@ docker-build-%: docker-setup-builder
 docker-push-%:
 	@$(MAKE) docker-build-$* PUSH=1
 
-.PHONY: docker-pull-%
+.PHONY: docker-run-%
 ## docker-run-<api>: Run Docker container
 docker-run-%:
 	@docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$*:latest
 
 .PHONY: docker-clean
 docker-clean:
-	@echo "🗑️  Removing local docker images..."
+	@echo "🗑️  Removing all local docker images for project binaries..."
 	@for bin in $(BINARIES); do \
-		docker rmi -f $(DOCKER_REGISTRY)/$$bin:$(DOCKER_VERSION) || true; \
-		docker rmi -f $(DOCKER_REGISTRY)/$$bin:latest || true; \
+		docker images "$(DOCKER_REGISTRY)/$$bin" --format '{{.Repository}}:{{.Tag}}' | xargs -r docker rmi -f || true; \
 	done

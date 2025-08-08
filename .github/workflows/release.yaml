@@ -2,7 +2,6 @@ on:
   push:
     branches:
       - main
-
 permissions:
   contents: write
   pull-requests: write
@@ -28,20 +27,13 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ steps.app-token.outputs.token }}
-  debug-paths:
-    needs: release-please
-    runs-on: ubuntu-latest
-    steps:
-      - name: Show raw paths_released
-        run: |
-          echo "Raw JSON from release-please:"
-          echo '${{ needs.release-please.outputs.paths_released }}'
-          echo "FROMJSON:"
-          echo '${{ fromJSON(needs.release-please.outputs.paths_released) }}'
   docker:
     needs: release-please
     if: needs.release-please.outputs.releases_created == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: ${{ fromJSON(needs.release-please.outputs.paths_released) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,13 +49,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and push Docker image
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build & push ${{ matrix.component }}
         run: |
-          for component in ${{ fromJSON(needs.release-please.outputs.paths_released) }}; do
-            echo "🚀 Building $component"
-            make docker-push-$component MULTIARCH=1
-          done
+          make docker-build-${{ matrix.component }} MULTIARCH=1
