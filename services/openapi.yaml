@@ -1,0 +1,221 @@
+openapi: 3.1.0
+info:
+  title: Onyxia services API for a region
+  description: Onyxia services API is responsible to provide service catalog and to run, modify delete services
+  version: 0.0.0
+paths:
+  "/my-lab/app":
+    get:
+      summary: Get the description of an installed service.
+      description:
+        Get the description of an installed service in the namespace. With
+        Kubernetes backend, an installed service can be seen as a Helm chart. Its
+        unique identifier will be the release name on the namespace.
+      operationId: getApp
+      parameters:
+        - name: ONYXIA-PROJECT
+          in: header
+          description: Project associated with the namespace, defaults to user project.
+          schema:
+            type: string
+            description: Generated project id.
+            example: project-id-example
+        - name: serviceId
+          in: query
+          description: Unique ID of the installed service in that namespace.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/Service"
+      security:
+        - oidc: []
+  "/my-lab/services":
+    get:
+      tags:
+        - My lab
+      summary: List the services installed in a namespace.
+      description:
+        List the services installed in a namespace. With a Kubernetes backend,
+        utilize Helm to list all installed services in a namespace.
+      operationId: getMyServices
+      parameters:
+        - name: ONYXIA-PROJECT
+          in: header
+          description: Project associated with the namespace, defaults to user project.
+          schema:
+            type: string
+            description: Generated project id.
+            example: project-id-example
+        - name: groupId
+          in: query
+          description: Deprectated.
+          required: false
+          deprecated: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ServicesListing"
+      security:
+        - oidc: []
+components:
+  schemas:
+    Task:
+      type: object
+      description: Pod/task of a service
+      properties:
+        id:
+          type: string
+          description: Unique task ID (e.g., pod name)
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        logs:
+          type: string
+          description: Logs or log URL
+
+    Monitoring:
+      type: object
+      description: Monitoring info (placeholder)
+
+    HealthCheckResult:
+      type: object
+      description: Health check result (placeholder)
+
+    Group:
+      type: object
+      description: Group entry in services listing (placeholder)
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: string
+          description: This is the name of the chart helm. This should be removed in v1.0
+        name:
+          type: string
+          description: This is the name of the chart helm.
+        instances:
+          type: integer
+          format: int32
+          description: This is fixed to 1. This should be removed in v1.0
+        cpus:
+          type: number
+          format: double
+          description: This is fixed to 0. This should be removed in v1.0
+        mem:
+          type: number
+          format: double
+          description: This is fixed to 0. This should be removed in v1.0
+        status:
+          type: string
+          description: "State of the release (can be: unknown, deployed, uninstalled, superseded, failed, uninstalling, pending-install, pending-upgrade or pending-rollback)"
+        urls:
+          type: array
+          description: Urls are coming from ingress object
+          items:
+            type: string
+        internalUrls:
+          type: array
+          description: This should be removed in v1.0
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          description: Contains helm get values. This should be re-ingeneer in v1.0
+        tasks:
+          type: array
+          description: Task represents pods running. This should be re-ingeneer in v1.0
+          items:
+            $ref: "#/components/schemas/Task"
+        subtitle:
+          type: string
+          description: This should be removed in v1.0
+        monitoring:
+          $ref: "#/components/schemas/Monitoring"
+          description: This should be removed in v1.0
+        postInstallInstructions:
+          type: string
+          description: Contains helm get notes.
+        namespace:
+          type: string
+          description: Namespace of the helm release
+        revision:
+          type: string
+          description: Version of the helm release
+        updated:
+          type: string
+          description: Last updated time
+        appVersion:
+          type: string
+          description: Version of the app. Often non relevant
+        chart:
+          type: string
+          description: Chart name and version
+        startedAt:
+          type: integer
+          format: int64
+          description: This should be removed in v1.0
+        suspendable:
+          type: boolean
+          description: Is this service suspendable ?
+        suspended:
+          type: boolean
+          description: Is this service suspended ?
+        catalogId:
+          type: string
+          description: CatalogId
+        owner:
+          type: string
+          description: userID who starts the service
+        friendlyName:
+          type: string
+          description: friendly name of the service
+        share:
+          type: boolean
+          description: Is this service shared ?
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        controllers:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthCheckResult"
+
+    ServicesListing:
+      type: object
+      properties:
+        apps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+  securitySchemes:
+    oidc:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: "https://auth.lab.sspcloud.fr/auth/realms/sspcloud/protocol/openid-connect/auth"
+          tokenUrl: https://auth.lab.sspcloud.fr/auth/realms/sspcloud/protocol/openid-connect/token
+          scopes: {}
