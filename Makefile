@@ -25,11 +25,11 @@ ifeq ($(MULTIARCH), 1)
 endif
 
 
-# ================== FUNCTIONS ==================
-# get_version(<component>):
-# - always read the last tag <comp>-vX.Y.Z and return X.Y.Z
-get_version = $(strip $(shell comp=$$(printf '%s' '$(1)' | tr '[:upper:]' '[:lower:]'); tag=$$(git tag -l "$${comp}-v*" | sort -V | tail -n1); if [ -n "$$tag" ]; then printf '%s' "$$(printf '%s' "$$tag" | sed -E "s/^$${comp}-v//")"; fi))
-
+# Shell helper: prints latest version (X.Y.Z) for a given component name ($1)
+define sh_get_version
+tag=$$(git tag -l "$1-v*" --sort=-version:refname | head -n1); \
+if [ -n "$$tag" ]; then printf '%s' "$${tag#"$1-v"}"; fi
+endef
 
 # --- HELP ---------------------------------------------------------------------
 
@@ -104,7 +104,7 @@ build:
 	@mkdir -p $(GOBIN)
 	@for bin in $(BINARIES); do \
 		comp=$${bin#onyxia-}; \
-		version='$(call get_version,$$comp)'; \
+		version=$$( { $(call sh_get_version,$$comp); } ); \
 		echo "📦 Building $$bin (version: $$version)..."; \
 		go build -ldflags "-X=main.Version=$$version -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
@@ -136,7 +136,11 @@ endif
 ## docker-build-<api>: Build Docker image for API (example: make docker-build-onboarding)
 docker-build-%: docker-setup-builder
 	@echo "🐳 Building Docker image for onyxia-$*..."
-	@VERSION=$(call get_version,$*); \
+	@VERSION=$$( { $(call sh_get_version,$*); } ); \
+	if [ -z "$$VERSION" ]; then \
+	  echo "❌ No version tag found for '$*' (expected tags like '$*-vX.Y.Z')"; exit 1; \
+	fi; \
+	echo "→ version=$$VERSION"; \
 	docker buildx build \
 		--platform $(DOCKER_PLATFORMS) \
 		--tag $(DOCKER_REGISTRY)/onyxia-$*:$$VERSION \
