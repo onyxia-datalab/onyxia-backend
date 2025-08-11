@@ -30,6 +30,9 @@ func main() {
 
 	r := chi.NewRouter()
 
+	//We set up heartbeat before logging to avoid logging the heartbeat requests
+	r.Use(middleware.Heartbeat("/healthz"))
+
 	logger := slog.Default()
 
 	r.Use(
@@ -38,7 +41,6 @@ func main() {
 
 	r.Use(middleware.Recoverer)
 
-	r.Use(middleware.Heartbeat("/"))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: env.Security.CORSAllowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
