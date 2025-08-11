@@ -1,13 +1,9 @@
 package bootstrap
 
 import (
-	"bytes"
 	_ "embed"
-	"fmt"
-	"log/slog"
-	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
 )
 
 //go:embed env.default.yaml
@@ -79,33 +75,6 @@ type Env struct {
 	Onboarding         Onboarding `mapstructure:"onboarding"         json:"onboarding"`
 }
 
-func NewEnv() (*Env, error) {
-	env := Env{}
-
-	viper.SetConfigType("yaml")
-
-	if err := viper.ReadConfig(bytes.NewReader(defaultConfig)); err != nil {
-		return nil, fmt.Errorf("failed to read embedded default config: %w", err)
-	} else {
-		slog.Info("Successfully loaded embedded default config")
-	}
-
-	viper.SetConfigFile("env.yaml")
-	viper.AddConfigPath(".") // Look in root directory
-
-	// If `env.yaml` exists, merge it (it overrides embedded defaults)
-	if err := viper.MergeInConfig(); err == nil {
-		slog.Info("Loaded external config file", slog.String("file", "env.yaml"))
-	} else {
-		slog.Warn("No external config file found, using embedded defaults")
-	}
-
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-
-	if err := viper.Unmarshal(&env); err != nil {
-		return nil, fmt.Errorf("failed to parse environment configuration: %w", err)
-	}
-
-	return &env, nil
+func NewEnv() (Env, error) {
+	return configloader.Load[Env](defaultConfig, "env.yaml")
 }

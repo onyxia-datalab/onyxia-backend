@@ -33,7 +33,7 @@ func NewApplication() (*Application, error) {
 	}
 
 	app := &Application{
-		Env:               env,
+		Env:               &env,
 		K8sClient:         k8sClient,
 		UserContextReader: userReader,
 		UserContextWriter: userWriter,
