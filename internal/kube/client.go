@@ -16,7 +16,8 @@ import (
 )
 
 type Client struct {
-	Clientset *kubernetes.Clientset
+	clientset *kubernetes.Clientset
+	config    *rest.Config
 }
 
 func NewClient(kubeconfigPath string) (*Client, error) {
@@ -30,14 +31,22 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kube: clientset: %w", err)
 	}
-	return &Client{Clientset: cs}, nil
+	return &Client{clientset: cs, config: cfg}, nil
+}
+
+func (c *Client) Clientset() *kubernetes.Clientset {
+	return c.clientset
+}
+
+func (c *Client) Config() *rest.Config {
+	return c.config
 }
 
 func (c *Client) Ping(ctx context.Context) error {
 	_, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	ver, err := c.Clientset.Discovery().ServerVersion()
+	ver, err := c.Clientset().Discovery().ServerVersion()
 	if err != nil {
 		return fmt.Errorf("kube: API unreachable: %w", err)
 	}

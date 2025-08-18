@@ -11,7 +11,7 @@ import (
 func SetupOnboardingController(
 	app *bootstrap.Application,
 ) *controller.OnboardingController {
-	namespaceCreator := kubernetes.NewKubernetesNamespaceService(app.K8sClient.Clientset)
+	namespaceCreator := kubernetes.NewKubernetesNamespaceService(app.K8sClient.Clientset())
 
 	envQuotas := app.Env.Onboarding.Quotas
 
