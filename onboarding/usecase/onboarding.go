@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
 )
@@ -11,14 +12,14 @@ type onboardingUsecase struct {
 	namespaceService  interfaces.NamespaceService
 	namespace         domain.Namespace
 	quotas            domain.Quotas
-	userContextReader interfaces.UserContextReader
+	userContextReader usercontext.Reader
 }
 
 func NewOnboardingUsecase(
 	namespaceService interfaces.NamespaceService,
 	namespace domain.Namespace,
 	quotas domain.Quotas,
-	userContextReader interfaces.UserContextReader,
+	userContextReader usercontext.Reader,
 
 ) *onboardingUsecase {
 	return &onboardingUsecase{

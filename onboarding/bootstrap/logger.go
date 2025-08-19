@@ -8,22 +8,22 @@ import (
 	"syscall"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/logging"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"go.uber.org/zap/exp/zapslog"
 )
 
 // InitLogger initializes the global logger and handles log flushing on exit.
-func InitLogger(userReaderCtx interfaces.UserContextReader) {
+func InitLogger(userCtxReader usercontext.Reader) {
 
 	attrFn := func(ctx context.Context) []slog.Attr {
 		attrs := make([]slog.Attr, 0, 3)
-		if u, ok := userReaderCtx.GetUsername(ctx); ok && u != "" {
+		if u, ok := userCtxReader.GetUsername(ctx); ok && u != "" {
 			attrs = append(attrs, slog.String("username", u))
 		}
-		if g, ok := userReaderCtx.GetGroups(ctx); ok && len(g) > 0 {
+		if g, ok := userCtxReader.GetGroups(ctx); ok && len(g) > 0 {
 			attrs = append(attrs, slog.Any("groups", g))
 		}
-		if r, ok := userReaderCtx.GetRoles(ctx); ok && len(r) > 0 {
+		if r, ok := userCtxReader.GetRoles(ctx); ok && len(r) > 0 {
 			attrs = append(attrs, slog.Any("roles", r))
 		}
 		return attrs
@@ -36,7 +36,7 @@ func InitLogger(userReaderCtx interfaces.UserContextReader) {
 	}
 	slog.SetDefault(logger)
 
-	// Graceful shutdown (ideally move to cmd/<service>/main.go)
+	// Graceful shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	go func() {

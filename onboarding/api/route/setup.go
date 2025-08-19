@@ -11,11 +11,11 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
 )
 
-func Setup(app *bootstrap.Application) (http.Handler, error) {
+func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error) {
 
-	auth, err := middleware.OidcMiddleware(context.Background(),
+	auth, err := middleware.BuildSecurityHandler(ctx,
 		app.Env.AuthenticationMode,
-		middleware.OIDCConfig(app.Env.OIDC),
+		middleware.OIDCConfigOnboarding(app.Env.OIDC),
 		app.UserContextWriter,
 	)
 

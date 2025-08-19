@@ -3,11 +3,12 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	usercontext "github.com/onyxia-datalab/onyxia-backend/onboarding/infrastructure/context"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,38 +18,69 @@ func TestCreateNamespace_Success(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
-	mockService.On("CreateNamespace", mock.Anything, userNamespace).
-		Return(interfaces.NamespaceCreated, nil)
+	mockService.On(
+		"CreateNamespace",
+		mock.Anything, // ctx
+		userNamespace, // name
+		mock.Anything, // annotations
+		mock.Anything, // labels
+	).Return(interfaces.NamespaceCreated, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
 	assert.NoError(t, err)
-	mockService.AssertCalled(t, "CreateNamespace", mock.Anything, userNamespace)
+	mockService.AssertCalled(
+		t,
+		"CreateNamespace",
+		mock.Anything,
+		userNamespace,
+		mock.Anything,
+		mock.Anything,
+	)
 }
 
 func TestCreateNamespace_AlreadyExists(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
-	mockService.On("CreateNamespace", mock.Anything, userNamespace).
-		Return(interfaces.NamespaceAlreadyExists, nil)
+	mockService.On(
+		"CreateNamespace",
+		mock.Anything, userNamespace, mock.Anything, mock.Anything,
+	).Return(interfaces.NamespaceAlreadyExists, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
 	assert.NoError(t, err)
-	mockService.AssertCalled(t, "CreateNamespace", mock.Anything, userNamespace)
+	mockService.AssertCalled(
+		t,
+		"CreateNamespace",
+		mock.Anything,
+		userNamespace,
+		mock.Anything,
+		mock.Anything,
+	)
 }
 
 func TestCreateNamespace_Failure(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
-	mockService.On("CreateNamespace", mock.Anything, userNamespace).
-		Return(interfaces.NamespaceCreationResult(""), errors.New("failed to create namespace"))
+	mockService.On(
+		"CreateNamespace",
+		mock.Anything, userNamespace, mock.Anything, mock.Anything,
+	).Return(interfaces.NamespaceCreationResult(""), errors.New("failed to create namespace"))
+
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
 	assert.Error(t, err)
-	mockService.AssertCalled(t, "CreateNamespace", mock.Anything, userNamespace)
+	mockService.AssertCalled(
+		t,
+		"CreateNamespace",
+		mock.Anything,
+		userNamespace,
+		mock.Anything,
+		mock.Anything,
+	)
 }
 
 func TestGetNamespaceAnnotations_Disabled(t *testing.T) {
@@ -78,18 +110,19 @@ func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Dynamic.LastLoginTimestamp = true
 
+	before := time.Now().Add(-2 * time.Second).UnixMilli()
 	annotations := usecase.getNamespaceAnnotations(context.Background())
+	after := time.Now().Add(+2 * time.Second).UnixMilli()
 
-	assert.NotNil(t, annotations)
-	assert.Contains(t, annotations, "onyxia_last_login_timestamp")
-
-	timestamp, err := time.ParseDuration(annotations["onyxia_last_login_timestamp"] + "ms")
+	v := annotations["onyxia_last_login_timestamp"]
+	ms, err := strconv.ParseInt(v, 10, 64)
 	assert.NoError(t, err)
-	assert.Greater(t, timestamp.Milliseconds(), int64(0))
+	assert.GreaterOrEqual(t, ms, before)
+	assert.LessOrEqual(t, ms, after)
 }
 
 func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
-	mockUserCtx, _ := usercontext.NewFakeUserContext(&domain.User{
+	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 			"user-attr2": "value2",
@@ -99,9 +132,9 @@ func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Dynamic.UserAttributes = []string{"user-attr1", "user-attr2"}
-	usecase.userContextReader = mockUserCtx
+	usecase.userContextReader = reader
 
-	annotations := usecase.getNamespaceAnnotations(context.Background())
+	annotations := usecase.getNamespaceAnnotations(ctx)
 
 	assert.NotNil(t, annotations)
 	assert.Equal(t, "value1", annotations["user-attr1"])
@@ -109,7 +142,7 @@ func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
 }
 
 func TestGetNamespaceAnnotations_AllAnnotations(t *testing.T) {
-	mockUserCtx, _ := usercontext.NewFakeUserContext(&domain.User{
+	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 		},
@@ -122,9 +155,9 @@ func TestGetNamespaceAnnotations_AllAnnotations(t *testing.T) {
 	}
 	usecase.namespace.Annotation.Dynamic.LastLoginTimestamp = true
 	usecase.namespace.Annotation.Dynamic.UserAttributes = []string{"user-attr1"}
-	usecase.userContextReader = mockUserCtx
+	usecase.userContextReader = reader
 
-	annotations := usecase.getNamespaceAnnotations(context.Background())
+	annotations := usecase.getNamespaceAnnotations(ctx)
 
 	assert.NotNil(t, annotations)
 	assert.Equal(t, "static-value", annotations["static-key"])

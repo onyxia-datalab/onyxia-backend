@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"fmt"
 	"log/slog"
 
 	"go.uber.org/zap"
@@ -16,11 +15,11 @@ func NewLogger(
 
 	zl := zapLogger
 	if zl == nil {
-		if built, err := zap.NewProduction(); err != nil {
-			return nil, nil, fmt.Errorf("failed to initialize zap logger: %w", err)
-		} else {
-			zl = built
+		built, err := zap.NewProduction()
+		if err != nil {
+			return nil, nil, err
 		}
+		zl = built
 	}
 
 	base := zapslog.NewHandler(

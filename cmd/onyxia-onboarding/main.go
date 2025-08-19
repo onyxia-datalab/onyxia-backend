@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -17,7 +20,10 @@ import (
 
 func main() {
 
-	app, err := bootstrap.NewApplication()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	app, err := bootstrap.NewApplication(ctx)
 
 	if err != nil {
 		slog.Error("failed to initialize application",
@@ -58,7 +64,7 @@ func main() {
 		MaxAge:           300,
 	}))
 
-	apiHandler, err := route.Setup(app)
+	apiHandler, err := route.Setup(ctx, app)
 	if err != nil {
 		slog.Error("failed to set up routes", slog.Any("error", err))
 		os.Exit(1)
