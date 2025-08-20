@@ -1,0 +1,31 @@
+## Helm `Wait=false` + informers (push Kubernetes)
+
+- **PUT `/install`** lance `helm install` avec `Wait=false` (retour immédiat après création des ressources).
+- **Surveillance côté API** :
+  - Démarre des **informers `client-go`** filtrés par  
+    `labelSelector: app.kubernetes.io/instance=<release>` et `namespace=<namespace>`.
+  - Les informers reçoivent des **événements push** (`ADDED`, `MODIFIED`, `DELETED`, `BOOKMARK`) depuis l’API server Kubernetes.
+- **Traitement à chaque événement** :
+  - Recalcule la readiness globale :
+    - **Deployment** : `AvailableReplicas >= Spec.Replicas`.
+    - **StatefulSet** : `ReadyReplicas >= Spec.Replicas`.
+    - **Pod** : phase `Running` et condition `Ready=True`.
+  - Si **toutes les ressources** sont prêtes → push SSE `done: { "status": "succeeded" }`.
+  - Sinon → push SSE `status: { "status": "waiting-for-rollout", "why": "<détail>" }`.
+- **SSE côté API** :
+  - `status: installing` au démarrage.
+  - `status: waiting-for-rollout` avec détails tant que tout n’est pas prêt.
+  - `done: { "status": "succeeded" }` si ok.
+  - `done: { "status": "failed", "error": "timeout ... " }` si échec.
+- **Timeout & ressources** :
+  - Timeout global géré avec `context.WithTimeout` (ex. 10 min) autour des informers.
+  - Nettoyage du watch à la fin.
+- **Points clés / prérequis** :
+  - RBAC **get/list/watch** sur Deployments, StatefulSets, Pods (namespace concerné).
+  - **`cache.WaitForCacheSync`** obligatoire avant d’évaluer l’état.
+  - Labels Helm par défaut (`app.kubernetes.io/instance`) nécessaires pour filtrer.
+- **À retenir** :
+  - Non bloquant pour Helm.
+  - Push temps réel via watch API server.
+  - Granularité fine sur la progression du déploiement.
+  - Code plus complexe (gestion des informers, timeout, cleanup).

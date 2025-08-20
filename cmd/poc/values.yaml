@@ -1,0 +1,119 @@
+service:
+  image:
+    pullPolicy: IfNotPresent
+    version: inseefrlab/onyxia-jupyter-python:py3.13.5
+    custom:
+      enabled: false
+      version: inseefrlab/onyxia-jupyter-python:py3.13.5
+resources:
+  requests:
+    cpu: 100m
+    memory: 2Gi
+  limits:
+    cpu: 15000m
+    memory: 50Gi
+persistence:
+  enabled: true
+  size: 10Gi
+init:
+  regionInit: ""
+  personalInit: ""
+  personalInitArgs: ""
+extraEnvVars: []
+kubernetes:
+  enabled: true
+  role: view
+vault:
+  enabled: true
+  token: hvs.******
+  url: https://vault.lab.sspcloud.fr
+  mount: onyxia-kv
+  directory: ddecrulle
+  secret: ""
+s3:
+  enabled: true
+  accessKeyId: ******
+  endpoint: minio.lab.sspcloud.fr
+  defaultRegion: us-east-1
+  secretAccessKey: ******
+  sessionToken: ******
+  pathStyleAccess: true
+  workingDirectoryPath: ddecrulle/
+git:
+  enabled: true
+  name: ddecrulle
+  email: dylan.decrulle@insee.fr
+  cache: "0"
+  token: token
+  repository: ""
+  branch: ""
+networking:
+  user:
+    enabled: false
+    port: 5000
+    ports:
+      - 5000
+discovery:
+  hive: true
+  mlflow: true
+  metaflow: true
+  chromadb: true
+  milvus: true
+  postgresql: true
+security:
+  password: ******
+  networkPolicy:
+    enabled: true
+    from:
+      - ipBlock:
+          cidr: 10.233.103.0/32
+      - ipBlock:
+          cidr: 10.233.111.0/32
+      - ipBlock:
+          cidr: 10.233.116.0/32
+      - ipBlock:
+          cidr: 10.233.108.0/32
+nodeSelector: {}
+openshiftSCC:
+  enabled: false
+  scc: anyuid
+ingress:
+  enabled: true
+  hostname: user-ddecrulle-202030-0.user.lab.sspcloud.fr
+  userHostname: user-ddecrulle-202030-user.user.lab.sspcloud.fr
+  ingressClassName: onyxia
+  useCertManager: false
+  certManagerClusterIssuer: ""
+route:
+  enabled: false
+  hostname: user-ddecrulle-202030-0.user.lab.sspcloud.fr
+  userHostname: user-ddecrulle-202030-user.user.lab.sspcloud.fr
+repository:
+  pipRepository: ""
+  condaRepository: ""
+startupProbe:
+  failureThreshold: 60
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 2
+tolerations: []
+userPreferences:
+  darkMode: false
+  language: en
+global:
+  suspend: false
+proxy:
+  enabled: false
+  httpProxy: ""
+  httpsProxy: ""
+  noProxy: ""
+certificates:
+  cacerts: ""
+  pathToCaBundle: /usr/local/share/ca-certificates/
+message:
+  fr: "**NB:** ce service pourrait être supprimé après 7 jours d'utilisation en
+    raison de nos règles de gestion"
+  en:
+    "**Warning:** this service may be deleted after 7 days due to our management
+    policies"
