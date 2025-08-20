@@ -50,7 +50,7 @@ func SetupOnboardingController(
 		app.UserContextReader,
 	)
 
-	return controller.NewOnboardingController(onboardingUsecase, app.UserContextReader.GetUser)
+	return controller.NewOnboardingController(onboardingUsecase, app.UserContextReader)
 
 }
 

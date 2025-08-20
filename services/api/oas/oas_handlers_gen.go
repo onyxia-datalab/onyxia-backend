@@ -30,24 +30,23 @@ func (c *codeRecorder) WriteHeader(status int) {
 	c.ResponseWriter.WriteHeader(status)
 }
 
-// handleGetAppRequest handles getApp operation.
+// handleInstallServiceRequest handles installService operation.
 //
-// Get the description of an installed service in the namespace. With Kubernetes backend, an
-// installed service can be seen as a Helm chart. Its unique identifier will be the release name on
-// the namespace.
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
+// the release already exists (returns 202 with same event URLs).
 //
-// GET /my-lab/app
-func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// PUT /services/{releaseId}/install
+func (s *Server) handleInstallServiceRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getApp"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/my-lab/app"),
+		otelogen.OperationID("installService"),
+		semconv.HTTPRequestMethodKey.String("PUT"),
+		semconv.HTTPRouteKey.String("/services/{releaseId}/install"),
 	}
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetAppOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), InstallServiceOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -102,15 +101,15 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetAppOperation,
-			ID:   "getApp",
+			Name: InstallServiceOperation,
+			ID:   "installService",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOidc(ctx, GetAppOperation, r)
+			sctx, ok, err := s.securityOidc(ctx, InstallServiceOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -150,7 +149,7 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 			return
 		}
 	}
-	params, err := decodeGetAppParams(args, argsEscaped, r)
+	params, err := decodeInstallServiceParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -160,32 +159,43 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 		s.cfg.ErrorHandler(ctx, w, r, err)
 		return
 	}
+	request, close, err := s.decodeInstallServiceRequest(r)
+	if err != nil {
+		err = &ogenerrors.DecodeRequestError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeRequest", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+	defer func() {
+		if err := close(); err != nil {
+			recordError("CloseRequest", err)
+		}
+	}()
 
-	var response *Service
+	var response InstallServiceRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetAppOperation,
-			OperationSummary: "Get the description of an installed service.",
-			OperationID:      "getApp",
-			Body:             nil,
+			OperationName:    InstallServiceOperation,
+			OperationSummary: "Trigger service installation (async)",
+			OperationID:      "installService",
+			Body:             request,
 			Params: middleware.Parameters{
 				{
-					Name: "ONYXIA-PROJECT",
-					In:   "header",
-				}: params.ONYXIAPROJECT,
-				{
-					Name: "serviceId",
-					In:   "query",
-				}: params.ServiceId,
+					Name: "releaseId",
+					In:   "path",
+				}: params.ReleaseId,
 			},
 			Raw: r,
 		}
 
 		type (
-			Request  = struct{}
-			Params   = GetAppParams
-			Response = *Service
+			Request  = *ServiceInstallRequest
+			Params   = InstallServiceParams
+			Response = InstallServiceRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -194,14 +204,14 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 		](
 			m,
 			mreq,
-			unpackGetAppParams,
+			unpackInstallServiceParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetApp(ctx, params)
+				response, err = s.h.InstallService(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetApp(ctx, params)
+		response, err = s.h.InstallService(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -209,7 +219,7 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 		return
 	}
 
-	if err := encodeGetAppResponse(response, w, span); err != nil {
+	if err := encodeInstallServiceResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -218,23 +228,22 @@ func (s *Server) handleGetAppRequest(args [0]string, argsEscaped bool, w http.Re
 	}
 }
 
-// handleGetMyServicesRequest handles getMyServices operation.
+// handleWatchReleaseRequest handles watchRelease operation.
 //
-// List the services installed in a namespace. With a Kubernetes backend, utilize Helm to list all
-// installed services in a namespace.
+// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 //
-// GET /my-lab/services
-func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// GET /events/{releaseId}/watch-release
+func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getMyServices"),
+		otelogen.OperationID("watchRelease"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/my-lab/services"),
+		semconv.HTTPRouteKey.String("/events/{releaseId}/watch-release"),
 	}
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetMyServicesOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchReleaseOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -289,15 +298,15 @@ func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w 
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: GetMyServicesOperation,
-			ID:   "getMyServices",
+			Name: WatchReleaseOperation,
+			ID:   "watchRelease",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOidc(ctx, GetMyServicesOperation, r)
+			sctx, ok, err := s.securityOidc(ctx, WatchReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -337,7 +346,7 @@ func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w 
 			return
 		}
 	}
-	params, err := decodeGetMyServicesParams(args, argsEscaped, r)
+	params, err := decodeWatchReleaseParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -348,31 +357,31 @@ func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w 
 		return
 	}
 
-	var response *ServicesListing
+	var response WatchReleaseRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    GetMyServicesOperation,
-			OperationSummary: "List the services installed in a namespace.",
-			OperationID:      "getMyServices",
+			OperationName:    WatchReleaseOperation,
+			OperationSummary: "Release-level status stream (SSE)",
+			OperationID:      "watchRelease",
 			Body:             nil,
 			Params: middleware.Parameters{
 				{
-					Name: "ONYXIA-PROJECT",
-					In:   "header",
-				}: params.ONYXIAPROJECT,
+					Name: "releaseId",
+					In:   "path",
+				}: params.ReleaseId,
 				{
-					Name: "groupId",
-					In:   "query",
-				}: params.GroupId,
+					Name: "Last-Event-Id",
+					In:   "header",
+				}: params.LastEventID,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = GetMyServicesParams
-			Response = *ServicesListing
+			Params   = WatchReleaseParams
+			Response = WatchReleaseRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -381,14 +390,14 @@ func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w 
 		](
 			m,
 			mreq,
-			unpackGetMyServicesParams,
+			unpackWatchReleaseParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetMyServices(ctx, params)
+				response, err = s.h.WatchRelease(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.GetMyServices(ctx, params)
+		response, err = s.h.WatchRelease(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -396,7 +405,195 @@ func (s *Server) handleGetMyServicesRequest(args [0]string, argsEscaped bool, w 
 		return
 	}
 
-	if err := encodeGetMyServicesResponse(response, w, span); err != nil {
+	if err := encodeWatchReleaseResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleWatchResourcesRequest handles watchResources operation.
+//
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
+// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
+// "done".
+//
+// GET /events/{releaseId}/watch-resources
+func (s *Server) handleWatchResourcesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("watchResources"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/events/{releaseId}/watch-resources"),
+	}
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchResourcesOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code >= 100 && code < 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: WatchResourcesOperation,
+			ID:   "watchResources",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOidc(ctx, WatchResourcesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Oidc",
+					Err:              err,
+				}
+				defer recordError("Security:Oidc", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeWatchResourcesParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var response WatchResourcesRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    WatchResourcesOperation,
+			OperationSummary: "Kubernetes resources status stream (SSE)",
+			OperationID:      "watchResources",
+			Body:             nil,
+			Params: middleware.Parameters{
+				{
+					Name: "releaseId",
+					In:   "path",
+				}: params.ReleaseId,
+				{
+					Name: "Last-Event-Id",
+					In:   "header",
+				}: params.LastEventID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = WatchResourcesParams
+			Response = WatchResourcesRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackWatchResourcesParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.WatchResources(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.WatchResources(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeWatchResourcesResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

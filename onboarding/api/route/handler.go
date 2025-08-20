@@ -3,19 +3,24 @@ package route
 import (
 	"context"
 
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/controller"
 	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 )
 
-type MyHandler struct {
-	oas.UnimplementedHandler
-	onboardImpl func(ctx context.Context, req *oas.OnboardingRequest) (oas.OnboardRes, error)
+type Handler struct {
+	onboard *controller.OnboardingController
 }
 
-func (h *MyHandler) Onboard(
+func NewHandler(
+	onboard *controller.OnboardingController) *Handler {
+	return &Handler{onboard: onboard}
+}
+
+func (h *Handler) Onboard(
 	ctx context.Context,
 	req *oas.OnboardingRequest,
 ) (oas.OnboardRes, error) {
-	return h.onboardImpl(ctx, req)
+	return h.onboard.Onboard(ctx, req)
 }
 
-var _ oas.Handler = (*MyHandler)(nil)
+var _ oas.Handler = (*Handler)(nil)

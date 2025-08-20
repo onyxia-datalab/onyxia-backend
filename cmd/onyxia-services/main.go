@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -12,12 +15,16 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/api/route"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 )
 
 func main() {
 
-	app, err := bootstrap.NewApplication()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	app, err := bootstrap.NewApplication(ctx)
 	if err != nil {
 		slog.Error("failed to initialize application",
 			slog.Any("error", err),
@@ -27,9 +34,11 @@ func main() {
 
 	env := app.Env
 
-	logger := slog.Default()
-
 	r := chi.NewRouter()
+
+	r.Use(middleware.Heartbeat("/healthz"))
+
+	logger := slog.Default()
 
 	r.Use(
 		httplog.RequestLogger(logger, &httplog.Options{Level: slog.LevelInfo, RecoverPanics: true}),
@@ -37,7 +46,6 @@ func main() {
 
 	r.Use(middleware.Recoverer)
 
-	r.Use(middleware.Heartbeat("/"))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: env.Security.CORSAllowedOrigins,
 		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
@@ -54,6 +62,18 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	apiHandler, err := route.Setup(ctx, app)
+
+	if err != nil {
+		slog.Error("failed to set up routes", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	r.Mount(
+		env.Server.ContextPath,
+		http.StripPrefix(env.Server.ContextPath, apiHandler),
+	)
 
 	slog.Info("API mounted", slog.String("contextPath", env.Server.ContextPath))
 
