@@ -3,20 +3,100 @@
 package api
 
 import (
-	"time"
+	"io"
+	"net/url"
+
+	"github.com/go-faster/jx"
 )
 
-// Group entry in services listing (placeholder).
-// Ref: #/components/schemas/Group
-type Group struct{}
+// Ref: #/components/schemas/InstallAccepted
+type InstallAccepted struct {
+	EventsUrl InstallAcceptedEventsUrl `json:"eventsUrl"`
+}
 
-// Health check result (placeholder).
-// Ref: #/components/schemas/HealthCheckResult
-type HealthCheckResult struct{}
+// GetEventsUrl returns the value of EventsUrl.
+func (s *InstallAccepted) GetEventsUrl() InstallAcceptedEventsUrl {
+	return s.EventsUrl
+}
 
-// Monitoring info (placeholder).
-// Ref: #/components/schemas/Monitoring
-type Monitoring struct{}
+// SetEventsUrl sets the value of EventsUrl.
+func (s *InstallAccepted) SetEventsUrl(val InstallAcceptedEventsUrl) {
+	s.EventsUrl = val
+}
+
+type InstallAcceptedEventsUrl struct {
+	Release   string `json:"release"`
+	Resources string `json:"resources"`
+}
+
+// GetRelease returns the value of Release.
+func (s *InstallAcceptedEventsUrl) GetRelease() string {
+	return s.Release
+}
+
+// GetResources returns the value of Resources.
+func (s *InstallAcceptedEventsUrl) GetResources() string {
+	return s.Resources
+}
+
+// SetRelease sets the value of Release.
+func (s *InstallAcceptedEventsUrl) SetRelease(val string) {
+	s.Release = val
+}
+
+// SetResources sets the value of Resources.
+func (s *InstallAcceptedEventsUrl) SetResources(val string) {
+	s.Resources = val
+}
+
+// InstallAcceptedHeaders wraps InstallAccepted with response headers.
+type InstallAcceptedHeaders struct {
+	Location OptString
+	Response InstallAccepted
+}
+
+// GetLocation returns the value of Location.
+func (s *InstallAcceptedHeaders) GetLocation() OptString {
+	return s.Location
+}
+
+// GetResponse returns the value of Response.
+func (s *InstallAcceptedHeaders) GetResponse() InstallAccepted {
+	return s.Response
+}
+
+// SetLocation sets the value of Location.
+func (s *InstallAcceptedHeaders) SetLocation(val OptString) {
+	s.Location = val
+}
+
+// SetResponse sets the value of Response.
+func (s *InstallAcceptedHeaders) SetResponse(val InstallAccepted) {
+	s.Response = val
+}
+
+func (*InstallAcceptedHeaders) installServiceRes() {}
+
+type InstallServiceBadRequest Problem
+
+func (*InstallServiceBadRequest) installServiceRes() {}
+
+type InstallServiceConflict Problem
+
+func (*InstallServiceConflict) installServiceRes() {}
+
+type InstallServiceForbidden Problem
+
+func (*InstallServiceForbidden) installServiceRes() {}
+
+type InstallServiceInternalServerError Problem
+
+func (*InstallServiceInternalServerError) installServiceRes() {}
+
+// InstallServiceUnauthorized is response for InstallService operation.
+type InstallServiceUnauthorized struct{}
+
+func (*InstallServiceUnauthorized) installServiceRes() {}
 
 type Oidc struct {
 	Token  string
@@ -43,38 +123,38 @@ func (s *Oidc) SetScopes(val []string) {
 	s.Scopes = val
 }
 
-// NewOptBool returns new OptBool with value set to v.
-func NewOptBool(v bool) OptBool {
-	return OptBool{
+// NewOptInt returns new OptInt with value set to v.
+func NewOptInt(v int) OptInt {
+	return OptInt{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptBool is optional bool.
-type OptBool struct {
-	Value bool
+// OptInt is optional int.
+type OptInt struct {
+	Value int
 	Set   bool
 }
 
-// IsSet returns true if OptBool was set.
-func (o OptBool) IsSet() bool { return o.Set }
+// IsSet returns true if OptInt was set.
+func (o OptInt) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptBool) Reset() {
-	var v bool
+func (o *OptInt) Reset() {
+	var v int
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptBool) SetTo(v bool) {
+func (o *OptInt) SetTo(v int) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptBool) Get() (v bool, ok bool) {
+func (o OptInt) Get() (v int, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -82,45 +162,45 @@ func (o OptBool) Get() (v bool, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptBool) Or(d bool) bool {
+func (o OptInt) Or(d int) int {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptDateTime returns new OptDateTime with value set to v.
-func NewOptDateTime(v time.Time) OptDateTime {
-	return OptDateTime{
+// NewOptServiceInstallRequestValues returns new OptServiceInstallRequestValues with value set to v.
+func NewOptServiceInstallRequestValues(v ServiceInstallRequestValues) OptServiceInstallRequestValues {
+	return OptServiceInstallRequestValues{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptDateTime is optional time.Time.
-type OptDateTime struct {
-	Value time.Time
+// OptServiceInstallRequestValues is optional ServiceInstallRequestValues.
+type OptServiceInstallRequestValues struct {
+	Value ServiceInstallRequestValues
 	Set   bool
 }
 
-// IsSet returns true if OptDateTime was set.
-func (o OptDateTime) IsSet() bool { return o.Set }
+// IsSet returns true if OptServiceInstallRequestValues was set.
+func (o OptServiceInstallRequestValues) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptDateTime) Reset() {
-	var v time.Time
+func (o *OptServiceInstallRequestValues) Reset() {
+	var v ServiceInstallRequestValues
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptDateTime) SetTo(v time.Time) {
+func (o *OptServiceInstallRequestValues) SetTo(v ServiceInstallRequestValues) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptDateTime) Get() (v time.Time, ok bool) {
+func (o OptServiceInstallRequestValues) Get() (v ServiceInstallRequestValues, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -128,237 +208,7 @@ func (o OptDateTime) Get() (v time.Time, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptDateTime) Or(d time.Time) time.Time {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptFloat64 returns new OptFloat64 with value set to v.
-func NewOptFloat64(v float64) OptFloat64 {
-	return OptFloat64{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptFloat64 is optional float64.
-type OptFloat64 struct {
-	Value float64
-	Set   bool
-}
-
-// IsSet returns true if OptFloat64 was set.
-func (o OptFloat64) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptFloat64) Reset() {
-	var v float64
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptFloat64) SetTo(v float64) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptFloat64) Get() (v float64, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptFloat64) Or(d float64) float64 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInt32 returns new OptInt32 with value set to v.
-func NewOptInt32(v int32) OptInt32 {
-	return OptInt32{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInt32 is optional int32.
-type OptInt32 struct {
-	Value int32
-	Set   bool
-}
-
-// IsSet returns true if OptInt32 was set.
-func (o OptInt32) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInt32) Reset() {
-	var v int32
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInt32) SetTo(v int32) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInt32) Get() (v int32, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInt32) Or(d int32) int32 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptInt64 returns new OptInt64 with value set to v.
-func NewOptInt64(v int64) OptInt64 {
-	return OptInt64{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptInt64 is optional int64.
-type OptInt64 struct {
-	Value int64
-	Set   bool
-}
-
-// IsSet returns true if OptInt64 was set.
-func (o OptInt64) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptInt64) Reset() {
-	var v int64
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptInt64) SetTo(v int64) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptInt64) Get() (v int64, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptInt64) Or(d int64) int64 {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptServiceEnv returns new OptServiceEnv with value set to v.
-func NewOptServiceEnv(v ServiceEnv) OptServiceEnv {
-	return OptServiceEnv{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptServiceEnv is optional ServiceEnv.
-type OptServiceEnv struct {
-	Value ServiceEnv
-	Set   bool
-}
-
-// IsSet returns true if OptServiceEnv was set.
-func (o OptServiceEnv) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptServiceEnv) Reset() {
-	var v ServiceEnv
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptServiceEnv) SetTo(v ServiceEnv) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptServiceEnv) Get() (v ServiceEnv, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptServiceEnv) Or(d ServiceEnv) ServiceEnv {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptServiceLabels returns new OptServiceLabels with value set to v.
-func NewOptServiceLabels(v ServiceLabels) OptServiceLabels {
-	return OptServiceLabels{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptServiceLabels is optional ServiceLabels.
-type OptServiceLabels struct {
-	Value ServiceLabels
-	Set   bool
-}
-
-// IsSet returns true if OptServiceLabels was set.
-func (o OptServiceLabels) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptServiceLabels) Reset() {
-	var v ServiceLabels
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptServiceLabels) SetTo(v ServiceLabels) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptServiceLabels) Get() (v ServiceLabels, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptServiceLabels) Or(d ServiceLabels) ServiceLabels {
+func (o OptServiceInstallRequestValues) Or(d ServiceInstallRequestValues) ServiceInstallRequestValues {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -411,440 +261,322 @@ func (o OptString) Or(d string) string {
 	return d
 }
 
-// Ref: #/components/schemas/Service
-type Service struct {
-	// This is the name of the chart helm. This should be removed in v1.0.
-	ID OptString `json:"id"`
-	// This is the name of the chart helm.
-	Name OptString `json:"name"`
-	// This is fixed to 1. This should be removed in v1.0.
-	Instances OptInt32 `json:"instances"`
-	// This is fixed to 0. This should be removed in v1.0.
-	Cpus OptFloat64 `json:"cpus"`
-	// This is fixed to 0. This should be removed in v1.0.
-	Mem OptFloat64 `json:"mem"`
-	// State of the release (can be: unknown, deployed, uninstalled, superseded, failed, uninstalling,
-	// pending-install, pending-upgrade or pending-rollback).
-	Status OptString `json:"status"`
-	// Urls are coming from ingress object.
-	Urls []string `json:"urls"`
-	// This should be removed in v1.0.
-	InternalUrls []string `json:"internalUrls"`
-	// Contains helm get values. This should be re-ingeneer in v1.0.
-	Env OptServiceEnv `json:"env"`
-	// Task represents pods running. This should be re-ingeneer in v1.0.
-	Tasks []Task `json:"tasks"`
-	// This should be removed in v1.0.
-	Subtitle OptString `json:"subtitle"`
-	// This should be removed in v1.0.
-	Monitoring *Monitoring `json:"monitoring"`
-	// Contains helm get notes.
-	PostInstallInstructions OptString `json:"postInstallInstructions"`
-	// Namespace of the helm release.
-	Namespace OptString `json:"namespace"`
-	// Version of the helm release.
-	Revision OptString `json:"revision"`
-	// Last updated time.
-	Updated OptString `json:"updated"`
-	// Version of the app. Often non relevant.
-	AppVersion OptString `json:"appVersion"`
-	// Chart name and version.
-	Chart OptString `json:"chart"`
-	// This should be removed in v1.0.
-	StartedAt OptInt64 `json:"startedAt"`
-	// Is this service suspendable ?.
-	Suspendable OptBool `json:"suspendable"`
-	// Is this service suspended ?.
-	Suspended OptBool `json:"suspended"`
-	// CatalogId.
-	CatalogId OptString `json:"catalogId"`
-	// UserID who starts the service.
-	Owner OptString `json:"owner"`
-	// Friendly name of the service.
-	FriendlyName OptString `json:"friendlyName"`
-	// Is this service shared ?.
-	Share       OptBool             `json:"share"`
-	Labels      OptServiceLabels    `json:"labels"`
-	Controllers []HealthCheckResult `json:"controllers"`
+// NewOptURI returns new OptURI with value set to v.
+func NewOptURI(v url.URL) OptURI {
+	return OptURI{
+		Value: v,
+		Set:   true,
+	}
 }
 
-// GetID returns the value of ID.
-func (s *Service) GetID() OptString {
-	return s.ID
+// OptURI is optional url.URL.
+type OptURI struct {
+	Value url.URL
+	Set   bool
 }
 
-// GetName returns the value of Name.
-func (s *Service) GetName() OptString {
-	return s.Name
+// IsSet returns true if OptURI was set.
+func (o OptURI) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptURI) Reset() {
+	var v url.URL
+	o.Value = v
+	o.Set = false
 }
 
-// GetInstances returns the value of Instances.
-func (s *Service) GetInstances() OptInt32 {
-	return s.Instances
+// SetTo sets value to v.
+func (o *OptURI) SetTo(v url.URL) {
+	o.Set = true
+	o.Value = v
 }
 
-// GetCpus returns the value of Cpus.
-func (s *Service) GetCpus() OptFloat64 {
-	return s.Cpus
+// Get returns value and boolean that denotes whether value was set.
+func (o OptURI) Get() (v url.URL, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
 }
 
-// GetMem returns the value of Mem.
-func (s *Service) GetMem() OptFloat64 {
-	return s.Mem
+// Or returns value if set, or given parameter if does not.
+func (o OptURI) Or(d url.URL) url.URL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// Ref: #/components/schemas/Problem
+type Problem struct {
+	Type            OptURI    `json:"type"`
+	Title           OptString `json:"title"`
+	Status          OptInt    `json:"status"`
+	Detail          OptString `json:"detail"`
+	Instance        OptString `json:"instance"`
+	AdditionalProps ProblemAdditional
+}
+
+// GetType returns the value of Type.
+func (s *Problem) GetType() OptURI {
+	return s.Type
+}
+
+// GetTitle returns the value of Title.
+func (s *Problem) GetTitle() OptString {
+	return s.Title
 }
 
 // GetStatus returns the value of Status.
-func (s *Service) GetStatus() OptString {
+func (s *Problem) GetStatus() OptInt {
 	return s.Status
 }
 
-// GetUrls returns the value of Urls.
-func (s *Service) GetUrls() []string {
-	return s.Urls
+// GetDetail returns the value of Detail.
+func (s *Problem) GetDetail() OptString {
+	return s.Detail
 }
 
-// GetInternalUrls returns the value of InternalUrls.
-func (s *Service) GetInternalUrls() []string {
-	return s.InternalUrls
+// GetInstance returns the value of Instance.
+func (s *Problem) GetInstance() OptString {
+	return s.Instance
 }
 
-// GetEnv returns the value of Env.
-func (s *Service) GetEnv() OptServiceEnv {
-	return s.Env
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *Problem) GetAdditionalProps() ProblemAdditional {
+	return s.AdditionalProps
 }
 
-// GetTasks returns the value of Tasks.
-func (s *Service) GetTasks() []Task {
-	return s.Tasks
+// SetType sets the value of Type.
+func (s *Problem) SetType(val OptURI) {
+	s.Type = val
 }
 
-// GetSubtitle returns the value of Subtitle.
-func (s *Service) GetSubtitle() OptString {
-	return s.Subtitle
+// SetTitle sets the value of Title.
+func (s *Problem) SetTitle(val OptString) {
+	s.Title = val
 }
 
-// GetMonitoring returns the value of Monitoring.
-func (s *Service) GetMonitoring() *Monitoring {
-	return s.Monitoring
+// SetStatus sets the value of Status.
+func (s *Problem) SetStatus(val OptInt) {
+	s.Status = val
 }
 
-// GetPostInstallInstructions returns the value of PostInstallInstructions.
-func (s *Service) GetPostInstallInstructions() OptString {
-	return s.PostInstallInstructions
+// SetDetail sets the value of Detail.
+func (s *Problem) SetDetail(val OptString) {
+	s.Detail = val
 }
 
-// GetNamespace returns the value of Namespace.
-func (s *Service) GetNamespace() OptString {
-	return s.Namespace
+// SetInstance sets the value of Instance.
+func (s *Problem) SetInstance(val OptString) {
+	s.Instance = val
 }
 
-// GetRevision returns the value of Revision.
-func (s *Service) GetRevision() OptString {
-	return s.Revision
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *Problem) SetAdditionalProps(val ProblemAdditional) {
+	s.AdditionalProps = val
 }
 
-// GetUpdated returns the value of Updated.
-func (s *Service) GetUpdated() OptString {
-	return s.Updated
+func (*Problem) watchReleaseRes()   {}
+func (*Problem) watchResourcesRes() {}
+
+type ProblemAdditional map[string]jx.Raw
+
+func (s *ProblemAdditional) init() ProblemAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
-// GetAppVersion returns the value of AppVersion.
-func (s *Service) GetAppVersion() OptString {
-	return s.AppVersion
+// Ref: #/components/schemas/ServiceInstallRequest
+type ServiceInstallRequest struct {
+	// Chart name or OCI ref (e.g., oci://registry-1.docker.io/bitnamicharts/nginx).
+	Chart string `json:"chart"`
+	// Chart repository URL (not required for OCI).
+	RepoUrl OptURI `json:"repoUrl"`
+	// Chart version (empty for latest).
+	Version OptString `json:"version"`
+	// Helm values override.
+	Values OptServiceInstallRequestValues `json:"values"`
 }
 
 // GetChart returns the value of Chart.
-func (s *Service) GetChart() OptString {
+func (s *ServiceInstallRequest) GetChart() string {
 	return s.Chart
 }
 
-// GetStartedAt returns the value of StartedAt.
-func (s *Service) GetStartedAt() OptInt64 {
-	return s.StartedAt
+// GetRepoUrl returns the value of RepoUrl.
+func (s *ServiceInstallRequest) GetRepoUrl() OptURI {
+	return s.RepoUrl
 }
 
-// GetSuspendable returns the value of Suspendable.
-func (s *Service) GetSuspendable() OptBool {
-	return s.Suspendable
+// GetVersion returns the value of Version.
+func (s *ServiceInstallRequest) GetVersion() OptString {
+	return s.Version
 }
 
-// GetSuspended returns the value of Suspended.
-func (s *Service) GetSuspended() OptBool {
-	return s.Suspended
-}
-
-// GetCatalogId returns the value of CatalogId.
-func (s *Service) GetCatalogId() OptString {
-	return s.CatalogId
-}
-
-// GetOwner returns the value of Owner.
-func (s *Service) GetOwner() OptString {
-	return s.Owner
-}
-
-// GetFriendlyName returns the value of FriendlyName.
-func (s *Service) GetFriendlyName() OptString {
-	return s.FriendlyName
-}
-
-// GetShare returns the value of Share.
-func (s *Service) GetShare() OptBool {
-	return s.Share
-}
-
-// GetLabels returns the value of Labels.
-func (s *Service) GetLabels() OptServiceLabels {
-	return s.Labels
-}
-
-// GetControllers returns the value of Controllers.
-func (s *Service) GetControllers() []HealthCheckResult {
-	return s.Controllers
-}
-
-// SetID sets the value of ID.
-func (s *Service) SetID(val OptString) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *Service) SetName(val OptString) {
-	s.Name = val
-}
-
-// SetInstances sets the value of Instances.
-func (s *Service) SetInstances(val OptInt32) {
-	s.Instances = val
-}
-
-// SetCpus sets the value of Cpus.
-func (s *Service) SetCpus(val OptFloat64) {
-	s.Cpus = val
-}
-
-// SetMem sets the value of Mem.
-func (s *Service) SetMem(val OptFloat64) {
-	s.Mem = val
-}
-
-// SetStatus sets the value of Status.
-func (s *Service) SetStatus(val OptString) {
-	s.Status = val
-}
-
-// SetUrls sets the value of Urls.
-func (s *Service) SetUrls(val []string) {
-	s.Urls = val
-}
-
-// SetInternalUrls sets the value of InternalUrls.
-func (s *Service) SetInternalUrls(val []string) {
-	s.InternalUrls = val
-}
-
-// SetEnv sets the value of Env.
-func (s *Service) SetEnv(val OptServiceEnv) {
-	s.Env = val
-}
-
-// SetTasks sets the value of Tasks.
-func (s *Service) SetTasks(val []Task) {
-	s.Tasks = val
-}
-
-// SetSubtitle sets the value of Subtitle.
-func (s *Service) SetSubtitle(val OptString) {
-	s.Subtitle = val
-}
-
-// SetMonitoring sets the value of Monitoring.
-func (s *Service) SetMonitoring(val *Monitoring) {
-	s.Monitoring = val
-}
-
-// SetPostInstallInstructions sets the value of PostInstallInstructions.
-func (s *Service) SetPostInstallInstructions(val OptString) {
-	s.PostInstallInstructions = val
-}
-
-// SetNamespace sets the value of Namespace.
-func (s *Service) SetNamespace(val OptString) {
-	s.Namespace = val
-}
-
-// SetRevision sets the value of Revision.
-func (s *Service) SetRevision(val OptString) {
-	s.Revision = val
-}
-
-// SetUpdated sets the value of Updated.
-func (s *Service) SetUpdated(val OptString) {
-	s.Updated = val
-}
-
-// SetAppVersion sets the value of AppVersion.
-func (s *Service) SetAppVersion(val OptString) {
-	s.AppVersion = val
+// GetValues returns the value of Values.
+func (s *ServiceInstallRequest) GetValues() OptServiceInstallRequestValues {
+	return s.Values
 }
 
 // SetChart sets the value of Chart.
-func (s *Service) SetChart(val OptString) {
+func (s *ServiceInstallRequest) SetChart(val string) {
 	s.Chart = val
 }
 
-// SetStartedAt sets the value of StartedAt.
-func (s *Service) SetStartedAt(val OptInt64) {
-	s.StartedAt = val
+// SetRepoUrl sets the value of RepoUrl.
+func (s *ServiceInstallRequest) SetRepoUrl(val OptURI) {
+	s.RepoUrl = val
 }
 
-// SetSuspendable sets the value of Suspendable.
-func (s *Service) SetSuspendable(val OptBool) {
-	s.Suspendable = val
+// SetVersion sets the value of Version.
+func (s *ServiceInstallRequest) SetVersion(val OptString) {
+	s.Version = val
 }
 
-// SetSuspended sets the value of Suspended.
-func (s *Service) SetSuspended(val OptBool) {
-	s.Suspended = val
+// SetValues sets the value of Values.
+func (s *ServiceInstallRequest) SetValues(val OptServiceInstallRequestValues) {
+	s.Values = val
 }
 
-// SetCatalogId sets the value of CatalogId.
-func (s *Service) SetCatalogId(val OptString) {
-	s.CatalogId = val
-}
+// Helm values override.
+type ServiceInstallRequestValues map[string]jx.Raw
 
-// SetOwner sets the value of Owner.
-func (s *Service) SetOwner(val OptString) {
-	s.Owner = val
-}
-
-// SetFriendlyName sets the value of FriendlyName.
-func (s *Service) SetFriendlyName(val OptString) {
-	s.FriendlyName = val
-}
-
-// SetShare sets the value of Share.
-func (s *Service) SetShare(val OptBool) {
-	s.Share = val
-}
-
-// SetLabels sets the value of Labels.
-func (s *Service) SetLabels(val OptServiceLabels) {
-	s.Labels = val
-}
-
-// SetControllers sets the value of Controllers.
-func (s *Service) SetControllers(val []HealthCheckResult) {
-	s.Controllers = val
-}
-
-// Contains helm get values. This should be re-ingeneer in v1.0.
-type ServiceEnv map[string]string
-
-func (s *ServiceEnv) init() ServiceEnv {
+func (s *ServiceInstallRequestValues) init() ServiceInstallRequestValues {
 	m := *s
 	if m == nil {
-		m = map[string]string{}
+		m = map[string]jx.Raw{}
 		*s = m
 	}
 	return m
 }
 
-type ServiceLabels map[string]string
+// WatchReleaseForbidden is response for WatchRelease operation.
+type WatchReleaseForbidden struct{}
 
-func (s *ServiceLabels) init() ServiceLabels {
-	m := *s
-	if m == nil {
-		m = map[string]string{}
-		*s = m
+func (*WatchReleaseForbidden) watchReleaseRes() {}
+
+type WatchReleaseOK struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s WatchReleaseOK) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
 	}
-	return m
+	return s.Data.Read(p)
 }
 
-// Ref: #/components/schemas/ServicesListing
-type ServicesListing struct {
-	Apps   []Service `json:"apps"`
-	Groups []Group   `json:"groups"`
+// WatchReleaseOKHeaders wraps WatchReleaseOK with response headers.
+type WatchReleaseOKHeaders struct {
+	CacheControl OptString
+	Connection   OptString
+	Response     WatchReleaseOK
 }
 
-// GetApps returns the value of Apps.
-func (s *ServicesListing) GetApps() []Service {
-	return s.Apps
+// GetCacheControl returns the value of CacheControl.
+func (s *WatchReleaseOKHeaders) GetCacheControl() OptString {
+	return s.CacheControl
 }
 
-// GetGroups returns the value of Groups.
-func (s *ServicesListing) GetGroups() []Group {
-	return s.Groups
+// GetConnection returns the value of Connection.
+func (s *WatchReleaseOKHeaders) GetConnection() OptString {
+	return s.Connection
 }
 
-// SetApps sets the value of Apps.
-func (s *ServicesListing) SetApps(val []Service) {
-	s.Apps = val
+// GetResponse returns the value of Response.
+func (s *WatchReleaseOKHeaders) GetResponse() WatchReleaseOK {
+	return s.Response
 }
 
-// SetGroups sets the value of Groups.
-func (s *ServicesListing) SetGroups(val []Group) {
-	s.Groups = val
+// SetCacheControl sets the value of CacheControl.
+func (s *WatchReleaseOKHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
 }
 
-// Pod/task of a service.
-// Ref: #/components/schemas/Task
-type Task struct {
-	// Unique task ID (e.g., pod name).
-	ID         OptString   `json:"id"`
-	Status     OptString   `json:"status"`
-	StartedAt  OptDateTime `json:"startedAt"`
-	FinishedAt OptDateTime `json:"finishedAt"`
-	// Logs or log URL.
-	Logs OptString `json:"logs"`
+// SetConnection sets the value of Connection.
+func (s *WatchReleaseOKHeaders) SetConnection(val OptString) {
+	s.Connection = val
 }
 
-// GetID returns the value of ID.
-func (s *Task) GetID() OptString {
-	return s.ID
+// SetResponse sets the value of Response.
+func (s *WatchReleaseOKHeaders) SetResponse(val WatchReleaseOK) {
+	s.Response = val
 }
 
-// GetStatus returns the value of Status.
-func (s *Task) GetStatus() OptString {
-	return s.Status
+func (*WatchReleaseOKHeaders) watchReleaseRes() {}
+
+// WatchReleaseUnauthorized is response for WatchRelease operation.
+type WatchReleaseUnauthorized struct{}
+
+func (*WatchReleaseUnauthorized) watchReleaseRes() {}
+
+// WatchResourcesForbidden is response for WatchResources operation.
+type WatchResourcesForbidden struct{}
+
+func (*WatchResourcesForbidden) watchResourcesRes() {}
+
+type WatchResourcesOK struct {
+	Data io.Reader
 }
 
-// GetStartedAt returns the value of StartedAt.
-func (s *Task) GetStartedAt() OptDateTime {
-	return s.StartedAt
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s WatchResourcesOK) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
 }
 
-// GetFinishedAt returns the value of FinishedAt.
-func (s *Task) GetFinishedAt() OptDateTime {
-	return s.FinishedAt
+// WatchResourcesOKHeaders wraps WatchResourcesOK with response headers.
+type WatchResourcesOKHeaders struct {
+	CacheControl OptString
+	Connection   OptString
+	Response     WatchResourcesOK
 }
 
-// GetLogs returns the value of Logs.
-func (s *Task) GetLogs() OptString {
-	return s.Logs
+// GetCacheControl returns the value of CacheControl.
+func (s *WatchResourcesOKHeaders) GetCacheControl() OptString {
+	return s.CacheControl
 }
 
-// SetID sets the value of ID.
-func (s *Task) SetID(val OptString) {
-	s.ID = val
+// GetConnection returns the value of Connection.
+func (s *WatchResourcesOKHeaders) GetConnection() OptString {
+	return s.Connection
 }
 
-// SetStatus sets the value of Status.
-func (s *Task) SetStatus(val OptString) {
-	s.Status = val
+// GetResponse returns the value of Response.
+func (s *WatchResourcesOKHeaders) GetResponse() WatchResourcesOK {
+	return s.Response
 }
 
-// SetStartedAt sets the value of StartedAt.
-func (s *Task) SetStartedAt(val OptDateTime) {
-	s.StartedAt = val
+// SetCacheControl sets the value of CacheControl.
+func (s *WatchResourcesOKHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
 }
 
-// SetFinishedAt sets the value of FinishedAt.
-func (s *Task) SetFinishedAt(val OptDateTime) {
-	s.FinishedAt = val
+// SetConnection sets the value of Connection.
+func (s *WatchResourcesOKHeaders) SetConnection(val OptString) {
+	s.Connection = val
 }
 
-// SetLogs sets the value of Logs.
-func (s *Task) SetLogs(val OptString) {
-	s.Logs = val
+// SetResponse sets the value of Response.
+func (s *WatchResourcesOKHeaders) SetResponse(val WatchResourcesOK) {
+	s.Response = val
 }
+
+func (*WatchResourcesOKHeaders) watchResourcesRes() {}
+
+// WatchResourcesUnauthorized is response for WatchResources operation.
+type WatchResourcesUnauthorized struct{}
+
+func (*WatchResourcesUnauthorized) watchResourcesRes() {}

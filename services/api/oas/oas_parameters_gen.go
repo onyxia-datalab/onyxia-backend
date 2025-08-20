@@ -4,93 +4,54 @@ package api
 
 import (
 	"net/http"
+	"net/url"
+
+	"github.com/go-faster/errors"
 
 	"github.com/ogen-go/ogen/conv"
 	"github.com/ogen-go/ogen/middleware"
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/ogen-go/ogen/uri"
+	"github.com/ogen-go/ogen/validate"
 )
 
-// GetAppParams is parameters of getApp operation.
-type GetAppParams struct {
-	// Project associated with the namespace, defaults to user project.
-	ONYXIAPROJECT OptString
-	// Unique ID of the installed service in that namespace.
-	ServiceId string
+// InstallServiceParams is parameters of installService operation.
+type InstallServiceParams struct {
+	// Logical release identifier.
+	ReleaseId string
 }
 
-func unpackGetAppParams(packed middleware.Parameters) (params GetAppParams) {
+func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "ONYXIA-PROJECT",
-			In:   "header",
+			Name: "releaseId",
+			In:   "path",
 		}
-		if v, ok := packed[key]; ok {
-			params.ONYXIAPROJECT = v.(OptString)
-		}
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "serviceId",
-			In:   "query",
-		}
-		params.ServiceId = packed[key].(string)
+		params.ReleaseId = packed[key].(string)
 	}
 	return params
 }
 
-func decodeGetAppParams(args [0]string, argsEscaped bool, r *http.Request) (params GetAppParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
-	h := uri.NewHeaderDecoder(r.Header)
-	// Decode header: ONYXIA-PROJECT.
+func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params InstallServiceParams, _ error) {
+	// Decode path: releaseId.
 	if err := func() error {
-		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "ONYXIA-PROJECT",
-			Explode: false,
-		}
-		if err := h.HasParam(cfg); err == nil {
-			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotONYXIAPROJECTVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotONYXIAPROJECTVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.ONYXIAPROJECT.SetTo(paramsDotONYXIAPROJECTVal)
-				return nil
-			}); err != nil {
-				return err
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
 			}
+			param = unescaped
 		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "ONYXIA-PROJECT",
-			In:   "header",
-			Err:  err,
-		}
-	}
-	// Decode query: serviceId.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "serviceId",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+			if err := func() error {
 				val, err := d.DecodeValue()
 				if err != nil {
 					return err
@@ -101,69 +62,141 @@ func decodeGetAppParams(args [0]string, argsEscaped bool, r *http.Request) (para
 					return err
 				}
 
-				params.ServiceId = c
+				params.ReleaseId = c
 				return nil
-			}); err != nil {
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:    1,
+					MinLengthSet: true,
+					MaxLength:    0,
+					MaxLengthSet: false,
+					Email:        false,
+					Hostname:     false,
+					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
 				return err
 			}
 		} else {
-			return err
+			return validate.ErrFieldRequired
 		}
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "serviceId",
-			In:   "query",
+			Name: "releaseId",
+			In:   "path",
 			Err:  err,
 		}
 	}
 	return params, nil
 }
 
-// GetMyServicesParams is parameters of getMyServices operation.
-type GetMyServicesParams struct {
-	// Project associated with the namespace, defaults to user project.
-	ONYXIAPROJECT OptString
-	// Deprectated.
-	//
-	// Deprecated: schema marks this parameter as deprecated.
-	GroupId OptString
+// WatchReleaseParams is parameters of watchRelease operation.
+type WatchReleaseParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Resume SSE from a specific event id (client reconnection).
+	LastEventID OptString
 }
 
-func unpackGetMyServicesParams(packed middleware.Parameters) (params GetMyServicesParams) {
+func unpackWatchReleaseParams(packed middleware.Parameters) (params WatchReleaseParams) {
 	{
 		key := middleware.ParameterKey{
-			Name: "ONYXIA-PROJECT",
-			In:   "header",
+			Name: "releaseId",
+			In:   "path",
 		}
-		if v, ok := packed[key]; ok {
-			params.ONYXIAPROJECT = v.(OptString)
-		}
+		params.ReleaseId = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "groupId",
-			In:   "query",
+			Name: "Last-Event-Id",
+			In:   "header",
 		}
 		if v, ok := packed[key]; ok {
-			params.GroupId = v.(OptString)
+			params.LastEventID = v.(OptString)
 		}
 	}
 	return params
 }
 
-func decodeGetMyServicesParams(args [0]string, argsEscaped bool, r *http.Request) (params GetMyServicesParams, _ error) {
-	q := uri.NewQueryDecoder(r.URL.Query())
+func decodeWatchReleaseParams(args [1]string, argsEscaped bool, r *http.Request) (params WatchReleaseParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
-	// Decode header: ONYXIA-PROJECT.
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:    1,
+					MinLengthSet: true,
+					MaxLength:    0,
+					MaxLengthSet: false,
+					Email:        false,
+					Hostname:     false,
+					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: Last-Event-Id.
 	if err := func() error {
 		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "ONYXIA-PROJECT",
+			Name:    "Last-Event-Id",
 			Explode: false,
 		}
 		if err := h.HasParam(cfg); err == nil {
 			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotONYXIAPROJECTVal string
+				var paramsDotLastEventIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -175,12 +208,12 @@ func decodeGetMyServicesParams(args [0]string, argsEscaped bool, r *http.Request
 						return err
 					}
 
-					paramsDotONYXIAPROJECTVal = c
+					paramsDotLastEventIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ONYXIAPROJECT.SetTo(paramsDotONYXIAPROJECTVal)
+				params.LastEventID.SetTo(paramsDotLastEventIDVal)
 				return nil
 			}); err != nil {
 				return err
@@ -189,22 +222,114 @@ func decodeGetMyServicesParams(args [0]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "ONYXIA-PROJECT",
+			Name: "Last-Event-Id",
 			In:   "header",
 			Err:  err,
 		}
 	}
-	// Decode query: groupId.
-	if err := func() error {
-		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "groupId",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
+	return params, nil
+}
 
-		if err := q.HasParam(cfg); err == nil {
-			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotGroupIdVal string
+// WatchResourcesParams is parameters of watchResources operation.
+type WatchResourcesParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Resume SSE from a specific event id (client reconnection).
+	LastEventID OptString
+}
+
+func unpackWatchResourcesParams(packed middleware.Parameters) (params WatchResourcesParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "Last-Event-Id",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.LastEventID = v.(OptString)
+		}
+	}
+	return params
+}
+
+func decodeWatchResourcesParams(args [1]string, argsEscaped bool, r *http.Request) (params WatchResourcesParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:    1,
+					MinLengthSet: true,
+					MaxLength:    0,
+					MaxLengthSet: false,
+					Email:        false,
+					Hostname:     false,
+					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: Last-Event-Id.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "Last-Event-Id",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotLastEventIDVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -216,12 +341,12 @@ func decodeGetMyServicesParams(args [0]string, argsEscaped bool, r *http.Request
 						return err
 					}
 
-					paramsDotGroupIdVal = c
+					paramsDotLastEventIDVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.GroupId.SetTo(paramsDotGroupIdVal)
+				params.LastEventID.SetTo(paramsDotLastEventIDVal)
 				return nil
 			}); err != nil {
 				return err
@@ -230,8 +355,8 @@ func decodeGetMyServicesParams(args [0]string, argsEscaped bool, r *http.Request
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "groupId",
-			In:   "query",
+			Name: "Last-Event-Id",
+			In:   "header",
 			Err:  err,
 		}
 	}

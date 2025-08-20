@@ -29,21 +29,27 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
-	// GetApp invokes getApp operation.
+	// InstallService invokes installService operation.
 	//
-	// Get the description of an installed service in the namespace. With Kubernetes backend, an
-	// installed service can be seen as a Helm chart. Its unique identifier will be the release name on
-	// the namespace.
+	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
+	// the release already exists (returns 202 with same event URLs).
 	//
-	// GET /my-lab/app
-	GetApp(ctx context.Context, params GetAppParams) (*Service, error)
-	// GetMyServices invokes getMyServices operation.
+	// PUT /services/{releaseId}/install
+	InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
+	// WatchRelease invokes watchRelease operation.
 	//
-	// List the services installed in a namespace. With a Kubernetes backend, utilize Helm to list all
-	// installed services in a namespace.
+	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 	//
-	// GET /my-lab/services
-	GetMyServices(ctx context.Context, params GetMyServicesParams) (*ServicesListing, error)
+	// GET /events/{releaseId}/watch-release
+	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
+	// WatchResources invokes watchResources operation.
+	//
+	// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
+	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
+	// "done".
+	//
+	// GET /events/{releaseId}/watch-resources
+	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
 }
 
 // Client implements OAS client.
@@ -91,23 +97,22 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 	return u
 }
 
-// GetApp invokes getApp operation.
+// InstallService invokes installService operation.
 //
-// Get the description of an installed service in the namespace. With Kubernetes backend, an
-// installed service can be seen as a Helm chart. Its unique identifier will be the release name on
-// the namespace.
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
+// the release already exists (returns 202 with same event URLs).
 //
-// GET /my-lab/app
-func (c *Client) GetApp(ctx context.Context, params GetAppParams) (*Service, error) {
-	res, err := c.sendGetApp(ctx, params)
+// PUT /services/{releaseId}/install
+func (c *Client) InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error) {
+	res, err := c.sendInstallService(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Service, err error) {
+func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (res InstallServiceRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getApp"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/my-lab/app"),
+		otelogen.OperationID("installService"),
+		semconv.HTTPRequestMethodKey.String("PUT"),
+		semconv.HTTPRouteKey.String("/services/{releaseId}/install"),
 	}
 
 	// Run stopwatch.
@@ -122,7 +127,7 @@ func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Serv
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetAppOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, InstallServiceOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -139,49 +144,36 @@ func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Serv
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/my-lab/app"
+	var pathParts [3]string
+	pathParts[0] = "/services/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/install"
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "serviceId" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "serviceId",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(params.ServiceId))
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
+	r, err := ht.NewRequest(ctx, "PUT", u)
 	if err != nil {
 		return res, errors.Wrap(err, "create request")
 	}
-
-	stage = "EncodeHeaderParams"
-	h := uri.NewHeaderEncoder(r.Header)
-	{
-		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "ONYXIA-PROJECT",
-			Explode: false,
-		}
-		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ONYXIAPROJECT.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode header")
-		}
+	if err := encodeInstallServiceRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
 	}
 
 	{
@@ -189,7 +181,7 @@ func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Serv
 		var satisfied bitset
 		{
 			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, GetAppOperation, r); {
+			switch err := c.securityOidc(ctx, InstallServiceOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -225,7 +217,7 @@ func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Serv
 	defer resp.Body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeGetAppResponse(resp)
+	result, err := decodeInstallServiceResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -233,22 +225,21 @@ func (c *Client) sendGetApp(ctx context.Context, params GetAppParams) (res *Serv
 	return result, nil
 }
 
-// GetMyServices invokes getMyServices operation.
+// WatchRelease invokes watchRelease operation.
 //
-// List the services installed in a namespace. With a Kubernetes backend, utilize Helm to list all
-// installed services in a namespace.
+// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 //
-// GET /my-lab/services
-func (c *Client) GetMyServices(ctx context.Context, params GetMyServicesParams) (*ServicesListing, error) {
-	res, err := c.sendGetMyServices(ctx, params)
+// GET /events/{releaseId}/watch-release
+func (c *Client) WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error) {
+	res, err := c.sendWatchRelease(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesParams) (res *ServicesListing, err error) {
+func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams) (res WatchReleaseRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getMyServices"),
+		otelogen.OperationID("watchRelease"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/my-lab/services"),
+		semconv.HTTPRouteKey.String("/events/{releaseId}/watch-release"),
 	}
 
 	// Run stopwatch.
@@ -263,7 +254,7 @@ func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesPara
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetMyServicesOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, WatchReleaseOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -280,30 +271,28 @@ func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesPara
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/my-lab/services"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
+	var pathParts [3]string
+	pathParts[0] = "/events/"
 	{
-		// Encode "groupId" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "groupId",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
 		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.GroupId.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
 		}
+		pathParts[1] = encoded
 	}
-	u.RawQuery = q.Values().Encode()
+	pathParts[2] = "/watch-release"
+	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -315,11 +304,11 @@ func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesPara
 	h := uri.NewHeaderEncoder(r.Header)
 	{
 		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "ONYXIA-PROJECT",
+			Name:    "Last-Event-Id",
 			Explode: false,
 		}
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.ONYXIAPROJECT.Get(); ok {
+			if val, ok := params.LastEventID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
@@ -333,7 +322,7 @@ func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesPara
 		var satisfied bitset
 		{
 			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, GetMyServicesOperation, r); {
+			switch err := c.securityOidc(ctx, WatchReleaseOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -369,7 +358,150 @@ func (c *Client) sendGetMyServices(ctx context.Context, params GetMyServicesPara
 	defer resp.Body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeGetMyServicesResponse(resp)
+	result, err := decodeWatchReleaseResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// WatchResources invokes watchResources operation.
+//
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
+// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
+// "done".
+//
+// GET /events/{releaseId}/watch-resources
+func (c *Client) WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error) {
+	res, err := c.sendWatchResources(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesParams) (res WatchResourcesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("watchResources"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/events/{releaseId}/watch-resources"),
+	}
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, WatchResourcesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/events/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/watch-resources"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Last-Event-Id",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.LastEventID.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, WatchResourcesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	defer resp.Body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeWatchResourcesResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

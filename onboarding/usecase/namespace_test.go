@@ -122,7 +122,8 @@ func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
 }
 
 func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
-	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
+
+	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 			"user-attr2": "value2",
@@ -142,7 +143,8 @@ func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
 }
 
 func TestGetNamespaceAnnotations_AllAnnotations(t *testing.T) {
-	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
+
+	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 		},

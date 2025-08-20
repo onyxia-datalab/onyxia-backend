@@ -40,6 +40,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
+	args := [1]string{}
 
 	// Static code generated router with unwrapped path search.
 	switch {
@@ -48,9 +49,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/my-lab/"
+		case '/': // Prefix: "/"
 
-			if l := len("/my-lab/"); len(elem) >= l && elem[0:l] == "/my-lab/" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -60,44 +61,130 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			switch elem[0] {
-			case 'a': // Prefix: "app"
+			case 'e': // Prefix: "events/"
 
-				if l := len("app"); len(elem) >= l && elem[0:l] == "app" {
+				if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
 				if len(elem) == 0 {
-					// Leaf node.
-					switch r.Method {
-					case "GET":
-						s.handleGetAppRequest([0]string{}, elemIsEscaped, w, r)
-					default:
-						s.notAllowed(w, r, "GET")
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/watch-re"
+
+					if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
+						elem = elem[l:]
+					} else {
+						break
 					}
 
-					return
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'l': // Prefix: "lease"
+
+						if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleWatchReleaseRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, "GET")
+							}
+
+							return
+						}
+
+					case 's': // Prefix: "sources"
+
+						if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "GET":
+								s.handleWatchResourcesRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, "GET")
+							}
+
+							return
+						}
+
+					}
+
 				}
 
-			case 's': // Prefix: "services"
+			case 's': // Prefix: "services/"
 
-				if l := len("services"); len(elem) >= l && elem[0:l] == "services" {
+				if l := len("services/"); len(elem) >= l && elem[0:l] == "services/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
 				if len(elem) == 0 {
-					// Leaf node.
-					switch r.Method {
-					case "GET":
-						s.handleGetMyServicesRequest([0]string{}, elemIsEscaped, w, r)
-					default:
-						s.notAllowed(w, r, "GET")
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/install"
+
+					if l := len("/install"); len(elem) >= l && elem[0:l] == "/install" {
+						elem = elem[l:]
+					} else {
+						break
 					}
 
-					return
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "PUT":
+							s.handleInstallServiceRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, "PUT")
+						}
+
+						return
+					}
+
 				}
 
 			}
@@ -114,7 +201,7 @@ type Route struct {
 	operationID string
 	pathPattern string
 	count       int
-	args        [0]string
+	args        [1]string
 }
 
 // Name returns ogen operation name.
@@ -182,9 +269,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/my-lab/"
+		case '/': // Prefix: "/"
 
-			if l := len("/my-lab/"); len(elem) >= l && elem[0:l] == "/my-lab/" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -194,52 +281,136 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 				break
 			}
 			switch elem[0] {
-			case 'a': // Prefix: "app"
+			case 'e': // Prefix: "events/"
 
-				if l := len("app"); len(elem) >= l && elem[0:l] == "app" {
+				if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
 				if len(elem) == 0 {
-					// Leaf node.
-					switch method {
-					case "GET":
-						r.name = GetAppOperation
-						r.summary = "Get the description of an installed service."
-						r.operationID = "getApp"
-						r.pathPattern = "/my-lab/app"
-						r.args = args
-						r.count = 0
-						return r, true
-					default:
-						return
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/watch-re"
+
+					if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
+						elem = elem[l:]
+					} else {
+						break
 					}
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case 'l': // Prefix: "lease"
+
+						if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = WatchReleaseOperation
+								r.summary = "Release-level status stream (SSE)"
+								r.operationID = "watchRelease"
+								r.pathPattern = "/events/{releaseId}/watch-release"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 's': // Prefix: "sources"
+
+						if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "GET":
+								r.name = WatchResourcesOperation
+								r.summary = "Kubernetes resources status stream (SSE)"
+								r.operationID = "watchResources"
+								r.pathPattern = "/events/{releaseId}/watch-resources"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
+					}
+
 				}
 
-			case 's': // Prefix: "services"
+			case 's': // Prefix: "services/"
 
-				if l := len("services"); len(elem) >= l && elem[0:l] == "services" {
+				if l := len("services/"); len(elem) >= l && elem[0:l] == "services/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
 				if len(elem) == 0 {
-					// Leaf node.
-					switch method {
-					case "GET":
-						r.name = GetMyServicesOperation
-						r.summary = "List the services installed in a namespace."
-						r.operationID = "getMyServices"
-						r.pathPattern = "/my-lab/services"
-						r.args = args
-						r.count = 0
-						return r, true
-					default:
-						return
+					break
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/install"
+
+					if l := len("/install"); len(elem) >= l && elem[0:l] == "/install" {
+						elem = elem[l:]
+					} else {
+						break
 					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "PUT":
+							r.name = InstallServiceOperation
+							r.summary = "Trigger service installation (async)"
+							r.operationID = "installService"
+							r.pathPattern = "/services/{releaseId}/install"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+
 				}
 
 			}

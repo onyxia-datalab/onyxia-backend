@@ -93,7 +93,7 @@ lint:
 ## test: Run all unit tests
 test:
 	@echo "✅ Running tests..."
-	go test ./... -v
+	go test ./...
 
 # --- BUILD -------------------------------------------------------------------
 

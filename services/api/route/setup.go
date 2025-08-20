@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	middleware "github.com/onyxia-datalab/onyxia-backend/onboarding/api/middleware"
-	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
+	middleware "github.com/onyxia-datalab/onyxia-backend/services/api/middleware"
+	oas "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 )
 
 func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error) {
@@ -23,12 +23,12 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to initialize OIDC middleware: %w", err)
 	}
 
-	onboardingController := SetupOnboardingController(app)
+	installCtrl := SetupInstallController(app)
 
-	handler := NewHandler(onboardingController)
+	h := NewHandler(installCtrl)
 
 	srv, err := oas.NewServer(
-		handler,
+		h,
 		auth,
 	)
 

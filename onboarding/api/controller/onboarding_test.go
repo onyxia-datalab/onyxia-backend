@@ -26,31 +26,30 @@ func (m *MockOnboardingUsecase) Onboard(ctx context.Context, req domain.Onboardi
 
 func TestOnboard_Success_NoGroup(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
-	getUser := func(ctx context.Context) (*usercontext.User, bool) {
-		return &usercontext.User{
-			Username: "test-user",
-			Groups:   []string{"g1", "g2"},
-			Roles:    []string{"r1"},
-		}, true
-	}
+	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
+		Username: "test-user",
+		Groups:   []string{},
+		Roles:    []string{"test-role"},
+	})
+
 	mockUC.On("Onboard", mock.Anything, mock.Anything).Return(nil)
 
-	ctrl := NewOnboardingController(mockUC, getUser)
+	ctrl := NewOnboardingController(mockUC, userCtxReader)
 	req := api.OnboardingRequest{Group: api.OptString{Set: false}}
 
-	res, err := ctrl.Onboard(context.Background(), &req)
+	res, err := ctrl.Onboard(ctx, &req)
 	assert.NoError(t, err)
 	assert.IsType(t, &api.OnboardOK{}, res)
 }
 
 func TestOnboard_GetUserFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
-	getUser := func(ctx context.Context) (*usercontext.User, bool) { return nil, false }
+	ctx, userCtxReader, _ := usercontext.NewTestUserContext(nil)
 
-	ctrl := NewOnboardingController(mockUC, getUser)
+	ctrl := NewOnboardingController(mockUC, userCtxReader)
 	req := api.OnboardingRequest{Group: api.OptString{Value: "g", Set: true}}
 
-	res, err := ctrl.Onboard(context.Background(), &req)
+	res, err := ctrl.Onboard(ctx, &req)
 	assert.Error(t, err)
 	assert.IsType(t, &api.OnboardForbidden{}, res)
 	mockUC.AssertNotCalled(t, "Onboard")
@@ -58,18 +57,16 @@ func TestOnboard_GetUserFails(t *testing.T) {
 
 func TestOnboard_GroupValidationFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
-	getUser := func(ctx context.Context) (*usercontext.User, bool) {
-		return &usercontext.User{
-			Username: "u",
-			Groups:   []string{"other"},
-			Roles:    []string{"r"},
-		}, true
-	}
+	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
+		Username: "u",
+		Groups:   []string{"not-test-group"},
+		Roles:    []string{"r"},
+	})
 
-	ctrl := NewOnboardingController(mockUC, getUser)
+	ctrl := NewOnboardingController(mockUC, userCtxReader)
 	req := api.OnboardingRequest{Group: api.OptString{Value: "test-group", Set: true}}
 
-	res, err := ctrl.Onboard(context.Background(), &req)
+	res, err := ctrl.Onboard(ctx, &req)
 	assert.Error(t, err)
 	assert.IsType(t, &api.OnboardUnauthorized{}, res)
 	mockUC.AssertNotCalled(t, "Onboard")
@@ -77,19 +74,18 @@ func TestOnboard_GroupValidationFails(t *testing.T) {
 
 func TestOnboard_OnboardingFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
-	getUser := func(ctx context.Context) (*usercontext.User, bool) {
-		return &usercontext.User{
-			Username: "u",
-			Groups:   []string{"test-group"},
-			Roles:    []string{"r"},
-		}, true
-	}
+	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
+		Username: "u",
+		Groups:   []string{"test-group"},
+		Roles:    []string{"r"},
+	})
+
 	mockUC.On("Onboard", mock.Anything, mock.Anything).Return(errors.New("boom"))
 
-	ctrl := NewOnboardingController(mockUC, getUser)
+	ctrl := NewOnboardingController(mockUC, userCtxReader)
 	req := api.OnboardingRequest{Group: api.OptString{Value: "test-group", Set: true}}
 
-	res, err := ctrl.Onboard(context.Background(), &req)
+	res, err := ctrl.Onboard(ctx, &req)
 	assert.Error(t, err)
 	assert.IsType(t, &api.OnboardForbidden{}, res)
 	mockUC.AssertCalled(t, "Onboard", mock.Anything, mock.Anything)
