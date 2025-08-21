@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,7 +20,7 @@ func TestApplyQuotas_Success(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaCreated, nil)
+		Return(port.QuotaCreated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -47,7 +47,7 @@ func TestApplyQuotas_AlreadyUpToDate(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaUnchanged, nil)
+		Return(port.QuotaUnchanged, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -89,7 +89,7 @@ func TestApplyQuotas_QuotaUpdated(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaUpdated, nil)
+		Return(port.QuotaUpdated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -116,7 +116,7 @@ func TestApplyQuotas_QuotaIgnored(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaIgnored, nil)
+		Return(port.QuotaIgnored, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -142,7 +142,7 @@ func TestApplyQuotas_Failure(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
+		Return(port.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,

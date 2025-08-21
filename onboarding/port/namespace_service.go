@@ -1,4 +1,4 @@
-package interfaces
+package port
 
 import (
 	"context"

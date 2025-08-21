@@ -2,11 +2,12 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 
-	"github.com/go-faster/jx"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -54,12 +55,19 @@ func (ic *InstallController) InstallService(
 		version = &v
 	}
 
-	// Convert Helm values: map[string]jx.Raw -> map[string][]byte (domain-friendly).
-	var values map[string][]byte
-	if vm, ok := req.Values.Get(); ok {
-		values = make(map[string][]byte, len(vm))
-		for k, raw := range vm {
-			values[k] = []byte(jx.Raw(raw))
+	values := make(map[string]interface{})
+
+	if rawMap, ok := req.Values.Get(); ok {
+		for k, raw := range rawMap {
+			var v interface{}
+			if err := json.Unmarshal(raw, &v); err != nil {
+				return &api.InstallServiceBadRequest{}, fmt.Errorf(
+					"unmarshal values[%q]: %w",
+					k,
+					err,
+				)
+			}
+			values[k] = v
 		}
 	}
 

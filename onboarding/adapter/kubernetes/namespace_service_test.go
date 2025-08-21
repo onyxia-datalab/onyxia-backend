@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,7 +25,7 @@ func TestCreateNamespace_Success(t *testing.T) {
 	result, err := service.CreateNamespace(context.Background(), "test-namespace", nil, nil)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.NamespaceCreated, result)
+	assert.Equal(t, port.NamespaceCreated, result)
 
 	_, err = clientset.CoreV1().
 		Namespaces().
@@ -43,7 +43,7 @@ func TestCreateNamespace_AlreadyExists(t *testing.T) {
 	result, err := service.CreateNamespace(context.Background(), "test-namespace", nil, nil)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.NamespaceAlreadyExists, result)
+	assert.Equal(t, port.NamespaceAlreadyExists, result)
 }
 
 // ✅ Test: Namespace Already Exists (No Annotations Given)
@@ -61,7 +61,7 @@ func TestCreateNamespace_AlreadyExists_NoAnnotations(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.NamespaceAlreadyExists, result)
+	assert.Equal(t, port.NamespaceAlreadyExists, result)
 }
 
 // ✅ Test: Update Annotations When Namespace Exists
@@ -106,7 +106,7 @@ func TestCreateNamespace_UpdateAnnotations(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.NamespaceAnnotationsUpdated, result)
+	assert.Equal(t, port.NamespaceAnnotationsUpdated, result)
 }
 
 // ❌ Test: Simulated API Failure (Create)
@@ -122,7 +122,7 @@ func TestCreateNamespace_Failure(t *testing.T) {
 	result, err := service.CreateNamespace(context.Background(), "error-namespace", nil, nil)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.NamespaceCreationResult(""), result)
+	assert.Equal(t, port.NamespaceCreationResult(""), result)
 	assert.Contains(t, err.Error(), "simulated API failure")
 }
 
@@ -145,7 +145,7 @@ func TestCreateNamespace_FailurePatch(t *testing.T) {
 	)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.NamespaceCreationResult(""), result)
+	assert.Equal(t, port.NamespaceCreationResult(""), result)
 	assert.Contains(t, err.Error(), "failed to patch annotations")
 }
 
@@ -159,7 +159,7 @@ func TestApplyResourceQuotas_Success(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.QuotaCreated, result)
+	assert.Equal(t, port.QuotaCreated, result)
 }
 
 // ✅ Test: Quota Already Exists with Unchanged Values
@@ -179,7 +179,7 @@ func TestApplyResourceQuotas_UnchangedQuota(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.QuotaUnchanged, result)
+	assert.Equal(t, port.QuotaUnchanged, result)
 }
 
 // ✅ Test: Quota is Ignored Due to Annotation
@@ -200,7 +200,7 @@ func TestApplyResourceQuotas_IgnoredQuota(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.QuotaIgnored, result)
+	assert.Equal(t, port.QuotaIgnored, result)
 }
 
 // ❌ Test: Failure When Checking for an Existing Quota
@@ -221,7 +221,7 @@ func TestApplyResourceQuotas_FailureCheck(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.QuotaApplicationResult(""), result)
+	assert.Equal(t, port.QuotaApplicationResult(""), result)
 	assert.Contains(t, err.Error(), "failed to get quota")
 }
 
@@ -243,7 +243,7 @@ func TestApplyResourceQuotas_FailureCreate(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.QuotaApplicationResult(""), result)
+	assert.Equal(t, port.QuotaApplicationResult(""), result)
 	assert.Contains(t, err.Error(), "failed to create quota")
 }
 
@@ -280,7 +280,7 @@ func TestApplyResourceQuotas_QuotaUpdated(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.QuotaUpdated, result)
+	assert.Equal(t, port.QuotaUpdated, result)
 }
 
 func TestApplyResourceQuotas_UnexpectedGetError(t *testing.T) {
@@ -300,7 +300,7 @@ func TestApplyResourceQuotas_UnexpectedGetError(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.QuotaApplicationResult(""), result)
+	assert.Equal(t, port.QuotaApplicationResult(""), result)
 	assert.Contains(t, err.Error(), "unexpected error checking for existing quota")
 }
 func TestApplyResourceQuotas_FailureUpdate(t *testing.T) {
@@ -330,7 +330,7 @@ func TestApplyResourceQuotas_FailureUpdate(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.QuotaApplicationResult(""), result)
+	assert.Equal(t, port.QuotaApplicationResult(""), result)
 	assert.Contains(t, err.Error(), "failed to update resource quota")
 }
 
@@ -343,7 +343,7 @@ func TestApplyResourceQuotas_EmptyQuota(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.NoError(t, err)
-	assert.Equal(t, interfaces.QuotaUnchanged, result)
+	assert.Equal(t, port.QuotaUnchanged, result)
 }
 
 func TestApplyResourceQuotas_FailureConvertQuota(t *testing.T) {
@@ -358,7 +358,7 @@ func TestApplyResourceQuotas_FailureConvertQuota(t *testing.T) {
 	result, err := service.ApplyResourceQuotas(context.Background(), "test-namespace", quota)
 
 	assert.Error(t, err)
-	assert.Equal(t, interfaces.QuotaApplicationResult(""), result)
+	assert.Equal(t, port.QuotaApplicationResult(""), result)
 	assert.Contains(t, err.Error(), "error converting quota to ResourceQuota")
 }
 

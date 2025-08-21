@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,10 +22,10 @@ func Test_Onboard_Success(t *testing.T) {
 	usecase := setupUsecase(mockService, quotas)
 
 	mockService.On("CreateNamespace", mock.Anything, groupNamespace).
-		Return(interfaces.NamespaceCreated, nil)
+		Return(port.NamespaceCreated, nil)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, groupNamespace, &quotas.Group).
-		Return(interfaces.QuotaCreated, nil)
+		Return(port.QuotaCreated, nil)
 
 	groupName := testGroupName
 	req := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
@@ -43,7 +43,7 @@ func Test_Onboard_QuotasDisabled(t *testing.T) {
 	usecase := setupUsecase(mockService, quotas)
 
 	mockService.On("CreateNamespace", mock.Anything, defaultNamespace).
-		Return(interfaces.NamespaceCreated, nil)
+		Return(port.NamespaceCreated, nil)
 
 	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
 	err := usecase.Onboard(context.Background(), req)
@@ -61,7 +61,7 @@ func Test_Onboard_CreateNamespaceFails(t *testing.T) {
 
 	expectedError := errors.New("namespace creation failed")
 	mockService.On("CreateNamespace", mock.Anything, groupNamespace).
-		Return(interfaces.NamespaceCreationResult(""), expectedError)
+		Return(port.NamespaceCreationResult(""), expectedError)
 
 	groupName := testGroupName
 	req := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
@@ -80,10 +80,10 @@ func Test_Onboard_ApplyResourceQuotasFails(t *testing.T) {
 	usecase := setupUsecase(mockService, quotas)
 
 	mockService.On("CreateNamespace", mock.Anything, defaultNamespace).
-		Return(interfaces.NamespaceCreated, nil)
+		Return(port.NamespaceCreated, nil)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, defaultNamespace, &quotas.Default).
-		Return(interfaces.QuotaApplicationResult(""), errors.New("failed to apply quota"))
+		Return(port.QuotaApplicationResult(""), errors.New("failed to apply quota"))
 
 	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
 	err := usecase.Onboard(context.Background(), req)
@@ -106,10 +106,10 @@ func Test_Onboard_NamespaceAlreadyExists(t *testing.T) {
 	usecase := setupUsecase(mockService, quotas)
 
 	mockService.On("CreateNamespace", mock.Anything, defaultNamespace).
-		Return(interfaces.NamespaceAlreadyExists, nil)
+		Return(port.NamespaceAlreadyExists, nil)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, defaultNamespace, &quotas.Default).
-		Return(interfaces.QuotaCreated, nil)
+		Return(port.QuotaCreated, nil)
 
 	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
 	err := usecase.Onboard(context.Background(), req)
