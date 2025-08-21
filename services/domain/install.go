@@ -10,7 +10,7 @@ type InstallRequest struct {
 	Chart     string
 	RepoURL   *url.URL
 	Version   *string
-	Values    map[string][]byte
+	Values    map[string]interface{}
 }
 
 type InstallUsecase interface {

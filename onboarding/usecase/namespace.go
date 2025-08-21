@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 )
 
 func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) error {
@@ -28,11 +28,11 @@ func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) er
 	}
 
 	switch result {
-	case interfaces.NamespaceCreated:
+	case port.NamespaceCreated:
 		slog.InfoContext(ctx, "✅ Successfully created namespace",
 			slog.String("namespace", name),
 		)
-	case interfaces.NamespaceAlreadyExists:
+	case port.NamespaceAlreadyExists:
 		slog.WarnContext(ctx, "⚠️ Namespace already exists",
 			slog.String("namespace", name),
 		)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -23,25 +23,25 @@ const (
 // ---------- NamespaceService mock ----------
 type MockNamespaceService struct{ mock.Mock }
 
-var _ interfaces.NamespaceService = (*MockNamespaceService)(nil)
+var _ port.NamespaceService = (*MockNamespaceService)(nil)
 
 func (m *MockNamespaceService) CreateNamespace(
 	ctx context.Context,
 	name string,
 	annotations map[string]string,
 	labels map[string]string,
-) (interfaces.NamespaceCreationResult, error) {
+) (port.NamespaceCreationResult, error) {
 	args := m.Called(ctx, name)
-	return args.Get(0).(interfaces.NamespaceCreationResult), args.Error(1)
+	return args.Get(0).(port.NamespaceCreationResult), args.Error(1)
 }
 
 func (m *MockNamespaceService) ApplyResourceQuotas(
 	ctx context.Context,
 	namespace string,
 	quota *domain.Quota,
-) (interfaces.QuotaApplicationResult, error) {
+) (port.QuotaApplicationResult, error) {
 	args := m.Called(ctx, namespace, quota)
-	return args.Get(0).(interfaces.QuotaApplicationResult), args.Error(1)
+	return args.Get(0).(port.QuotaApplicationResult), args.Error(1)
 }
 
 // ---------- Usercontext helpers ----------

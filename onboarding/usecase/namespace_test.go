@@ -9,7 +9,7 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -24,7 +24,7 @@ func TestCreateNamespace_Success(t *testing.T) {
 		userNamespace, // name
 		mock.Anything, // annotations
 		mock.Anything, // labels
-	).Return(interfaces.NamespaceCreated, nil)
+	).Return(port.NamespaceCreated, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
@@ -46,7 +46,7 @@ func TestCreateNamespace_AlreadyExists(t *testing.T) {
 	mockService.On(
 		"CreateNamespace",
 		mock.Anything, userNamespace, mock.Anything, mock.Anything,
-	).Return(interfaces.NamespaceAlreadyExists, nil)
+	).Return(port.NamespaceAlreadyExists, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
@@ -68,7 +68,7 @@ func TestCreateNamespace_Failure(t *testing.T) {
 	mockService.On(
 		"CreateNamespace",
 		mock.Anything, userNamespace, mock.Anything, mock.Anything,
-	).Return(interfaces.NamespaceCreationResult(""), errors.New("failed to create namespace"))
+	).Return(port.NamespaceCreationResult(""), errors.New("failed to create namespace"))
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 

@@ -11,7 +11,6 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
 )
 
-
 type OnboardingController struct {
 	OnboardingUsecase domain.OnboardingUsecase
 	users             usercontext.UserGetter
