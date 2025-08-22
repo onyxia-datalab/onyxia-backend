@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
@@ -14,17 +15,17 @@ import (
 )
 
 type InstallController struct {
-	usecase    domain.InstallUsecase
-	userGetter usercontext.UserGetter
+	serviceLifecycleUc domain.ServiceLifecycle
+	userGetter         usercontext.UserGetter
 }
 
 func NewInstallController(
-	usecase domain.InstallUsecase,
+	serviceLifecycleUc domain.ServiceLifecycle,
 	userGetter usercontext.UserGetter,
 ) *InstallController {
 	return &InstallController{
-		usecase:    usecase,
-		userGetter: userGetter,
+		serviceLifecycleUc: serviceLifecycleUc,
+		userGetter:         userGetter,
 	}
 }
 
@@ -33,10 +34,9 @@ func (ic *InstallController) InstallService(
 	req *api.ServiceInstallRequest,
 	params api.InstallServiceParams,
 ) (api.InstallServiceRes, error) {
-	// AuthN: middleware should have populated the context.
+	// Auth middleware should have populated the context.
 	if u, ok := ic.userGetter.GetUser(ctx); !ok || u == nil {
 		slog.ErrorContext(ctx, "user not found in context")
-		// Typically 401 is handled by auth middleware; treat missing user as 403 here.
 		return &api.InstallServiceForbidden{}, errors.New("user not found")
 	}
 
@@ -44,15 +44,15 @@ func (ic *InstallController) InstallService(
 		return &api.InstallServiceBadRequest{}, errors.New("chart is required")
 	}
 
-	// Optional fields to pointers via ogen helpers.
+	isOCI := strings.HasPrefix(req.Chart, "oci://")
+
 	var repoURL *url.URL
-	if u, ok := req.RepoUrl.Get(); ok {
-		repoURL = &u
-	}
-	var version *string
-	if v, ok := req.Version.Get(); ok {
-		// Keep pointer even if empty string to preserve “latest” explicitly provided.
-		version = &v
+	if u, ok := req.RepoUrl.Get(); ok && u.String() != "" {
+		if !isOCI {
+			repoURL = &u
+		}
+	} else if !isOCI {
+		return &api.InstallServiceBadRequest{}, errors.New("repoUrl is required for non-OCI charts")
 	}
 
 	values := make(map[string]interface{})
@@ -72,16 +72,16 @@ func (ic *InstallController) InstallService(
 	}
 
 	// Build domain request.
-	dreq := domain.InstallRequest{
+	dreq := domain.StartRequest{
 		ReleaseID: params.ReleaseId,
 		Chart:     req.Chart,
 		RepoURL:   repoURL,
-		Version:   version,
+		Version:   req.Version.Or("latest"),
 		Values:    values,
 	}
 
 	// Execute use case.
-	_, err := ic.usecase.DummyInstall(ctx, dreq)
+	_, err := ic.serviceLifecycleUc.Start(ctx, dreq)
 
 	if err != nil {
 		switch {
@@ -90,7 +90,6 @@ func (ic *InstallController) InstallService(
 		case errors.Is(err, domain.ErrForbidden):
 			return &api.InstallServiceForbidden{}, err
 		case errors.Is(err, domain.ErrAlreadyExists):
-			// If you want idempotent 202, change this mapping to Accepted with existing URLs.
 			return &api.InstallServiceConflict{}, err
 		default:
 			slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
@@ -98,7 +97,7 @@ func (ic *InstallController) InstallService(
 		}
 	}
 
-	// Success: 202 Accepted + headers/body per ogen schema.
+	// Success: 202 Accepted + headers/body per ogen schema.@
 	return &api.InstallAcceptedHeaders{
 		Location: api.NewOptString(""),
 		Response: api.InstallAccepted{

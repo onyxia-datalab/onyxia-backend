@@ -10,9 +10,9 @@ func SetupInstallController(
 	app *bootstrap.Application,
 ) *controller.InstallController {
 
-	var usecase domain.InstallUsecase // usecase.NewInstallUsecase()
+	var serviceLifecycleUc domain.ServiceLifecycle // usecase.NewInstallUsecase()
 
-	ctrl := controller.NewInstallController(usecase, app.UserContextReader)
+	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader)
 
 	return ctrl
 

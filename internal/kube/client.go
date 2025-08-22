@@ -16,7 +16,7 @@ import (
 )
 
 type Client struct {
-	clientset *kubernetes.Clientset
+	clientset kubernetes.Interface
 	config    *rest.Config
 }
 
@@ -34,7 +34,7 @@ func NewClient(kubeconfigPath string) (*Client, error) {
 	return &Client{clientset: cs, config: cfg}, nil
 }
 
-func (c *Client) Clientset() *kubernetes.Clientset {
+func (c *Client) Clientset() kubernetes.Interface {
 	return c.clientset
 }
 
