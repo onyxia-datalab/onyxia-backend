@@ -16,15 +16,15 @@ import (
 type Helm struct {
 	cfg      *action.Configuration
 	settings *cli.EnvSettings
-	global   ports.HelmInstallCallbacks
+	global   ports.HelmStartCallbacks
 }
 
-var _ ports.Helm = (*Helm)(nil)
+var _ ports.HelmReleasesGateway = (*Helm)(nil)
 
 func New(
 	cfg *action.Configuration,
 	settings *cli.EnvSettings,
-	global ports.HelmInstallCallbacks,
+	global ports.HelmStartCallbacks,
 ) *Helm {
 	return &Helm{cfg: cfg, settings: settings, global: global}
 }
@@ -35,7 +35,7 @@ func (i *Helm) StartInstall(
 	releaseName string,
 	chartRef string,
 	vals map[string]interface{},
-	opts ports.HelmInstallOptions,
+	opts ports.HelmStartOptions,
 ) error {
 	if releaseName == "" || chartRef == "" {
 		return fmt.Errorf("releaseName and chartRef are required")
@@ -44,10 +44,6 @@ func (i *Helm) StartInstall(
 	act := action.NewInstall(i.cfg)
 	act.ReleaseName = releaseName
 	act.Namespace = i.settings.Namespace()
-	act.Version = opts.Version
-	if opts.Timeout > 0 {
-		act.Timeout = opts.Timeout
-	}
 
 	// Resolve chart up front (fail fast before creating the op).
 	cp, err := act.LocateChart(chartRef, i.settings)
