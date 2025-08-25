@@ -29,7 +29,7 @@ func New(
 	return &Helm{cfg: cfg, settings: settings, global: global}
 }
 
-// Start launches a Helm install in the background.
+// StartInstall starts a helm install operation in background
 func (i *Helm) StartInstall(
 	ctx context.Context,
 	releaseName string,
@@ -45,7 +45,6 @@ func (i *Helm) StartInstall(
 	act.ReleaseName = releaseName
 	act.Namespace = i.settings.Namespace()
 
-	// Resolve chart up front (fail fast before creating the op).
 	cp, err := act.LocateChart(chartRef, i.settings)
 	if err != nil {
 		return fmt.Errorf("locating chart %q: %w", chartRef, err)
