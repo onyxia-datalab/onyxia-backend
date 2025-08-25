@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 )
 
 func (s *onboardingUsecase) applyQuotas(
@@ -33,19 +33,19 @@ func (s *onboardingUsecase) applyQuotas(
 	}
 
 	switch result {
-	case interfaces.QuotaCreated:
+	case port.QuotaCreated:
 		slog.InfoContext(ctx, "✅ Created new resource quota",
 			slog.String("namespace", namespace),
 		)
-	case interfaces.QuotaUpdated:
+	case port.QuotaUpdated:
 		slog.InfoContext(ctx, "✅ Updated resource quota",
 			slog.String("namespace", namespace),
 		)
-	case interfaces.QuotaUnchanged:
+	case port.QuotaUnchanged:
 		slog.WarnContext(ctx, "⚠️ Resource quota is already up-to-date",
 			slog.String("namespace", namespace),
 		)
-	case interfaces.QuotaIgnored:
+	case port.QuotaIgnored:
 		slog.WarnContext(ctx, "⚠️ Quota ignored due to annotation",
 			slog.String("namespace", namespace),
 		)

@@ -28,11 +28,37 @@ type Security struct {
 	CORSAllowedOrigins []string `mapstructure:"corsAllowedOrigins" json:"corsAllowedOrigins"`
 }
 
+type CatalogStatus string
+
+const (
+	StatusProd CatalogStatus = "PROD"
+	StatusTest CatalogStatus = "TEST"
+)
+
+type Restriction struct {
+	UserAttributeKey string `mapstructure:"userAttribute.key"     json:"userAttributeKey"`
+	Match            string `mapstructure:"userAttribute.matches" json:"match"`
+}
+
+type Catalog struct {
+	ID            string            `mapstructure:"id"                json:"id"`
+	Type          string            `mapstructure:"type"              json:"type"`
+	Location      string            `mapstructure:"location"          json:"location"`
+	Name          map[string]string `mapstructure:"name"              json:"name"`
+	Highlighted   []string          `mapstructure:"highlightedCharts" json:"highlightedCharts"`
+	Excluded      []string          `mapstructure:"excludedCharts"    json:"excludedCharts"`
+	Description   map[string]string `mapstructure:"description"       json:"description"`
+	Status        CatalogStatus     `mapstructure:"status"            json:"status"`
+	SkipTLSVerify bool              `mapstructure:"skipTlsVerify"     json:"skipTlsVerify"`
+	CAFile        string            `mapstructure:"caFile"            json:"caFile"`
+	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
+}
 type Env struct {
-	AuthenticationMode string   `mapstructure:"authenticationMode" json:"authenticationMode"`
-	Server             Server   `mapstructure:"server"             json:"server"`
-	OIDC               OIDC     `mapstructure:"oidc"               json:"oidc"`
-	Security           Security `mapstructure:"security"           json:"security"`
+	AuthenticationMode string    `mapstructure:"authenticationMode" json:"authenticationMode"`
+	Server             Server    `mapstructure:"server"             json:"server"`
+	OIDC               OIDC      `mapstructure:"oidc"               json:"oidc"`
+	Security           Security  `mapstructure:"security"           json:"security"`
+	Catalogs           []Catalog `mapstructure:"catalogs"           json:"catalogs"`
 }
 
 func NewEnv() (Env, error) {
