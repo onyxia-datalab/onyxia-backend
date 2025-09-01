@@ -188,6 +188,10 @@ func (s *Server) handleInstallServiceRequest(args [1]string, argsEscaped bool, w
 					Name: "releaseId",
 					In:   "path",
 				}: params.ReleaseId,
+				{
+					Name: "X-Onyxia-Project",
+					In:   "header",
+				}: params.XOnyxiaProject,
 			},
 			Raw: r,
 		}

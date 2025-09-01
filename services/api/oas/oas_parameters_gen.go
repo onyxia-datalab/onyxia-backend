@@ -19,6 +19,8 @@ import (
 type InstallServiceParams struct {
 	// Logical release identifier.
 	ReleaseId string
+	// Project identifier in Onyxia.
+	XOnyxiaProject OptString
 }
 
 func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
@@ -29,10 +31,20 @@ func unpackInstallServiceParams(packed middleware.Parameters) (params InstallSer
 		}
 		params.ReleaseId = packed[key].(string)
 	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XOnyxiaProject = v.(OptString)
+		}
+	}
 	return params
 }
 
 func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params InstallServiceParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: releaseId.
 	if err := func() error {
 		param := args[0]
@@ -91,6 +103,45 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 		return params, &ogenerrors.DecodeParamError{
 			Name: "releaseId",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXOnyxiaProjectVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXOnyxiaProjectVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XOnyxiaProject.SetTo(paramsDotXOnyxiaProjectVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
 			Err:  err,
 		}
 	}

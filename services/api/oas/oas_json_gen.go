@@ -372,6 +372,41 @@ func (s *InstallServiceInternalServerError) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes bool as json.
+func (o OptBool) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Bool(bool(o.Value))
+}
+
+// Decode decodes bool from json.
+func (o *OptBool) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptBool to nil")
+	}
+	o.Set = true
+	v, err := d.Bool()
+	if err != nil {
+		return err
+	}
+	o.Value = bool(v)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptBool) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptBool) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes int as json.
 func (o OptInt) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -403,40 +438,6 @@ func (s OptInt) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInt) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ServiceInstallRequestValues as json.
-func (o OptServiceInstallRequestValues) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes ServiceInstallRequestValues from json.
-func (o *OptServiceInstallRequestValues) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptServiceInstallRequestValues to nil")
-	}
-	o.Set = true
-	o.Value = make(ServiceInstallRequestValues)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptServiceInstallRequestValues) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptServiceInstallRequestValues) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -729,13 +730,17 @@ func (s *ServiceInstallRequest) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *ServiceInstallRequest) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("chart")
-		e.Str(s.Chart)
+		e.FieldStart("catalogId")
+		e.Str(s.CatalogId)
 	}
 	{
-		if s.RepoUrl.Set {
-			e.FieldStart("repoUrl")
-			s.RepoUrl.Encode(e)
+		e.FieldStart("packageName")
+		e.Str(s.PackageName)
+	}
+	{
+		if s.PackageVersion.Set {
+			e.FieldStart("packageVersion")
+			s.PackageVersion.Encode(e)
 		}
 	}
 	{
@@ -745,18 +750,36 @@ func (s *ServiceInstallRequest) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Values.Set {
-			e.FieldStart("values")
-			s.Values.Encode(e)
+		e.FieldStart("options")
+		s.Options.Encode(e)
+	}
+	{
+		if s.Share.Set {
+			e.FieldStart("share")
+			s.Share.Encode(e)
 		}
+	}
+	{
+		if s.FriendlyName.Set {
+			e.FieldStart("friendlyName")
+			s.FriendlyName.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
 	}
 }
 
-var jsonFieldsNameOfServiceInstallRequest = [4]string{
-	0: "chart",
-	1: "repoUrl",
-	2: "version",
-	3: "values",
+var jsonFieldsNameOfServiceInstallRequest = [8]string{
+	0: "catalogId",
+	1: "packageName",
+	2: "packageVersion",
+	3: "version",
+	4: "options",
+	5: "share",
+	6: "friendlyName",
+	7: "name",
 }
 
 // Decode decodes ServiceInstallRequest from json.
@@ -765,30 +788,43 @@ func (s *ServiceInstallRequest) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode ServiceInstallRequest to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "chart":
+		case "catalogId":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := d.Str()
-				s.Chart = string(v)
+				s.CatalogId = string(v)
 				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"chart\"")
+				return errors.Wrap(err, "decode field \"catalogId\"")
 			}
-		case "repoUrl":
+		case "packageName":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.RepoUrl.Reset()
-				if err := s.RepoUrl.Decode(d); err != nil {
+				v, err := d.Str()
+				s.PackageName = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"repoUrl\"")
+				return errors.Wrap(err, "decode field \"packageName\"")
+			}
+		case "packageVersion":
+			if err := func() error {
+				s.PackageVersion.Reset()
+				if err := s.PackageVersion.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"packageVersion\"")
 			}
 		case "version":
 			if err := func() error {
@@ -800,15 +836,47 @@ func (s *ServiceInstallRequest) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"version\"")
 			}
-		case "values":
+		case "options":
+			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
-				s.Values.Reset()
-				if err := s.Values.Decode(d); err != nil {
+				if err := s.Options.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"values\"")
+				return errors.Wrap(err, "decode field \"options\"")
+			}
+		case "share":
+			if err := func() error {
+				s.Share.Reset()
+				if err := s.Share.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"share\"")
+			}
+		case "friendlyName":
+			if err := func() error {
+				s.FriendlyName.Reset()
+				if err := s.FriendlyName.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"friendlyName\"")
+			}
+		case "name":
+			requiredBitSet[0] |= 1 << 7
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
 			}
 		default:
 			return d.Skip()
@@ -820,7 +888,7 @@ func (s *ServiceInstallRequest) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b10010011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -867,14 +935,14 @@ func (s *ServiceInstallRequest) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s ServiceInstallRequestValues) Encode(e *jx.Encoder) {
+func (s ServiceInstallRequestOptions) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields implements json.Marshaler.
-func (s ServiceInstallRequestValues) encodeFields(e *jx.Encoder) {
+func (s ServiceInstallRequestOptions) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
@@ -884,10 +952,10 @@ func (s ServiceInstallRequestValues) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes ServiceInstallRequestValues from json.
-func (s *ServiceInstallRequestValues) Decode(d *jx.Decoder) error {
+// Decode decodes ServiceInstallRequestOptions from json.
+func (s *ServiceInstallRequestOptions) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ServiceInstallRequestValues to nil")
+		return errors.New("invalid: unable to decode ServiceInstallRequestOptions to nil")
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
@@ -905,21 +973,21 @@ func (s *ServiceInstallRequestValues) Decode(d *jx.Decoder) error {
 		m[string(k)] = elem
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ServiceInstallRequestValues")
+		return errors.Wrap(err, "decode ServiceInstallRequestOptions")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s ServiceInstallRequestValues) MarshalJSON() ([]byte, error) {
+func (s ServiceInstallRequestOptions) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ServiceInstallRequestValues) UnmarshalJSON(data []byte) error {
+func (s *ServiceInstallRequestOptions) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

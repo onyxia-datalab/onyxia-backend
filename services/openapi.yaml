@@ -22,6 +22,12 @@ paths:
         Idempotent if the release already exists (returns 202 with same event URLs).
       parameters:
         - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Project identifier in Onyxia
       requestBody:
         required: true
         content:
@@ -162,22 +168,35 @@ components:
   schemas:
     ServiceInstallRequest:
       type: object
-      required: [chart]
+      required: [packageName, options, catalogId, name]
       properties:
-        chart:
+        catalogId:
           type: string
-          description: Chart name or OCI ref (e.g., oci://registry-1.docker.io/bitnamicharts/nginx)
-        repoUrl:
+          description: Catalog where the package of the service is taken from.
+        packageName:
           type: string
-          format: uri
-          description: Chart repository URL (not required for OCI)
+          description: Package name that will be used to create the service, necessary for package recovering (verify package)
+        packageVersion:
+          type: string
+          format: semver
+          description: Version of the helm package, put version into creation, if not null
         version:
           type: string
           description: Chart version (empty for latest)
-        values:
+        options:
           type: object
           additionalProperties: true
-          description: Helm values override
+          description: Options of package (values.yaml for helm)
+        share:
+          type: boolean
+          default: false
+          description: When true, all users of the namespace will list this service.
+        friendlyName:
+          type: string
+          description: Friendly name for the service
+        name:
+          type: string
+          description: A chosen name for the service
     InstallAccepted:
       type: object
       required: [eventsUrl]

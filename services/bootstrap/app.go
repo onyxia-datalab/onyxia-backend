@@ -7,10 +7,11 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/kube"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 )
 
 type Application struct {
-	Env               *Env
+	Env               *env.Env
 	K8sClient         *kube.Client
 	UserContextReader usercontext.Reader
 	UserContextWriter usercontext.Writer
@@ -21,7 +22,7 @@ func NewApplication(ctx context.Context) (*Application, error) {
 
 	InitLogger(userReader)
 
-	env, err := NewEnv()
+	env, err := env.New()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load environment: %w", err)
 

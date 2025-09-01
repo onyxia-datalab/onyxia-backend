@@ -1,10 +1,10 @@
 package route
 
 import (
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/adapter/kubernetes"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/adapter/kubernetes"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/usecase"
 )
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -33,13 +34,16 @@ func New(
 func (i *Helm) StartInstall(
 	ctx context.Context,
 	releaseName string,
-	chartRef string,
+	pkg domain.PackageRef,
 	vals map[string]interface{},
 	opts ports.HelmStartOptions,
 ) error {
-	if releaseName == "" || chartRef == "" {
-		return fmt.Errorf("releaseName and chartRef are required")
+
+	if releaseName == "" {
+		return fmt.Errorf("releaseName is required")
 	}
+
+	chartRef := pkg.ChartRef()
 
 	act := action.NewInstall(i.cfg)
 	act.ReleaseName = releaseName

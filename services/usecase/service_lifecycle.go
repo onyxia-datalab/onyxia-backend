@@ -5,14 +5,16 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
 type ServiceLifecycle struct {
-	secrets ports.OnyxiaSecretGateway
-	helm    ports.HelmReleasesGateway
+	secrets         ports.OnyxiaSecretGateway
+	helm            ports.HelmReleasesGateway
+	packageResolver ports.PackageResolver
 }
 
 var _ domain.ServiceLifecycle = (*ServiceLifecycle)(nil)
@@ -20,8 +22,9 @@ var _ domain.ServiceLifecycle = (*ServiceLifecycle)(nil)
 func NewServiceLifecycle(
 	secrets ports.OnyxiaSecretGateway,
 	helm ports.HelmReleasesGateway,
+	packageResolver ports.PackageResolver,
 ) *ServiceLifecycle {
-	return &ServiceLifecycle{secrets: secrets, helm: helm}
+	return &ServiceLifecycle{secrets: secrets, helm: helm, packageResolver: packageResolver}
 }
 
 func (uc *ServiceLifecycle) Start(
@@ -29,14 +32,28 @@ func (uc *ServiceLifecycle) Start(
 	req domain.StartRequest,
 ) (domain.StartResponse, error) {
 
-	// 1) Secret Onyxia
-	secretData := map[string][]byte{
-		// TODO
+	// 1) Get the package from catalog + packageName + packageVersion
+
+	pkg, err := uc.packageResolver.ResolvePackage(ctx, req.CatalogID, req.PackageName, req.Version)
+
+	if err != nil {
+		return domain.StartResponse{}, fmt.Errorf("resolve package: %w", err)
 	}
-	if err := uc.secrets.EnsureOnyxiaSecret(ctx, req.Namespace, req.Name, secretData); err != nil {
+
+	// 2) Create the  Secret Onyxia
+
+	secretData := map[string][]byte{
+		"catalog":      []byte(req.CatalogID),
+		"friendlyName": []byte(req.FriendlyName),
+		"owner":        []byte(req.Username),
+		"share":        []byte(strconv.FormatBool(req.Share)),
+	}
+
+	if err := uc.secrets.EnsureOnyxiaSecret(ctx, req.Namespace, req.ReleaseID, secretData); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("create onyxia secret: %w", err)
 	}
 
+	// 3) Start the helm install
 	opts := ports.HelmStartOptions{
 		Callbacks: ports.HelmStartCallbacks{
 			OnStart: func(release, chart string) {
@@ -54,7 +71,7 @@ func (uc *ServiceLifecycle) Start(
 		},
 	}
 
-	if err := uc.helm.StartInstall(ctx, req.Name, req.Chart, req.Values, opts); err != nil {
+	if err := uc.helm.StartInstall(ctx, req.Name, pkg, req.Values, opts); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("helm start: %w", err)
 	}
 

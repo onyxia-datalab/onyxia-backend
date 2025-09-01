@@ -2,17 +2,20 @@ package domain
 
 import (
 	"context"
-	"net/url"
 )
 
 type StartRequest struct {
-	Namespace string
-	Name      string
-	ReleaseID string
-	Chart     string
-	RepoURL   *url.URL
-	Version   string
-	Values    map[string]interface{}
+	Username      string
+	OnyxiaProject string
+	CatalogID     string
+	PackageName   string
+	Version       string
+	ReleaseID     string
+	Namespace     string
+	FriendlyName  string
+	Name          string
+	Share         bool
+	Values        map[string]interface{}
 }
 
 type StartResponse struct {

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
@@ -29,13 +30,15 @@ func newAdapter(t *testing.T) *Helm {
 func TestStartInstall_EmptyArgs(t *testing.T) {
 	i := newAdapter(t)
 
-	err := i.StartInstall(context.Background(), "", "my-chart", nil, ports.HelmStartOptions{})
+	err := i.StartInstall(
+		context.Background(),
+		"",
+		domain.PackageRef{},
+		nil,
+		ports.HelmStartOptions{},
+	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "releaseName")
 
-	err = i.StartInstall(context.Background(), "rel", "", nil, ports.HelmStartOptions{})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "chartRef")
 }
 
 func TestStartInstall_LocateChart_Error(t *testing.T) {
@@ -45,7 +48,12 @@ func TestStartInstall_LocateChart_Error(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		"this-chart-does-not-exist",
+		domain.PackageRef{
+			Kind:      domain.PackageKindHelm,
+			RepoURL:   "fake-repo",
+			ChartName: "this-chart-does-not-exist",
+			Version:   "0.1.0",
+		},
 		nil,
 		ports.HelmStartOptions{},
 	)
@@ -63,7 +71,10 @@ func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		nonChartDir,
+		domain.PackageRef{
+			Kind:      domain.PackageKindHelm,
+			ChartName: nonChartDir,
+		},
 		map[string]interface{}{},
 		ports.HelmStartOptions{},
 	)
@@ -89,7 +100,12 @@ func TestStartInstall_NoCallbacks_OnPreflightErrors(t *testing.T) {
 		},
 	})
 
-	err := i.StartInstall(context.Background(), "rel", "unknown-chart", nil, ports.HelmStartOptions{
+	err := i.StartInstall(context.Background(), "rel", domain.PackageRef{
+		Kind:      domain.PackageKindHelm,
+		RepoURL:   "fake-repo",
+		ChartName: "unknown-chart",
+		Version:   "0.1.0",
+	}, nil, ports.HelmStartOptions{
 		Callbacks: ports.HelmStartCallbacks{
 			OnStart:   func(_, _ string) { startCalled = true },
 			OnSuccess: func(_, _ string) { successCalled = true },

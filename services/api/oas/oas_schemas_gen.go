@@ -123,6 +123,52 @@ func (s *Oidc) SetScopes(val []string) {
 	s.Scopes = val
 }
 
+// NewOptBool returns new OptBool with value set to v.
+func NewOptBool(v bool) OptBool {
+	return OptBool{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptBool is optional bool.
+type OptBool struct {
+	Value bool
+	Set   bool
+}
+
+// IsSet returns true if OptBool was set.
+func (o OptBool) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptBool) Reset() {
+	var v bool
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptBool) SetTo(v bool) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptBool) Get() (v bool, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptBool) Or(d bool) bool {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -163,52 +209,6 @@ func (o OptInt) Get() (v int, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt) Or(d int) int {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptServiceInstallRequestValues returns new OptServiceInstallRequestValues with value set to v.
-func NewOptServiceInstallRequestValues(v ServiceInstallRequestValues) OptServiceInstallRequestValues {
-	return OptServiceInstallRequestValues{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptServiceInstallRequestValues is optional ServiceInstallRequestValues.
-type OptServiceInstallRequestValues struct {
-	Value ServiceInstallRequestValues
-	Set   bool
-}
-
-// IsSet returns true if OptServiceInstallRequestValues was set.
-func (o OptServiceInstallRequestValues) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptServiceInstallRequestValues) Reset() {
-	var v ServiceInstallRequestValues
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptServiceInstallRequestValues) SetTo(v ServiceInstallRequestValues) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptServiceInstallRequestValues) Get() (v ServiceInstallRequestValues, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptServiceInstallRequestValues) Or(d ServiceInstallRequestValues) ServiceInstallRequestValues {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -393,24 +393,38 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 
 // Ref: #/components/schemas/ServiceInstallRequest
 type ServiceInstallRequest struct {
-	// Chart name or OCI ref (e.g., oci://registry-1.docker.io/bitnamicharts/nginx).
-	Chart string `json:"chart"`
-	// Chart repository URL (not required for OCI).
-	RepoUrl OptURI `json:"repoUrl"`
+	// Catalog where the package of the service is taken from.
+	CatalogId string `json:"catalogId"`
+	// Package name that will be used to create the service, necessary for package recovering (verify
+	// package).
+	PackageName string `json:"packageName"`
+	// Version of the helm package, put version into creation, if not null.
+	PackageVersion OptString `json:"packageVersion"`
 	// Chart version (empty for latest).
 	Version OptString `json:"version"`
-	// Helm values override.
-	Values OptServiceInstallRequestValues `json:"values"`
+	// Options of package (values.yaml for helm).
+	Options ServiceInstallRequestOptions `json:"options"`
+	// When true, all users of the namespace will list this service.
+	Share OptBool `json:"share"`
+	// Friendly name for the service.
+	FriendlyName OptString `json:"friendlyName"`
+	// A chosen name for the service.
+	Name string `json:"name"`
 }
 
-// GetChart returns the value of Chart.
-func (s *ServiceInstallRequest) GetChart() string {
-	return s.Chart
+// GetCatalogId returns the value of CatalogId.
+func (s *ServiceInstallRequest) GetCatalogId() string {
+	return s.CatalogId
 }
 
-// GetRepoUrl returns the value of RepoUrl.
-func (s *ServiceInstallRequest) GetRepoUrl() OptURI {
-	return s.RepoUrl
+// GetPackageName returns the value of PackageName.
+func (s *ServiceInstallRequest) GetPackageName() string {
+	return s.PackageName
+}
+
+// GetPackageVersion returns the value of PackageVersion.
+func (s *ServiceInstallRequest) GetPackageVersion() OptString {
+	return s.PackageVersion
 }
 
 // GetVersion returns the value of Version.
@@ -418,19 +432,39 @@ func (s *ServiceInstallRequest) GetVersion() OptString {
 	return s.Version
 }
 
-// GetValues returns the value of Values.
-func (s *ServiceInstallRequest) GetValues() OptServiceInstallRequestValues {
-	return s.Values
+// GetOptions returns the value of Options.
+func (s *ServiceInstallRequest) GetOptions() ServiceInstallRequestOptions {
+	return s.Options
 }
 
-// SetChart sets the value of Chart.
-func (s *ServiceInstallRequest) SetChart(val string) {
-	s.Chart = val
+// GetShare returns the value of Share.
+func (s *ServiceInstallRequest) GetShare() OptBool {
+	return s.Share
 }
 
-// SetRepoUrl sets the value of RepoUrl.
-func (s *ServiceInstallRequest) SetRepoUrl(val OptURI) {
-	s.RepoUrl = val
+// GetFriendlyName returns the value of FriendlyName.
+func (s *ServiceInstallRequest) GetFriendlyName() OptString {
+	return s.FriendlyName
+}
+
+// GetName returns the value of Name.
+func (s *ServiceInstallRequest) GetName() string {
+	return s.Name
+}
+
+// SetCatalogId sets the value of CatalogId.
+func (s *ServiceInstallRequest) SetCatalogId(val string) {
+	s.CatalogId = val
+}
+
+// SetPackageName sets the value of PackageName.
+func (s *ServiceInstallRequest) SetPackageName(val string) {
+	s.PackageName = val
+}
+
+// SetPackageVersion sets the value of PackageVersion.
+func (s *ServiceInstallRequest) SetPackageVersion(val OptString) {
+	s.PackageVersion = val
 }
 
 // SetVersion sets the value of Version.
@@ -438,15 +472,30 @@ func (s *ServiceInstallRequest) SetVersion(val OptString) {
 	s.Version = val
 }
 
-// SetValues sets the value of Values.
-func (s *ServiceInstallRequest) SetValues(val OptServiceInstallRequestValues) {
-	s.Values = val
+// SetOptions sets the value of Options.
+func (s *ServiceInstallRequest) SetOptions(val ServiceInstallRequestOptions) {
+	s.Options = val
 }
 
-// Helm values override.
-type ServiceInstallRequestValues map[string]jx.Raw
+// SetShare sets the value of Share.
+func (s *ServiceInstallRequest) SetShare(val OptBool) {
+	s.Share = val
+}
 
-func (s *ServiceInstallRequestValues) init() ServiceInstallRequestValues {
+// SetFriendlyName sets the value of FriendlyName.
+func (s *ServiceInstallRequest) SetFriendlyName(val OptString) {
+	s.FriendlyName = val
+}
+
+// SetName sets the value of Name.
+func (s *ServiceInstallRequest) SetName(val string) {
+	s.Name = val
+}
+
+// Options of package (values.yaml for helm).
+type ServiceInstallRequestOptions map[string]jx.Raw
+
+func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

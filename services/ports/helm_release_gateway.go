@@ -2,6 +2,8 @@ package ports
 
 import (
 	"context"
+
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
 type HelmStartCallbacks struct {
@@ -19,7 +21,7 @@ type HelmReleasesGateway interface {
 	StartInstall(
 		ctx context.Context,
 		releaseName string,
-		chartRef string,
+		pkg domain.PackageRef,
 		vals map[string]interface{},
 		opts HelmStartOptions,
 	) error
