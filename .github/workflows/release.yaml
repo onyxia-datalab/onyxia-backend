@@ -36,7 +36,7 @@ jobs:
         component: ${{ fromJSON(needs.release-please.outputs.paths_released) }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0 # Ensures full history is available
           fetch-tags: true # Ensures git describe works correctly
