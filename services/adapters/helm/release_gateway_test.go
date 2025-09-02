@@ -1,4 +1,4 @@
-package adapters
+package helm
 
 import (
 	"context"
@@ -9,26 +9,35 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/client-go/rest"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
 )
 
-func newAdapter(t *testing.T) *Helm {
+func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
 	t.Helper()
-	settings := cli.New()
-	settings.SetNamespace("test-ns")
-	return New(&action.Configuration{}, settings, ports.HelmStartCallbacks{
+
+	k8sCfg := &rest.Config{
+		Host: "https://fake-cluster",
+	}
+
+	adapter, err := NewReleaseGtw(k8sCfg, cb)
+	require.NoError(t, err)
+
+	return adapter
+}
+
+func defaultCallbacks() ports.HelmStartCallbacks {
+	return ports.HelmStartCallbacks{
 		OnStart:   func(_, _ string) {},
 		OnSuccess: func(_, _ string) {},
 		OnError:   func(_, _ string, _ error) {},
-	})
+	}
 }
 
 func TestStartInstall_EmptyArgs(t *testing.T) {
-	i := newAdapter(t)
+	i := newAdapter(t, defaultCallbacks())
 
 	err := i.StartInstall(
 		context.Background(),
@@ -42,7 +51,7 @@ func TestStartInstall_EmptyArgs(t *testing.T) {
 }
 
 func TestStartInstall_LocateChart_Error(t *testing.T) {
-	i := newAdapter(t)
+	i := newAdapter(t, defaultCallbacks())
 
 	// Chart inexistant → act.LocateChart renvoie une erreur (pré-flight)
 	err := i.StartInstall(
@@ -62,7 +71,7 @@ func TestStartInstall_LocateChart_Error(t *testing.T) {
 }
 
 func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
-	i := newAdapter(t)
+	i := newAdapter(t, defaultCallbacks())
 
 	tmp := t.TempDir()
 	nonChartDir := filepath.Join(tmp, "not-a-chart")
@@ -88,16 +97,10 @@ func TestStartInstall_NoCallbacks_OnPreflightErrors(t *testing.T) {
 	successCalled := false
 	errorCalled := false
 
-	settings := cli.New()
-	settings.SetNamespace("test-ns")
-	i := New(&action.Configuration{}, settings, ports.HelmStartCallbacks{
-		OnStart: func(_, _ string) { startCalled = true },
-		OnSuccess: func(_, _ string) {
-			successCalled = true
-		},
-		OnError: func(_, _ string, _ error) {
-			errorCalled = true
-		},
+	i := newAdapter(t, ports.HelmStartCallbacks{
+		OnStart:   func(_, _ string) { startCalled = true },
+		OnSuccess: func(_, _ string) { successCalled = true },
+		OnError:   func(_, _ string, _ error) { errorCalled = true },
 	})
 
 	err := i.StartInstall(context.Background(), "rel", domain.PackageRef{

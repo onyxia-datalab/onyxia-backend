@@ -20,7 +20,7 @@ import (
 func TestEnsure_Create(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	ns, name := "user-ddecrulle", "jupyter-python-721817"
 	data := map[string][]byte{"owner": []byte("ddecrulle")}
@@ -38,7 +38,7 @@ func TestEnsure_Create(t *testing.T) {
 func TestEnsure_UpdateOnExists(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	ns, name := "ns", "secret"
 	// seed
@@ -63,7 +63,7 @@ func TestEnsure_UpdateOnExists(t *testing.T) {
 func TestEnsure_RetryOnConflict(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	ns, name := "ns", "secret"
 	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
@@ -99,7 +99,7 @@ func TestEnsure_RetryOnConflict(t *testing.T) {
 func TestEnsure_RecreateIfDeletedDuringUpdate(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	ns, name := "ns", "secret"
 
@@ -145,7 +145,7 @@ func TestEnsure_RecreateIfDeletedDuringUpdate(t *testing.T) {
 func TestDelete_IgnoresNotFound(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	err := gw.DeleteOnyxiaSecret(ctx, "ns", "missing")
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestDelete_IgnoresNotFound(t *testing.T) {
 func TestRead_ReturnsEmptyMapWhenNil(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
-	gw := NewK8sOnyxiaSecretGateway(cs)
+	gw := NewOnyxiaSecretGtw(cs)
 
 	ns, name := "ns", "secret-nil"
 	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{

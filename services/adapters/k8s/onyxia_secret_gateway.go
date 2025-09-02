@@ -25,7 +25,7 @@ type K8sOnyxiaSecretGateway struct {
 	client kubernetes.Interface
 }
 
-func NewK8sOnyxiaSecretGateway(client kubernetes.Interface) *K8sOnyxiaSecretGateway {
+func NewOnyxiaSecretGtw(client kubernetes.Interface) *K8sOnyxiaSecretGateway {
 	return &K8sOnyxiaSecretGateway{client: client}
 }
 

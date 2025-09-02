@@ -23,7 +23,11 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to initialize OIDC middleware: %w", err)
 	}
 
-	installCtrl := SetupInstallController(app)
+	installCtrl, err := SetupInstallController(app)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup install controller: %w", err)
+	}
 
 	h := NewHandler(installCtrl)
 

@@ -1,4 +1,4 @@
-package adapters
+package helm
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"k8s.io/client-go/rest"
 )
 
 type Helm struct {
@@ -22,12 +23,29 @@ type Helm struct {
 
 var _ ports.HelmReleasesGateway = (*Helm)(nil)
 
-func New(
-	cfg *action.Configuration,
-	settings *cli.EnvSettings,
+func NewReleaseGtw(
+	k8sConfig *rest.Config,
 	global ports.HelmStartCallbacks,
-) *Helm {
-	return &Helm{cfg: cfg, settings: settings, global: global}
+) (*Helm, error) {
+
+	settings := cli.New()
+
+	cfg := new(action.Configuration)
+	err := cfg.Init(
+		&StaticRESTClientGetter{config: k8sConfig},
+		settings.Namespace(),
+		"secret",
+		slog.Debug,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init Helm config: %w", err)
+	}
+
+	return &Helm{
+		cfg:      cfg,
+		settings: settings,
+		global:   global,
+	}, nil
 }
 
 // StartInstall starts a helm install operation in background
