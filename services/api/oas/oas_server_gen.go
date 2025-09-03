@@ -8,21 +8,27 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// GetApp implements getApp operation.
+	// InstallService implements installService operation.
 	//
-	// Get the description of an installed service in the namespace. With Kubernetes backend, an
-	// installed service can be seen as a Helm chart. Its unique identifier will be the release name on
-	// the namespace.
+	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
+	// the release already exists (returns 202 with same event URLs).
 	//
-	// GET /my-lab/app
-	GetApp(ctx context.Context, params GetAppParams) (*Service, error)
-	// GetMyServices implements getMyServices operation.
+	// PUT /services/{releaseId}/install
+	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
+	// WatchRelease implements watchRelease operation.
 	//
-	// List the services installed in a namespace. With a Kubernetes backend, utilize Helm to list all
-	// installed services in a namespace.
+	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 	//
-	// GET /my-lab/services
-	GetMyServices(ctx context.Context, params GetMyServicesParams) (*ServicesListing, error)
+	// GET /events/{releaseId}/watch-release
+	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
+	// WatchResources implements watchResources operation.
+	//
+	// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
+	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
+	// "done".
+	//
+	// GET /events/{releaseId}/watch-resources
+	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
 }
 
 // Server implements http server based on OpenAPI v3 specification and

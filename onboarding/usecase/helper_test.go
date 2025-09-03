@@ -5,7 +5,7 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -23,46 +23,36 @@ const (
 // ---------- NamespaceService mock ----------
 type MockNamespaceService struct{ mock.Mock }
 
-var _ interfaces.NamespaceService = (*MockNamespaceService)(nil)
+var _ port.NamespaceService = (*MockNamespaceService)(nil)
 
 func (m *MockNamespaceService) CreateNamespace(
 	ctx context.Context,
 	name string,
 	annotations map[string]string,
 	labels map[string]string,
-) (interfaces.NamespaceCreationResult, error) {
+) (port.NamespaceCreationResult, error) {
 	args := m.Called(ctx, name)
-	return args.Get(0).(interfaces.NamespaceCreationResult), args.Error(1)
+	return args.Get(0).(port.NamespaceCreationResult), args.Error(1)
 }
 
 func (m *MockNamespaceService) ApplyResourceQuotas(
 	ctx context.Context,
 	namespace string,
 	quota *domain.Quota,
-) (interfaces.QuotaApplicationResult, error) {
+) (port.QuotaApplicationResult, error) {
 	args := m.Called(ctx, namespace, quota)
-	return args.Get(0).(interfaces.QuotaApplicationResult), args.Error(1)
+	return args.Get(0).(port.QuotaApplicationResult), args.Error(1)
 }
 
 // ---------- Usercontext helpers ----------
 
-// Default test user used by most tests.
-func defaultTestUser() *usercontext.User {
-	return &usercontext.User{
-		Username: testUserName,
-		Groups:   []string{testGroupName},
-		Roles:    []string{"role1"},
-		Attributes: map[string]any{
-			"attr1": "value1",
-		},
-	}
-}
-
-// Returns (ctxWithUser, reader) you can use in tests.
-func newCtxAndReaderWithUser(u *usercontext.User) (context.Context, usercontext.Reader) {
-	reader, writer := usercontext.NewUserContext()
-	ctx := writer.WithUser(context.Background(), u)
-	return ctx, reader
+var defaultTestUser = &usercontext.User{
+	Username: testUserName,
+	Groups:   []string{testGroupName},
+	Roles:    []string{"role1"},
+	Attributes: map[string]any{
+		"attr1": "value1",
+	},
 }
 
 // ---------- Usecase builders ----------
@@ -72,8 +62,8 @@ func setupUsecase(
 	mockService *MockNamespaceService,
 	quotas domain.Quotas,
 ) domain.OnboardingUsecase {
-	_, reader := // keep both for clarity, but only reader is needed here
-		func() (context.Context, usercontext.Reader) { return newCtxAndReaderWithUser(defaultTestUser()) }()
+
+	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
 
 	return NewOnboardingUsecase(
 		mockService,
@@ -87,16 +77,15 @@ func setupUsecase(
 			},
 		},
 		quotas,
-		reader, // <- shared usercontext.Reader
+		reader,
 	)
 }
 
-// Private usecase (struct) for tests that reach unexported methods.
 func setupPrivateUsecase(
 	mockService *MockNamespaceService,
 	quotas domain.Quotas,
 ) *onboardingUsecase {
-	_, reader := newCtxAndReaderWithUser(defaultTestUser())
+	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
 
 	return &onboardingUsecase{
 		namespaceService: mockService,
@@ -109,6 +98,6 @@ func setupPrivateUsecase(
 			},
 		},
 		quotas:            quotas,
-		userContextReader: reader, // <- inject the shared Reader
+		userContextReader: reader,
 	}
 }
