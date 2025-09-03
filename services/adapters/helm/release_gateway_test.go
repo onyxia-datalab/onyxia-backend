@@ -58,10 +58,9 @@ func TestStartInstall_LocateChart_Error(t *testing.T) {
 		context.Background(),
 		"rel",
 		domain.PackageRef{
-			Kind:      domain.PackageKindHelm,
-			RepoURL:   "fake-repo",
-			ChartName: "this-chart-does-not-exist",
-			Version:   "0.1.0",
+			RepoURL:     "fake-repo",
+			PackageName: "this-chart-does-not-exist",
+			Versions:    []string{"0.1.0"},
 		},
 		nil,
 		ports.HelmStartOptions{},
@@ -81,8 +80,7 @@ func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
 		context.Background(),
 		"rel",
 		domain.PackageRef{
-			Kind:      domain.PackageKindHelm,
-			ChartName: nonChartDir,
+			PackageName: nonChartDir,
 		},
 		map[string]interface{}{},
 		ports.HelmStartOptions{},
@@ -104,10 +102,9 @@ func TestStartInstall_NoCallbacks_OnPreflightErrors(t *testing.T) {
 	})
 
 	err := i.StartInstall(context.Background(), "rel", domain.PackageRef{
-		Kind:      domain.PackageKindHelm,
-		RepoURL:   "fake-repo",
-		ChartName: "unknown-chart",
-		Version:   "0.1.0",
+		RepoURL:     "fake-repo",
+		PackageName: "unknown-chart",
+		Versions:    []string{"0.1.0"},
 	}, nil, ports.HelmStartOptions{
 		Callbacks: ports.HelmStartCallbacks{
 			OnStart:   func(_, _ string) { startCalled = true },

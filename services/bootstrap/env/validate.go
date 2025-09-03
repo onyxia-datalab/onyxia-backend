@@ -1,58 +1,37 @@
 package env
 
 import (
+	"errors"
 	"fmt"
 )
 
-// ValidateCatalogs validates a slice of catalogs (including duplicate IDs).
 func ValidateCatalogs(catalogs []Catalog) error {
 	seen := make(map[string]struct{}, len(catalogs))
-	for i := range catalogs {
-		c := catalogs[i]
-
-		// Per-catalog validation
+	for _, c := range catalogs {
 		if err := ValidateCatalog(c); err != nil {
 			return err
 		}
-
-		// Duplicate ID check
-		id := catalogID(c)
-		if _, dup := seen[id]; dup {
-			return fmt.Errorf("catalog %q: duplicate id", id)
+		if _, dup := seen[c.ID]; dup {
+			return fmt.Errorf("catalog %q: duplicate id", c.ID)
 		}
-		seen[id] = struct{}{}
+		seen[c.ID] = struct{}{}
 	}
 	return nil
 }
 
-// ValidateCatalog validates a single catalog according to its Type.
 func ValidateCatalog(c Catalog) error {
+
+	if err := validateCommon(c); err != nil {
+		return err
+	}
+
 	switch c.Type {
 	case CatalogTypeHelm:
-		if c.Helm == nil || c.OCI != nil {
-			return fmt.Errorf(
-				"catalog %q: type=helm requires Helm block and forbids OCI block",
-				catalogID(c),
-			)
+		if c.Packages != nil {
+			return errors.New("helm catalog should not have packages")
 		}
-		if err := validateCommon(c.Helm.CatalogCommon); err != nil {
-			return err
-		}
-		if err := validateHelm(*c.Helm); err != nil {
-			return err
-		}
-
 	case CatalogTypeOCI:
-		if c.OCI == nil || c.Helm != nil {
-			return fmt.Errorf(
-				"catalog %q: type=oci requires OCI block and forbids Helm block",
-				catalogID(c),
-			)
-		}
-		if err := validateCommon(c.OCI.CatalogCommon); err != nil {
-			return err
-		}
-		if err := validateOCI(*c.OCI); err != nil {
+		if err := validateOCI(c); err != nil {
 			return err
 		}
 
@@ -67,24 +46,7 @@ func ValidateCatalog(c Catalog) error {
 	return nil
 }
 
-// --- helpers ---
-
-func catalogID(c Catalog) string {
-	switch c.Type {
-	case CatalogTypeHelm:
-		if c.Helm != nil {
-			return c.Helm.ID
-		}
-	case CatalogTypeOCI:
-		if c.OCI != nil {
-			return c.OCI.ID
-		}
-	}
-	// Fallback if type is invalid or blocks are missing
-	return "<unknown>"
-}
-
-func validateCommon(cc CatalogCommon) error {
+func validateCommon(cc Catalog) error {
 	// Status enum
 	switch cc.Status {
 	case StatusProd, StatusTest:
@@ -134,17 +96,7 @@ func validateCommon(cc CatalogCommon) error {
 	return nil
 }
 
-func validateHelm(h HelmCatalog) error {
-	if h.Location == "" {
-		return fmt.Errorf("catalog %q: helm.location is required", h.ID)
-	}
-	return nil
-}
-
-func validateOCI(o OCICatalog) error {
-	if o.Base == "" {
-		return fmt.Errorf("catalog %q: oci.base is required", o.ID)
-	}
+func validateOCI(o Catalog) error {
 	if len(o.Packages) == 0 {
 		return fmt.Errorf("catalog %q: oci.packages must not be empty", o.ID)
 	}
