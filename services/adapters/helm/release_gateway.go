@@ -52,7 +52,7 @@ func NewReleaseGtw(
 func (i *Helm) StartInstall(
 	ctx context.Context,
 	releaseName string,
-	pkg domain.PackageRef,
+	pkg domain.PackageVersion,
 	vals map[string]interface{},
 	opts ports.HelmStartOptions,
 ) error {
@@ -66,6 +66,7 @@ func (i *Helm) StartInstall(
 	act := action.NewInstall(i.cfg)
 	act.ReleaseName = releaseName
 	act.Namespace = i.settings.Namespace()
+	act.Version = pkg.Version
 
 	cp, err := act.LocateChart(chartRef, i.settings)
 	if err != nil {

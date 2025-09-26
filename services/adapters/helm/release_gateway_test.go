@@ -42,7 +42,7 @@ func TestStartInstall_EmptyArgs(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"",
-		domain.PackageRef{},
+		domain.PackageVersion{},
 		nil,
 		ports.HelmStartOptions{},
 	)
@@ -57,10 +57,13 @@ func TestStartInstall_LocateChart_Error(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		domain.PackageRef{
-			RepoURL:     "fake-repo",
-			PackageName: "this-chart-does-not-exist",
-			Versions:    []string{"0.1.0"},
+		domain.PackageVersion{
+			Package: domain.Package{
+				CatalogID: "fake-cat",
+				Name:      "this-chart-does-not-exist",
+			},
+			Version: "0.1.0",
+			RepoURL: "fake-repo",
 		},
 		nil,
 		ports.HelmStartOptions{},
@@ -79,8 +82,13 @@ func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		domain.PackageRef{
-			PackageName: nonChartDir,
+		domain.PackageVersion{
+			Package: domain.Package{
+				CatalogID: "fake-cat",
+				Name:      "",
+			},
+			Version: "0.1.0",
+			RepoURL: nonChartDir,
 		},
 		map[string]interface{}{},
 		ports.HelmStartOptions{},
@@ -101,10 +109,13 @@ func TestStartInstall_NoCallbacks_OnPreflightErrors(t *testing.T) {
 		OnError:   func(_, _ string, _ error) { errorCalled = true },
 	})
 
-	err := i.StartInstall(context.Background(), "rel", domain.PackageRef{
-		RepoURL:     "fake-repo",
-		PackageName: "unknown-chart",
-		Versions:    []string{"0.1.0"},
+	err := i.StartInstall(context.Background(), "rel", domain.PackageVersion{
+		Package: domain.Package{
+			CatalogID: "fake-cat",
+			Name:      "unknown-chart",
+		},
+		Version: "0.1.0",
+		RepoURL: "fake-repo",
 	}, nil, ports.HelmStartOptions{
 		Callbacks: ports.HelmStartCallbacks{
 			OnStart:   func(_, _ string) { startCalled = true },

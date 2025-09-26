@@ -58,17 +58,19 @@ func convertToDomainCatalogs(catalogs []env.Catalog) []domain.Catalog {
 
 	for _, c := range catalogs {
 		dc := domain.Catalog{
-			ID:      c.ID,
-			Type:    domain.CatalogType(c.Type),
-			RepoURL: c.Location,
+			ID:   c.ID,
+			Type: domain.CatalogType(c.Type),
+			URL:  c.Location,
 		}
 
 		if c.Type == env.CatalogTypeOCI {
 			for _, p := range c.Packages {
 				dc.Packages = append(dc.Packages, domain.PackageRef{
-					PackageName: p.Name,
-					Versions:    append([]string(nil), p.Versions...),
-					RepoURL:     c.Location,
+					Package: domain.Package{
+						CatalogID: c.ID,
+						Name:      p.Name,
+					},
+					Versions: append([]string(nil), p.Versions...),
 				})
 			}
 		}

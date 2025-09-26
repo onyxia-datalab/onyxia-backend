@@ -11,7 +11,47 @@ tags:
     description: Service lifecycle (install)
   - name: events
     description: Event streams (SSE)
+  - name: catalogs
+    description: Service catalogs
 paths:
+  /services/catalogs:
+    get:
+      tags:
+        - catalogs
+      operationId: getMyCatalogs
+      summary: List available catalogs and packages for installing for the user.
+      description: >
+        Returns the list of catalogs and packages available for the user.
+        The list of packages is filtered by user permissions if user is authenticated. Otherwise we return the public catalog.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Catalog"
+              examples:
+                default:
+                  value:
+                    - id: public
+                      name: Public catalog
+                      packages:
+                        - name: jupyter-python
+                          versions: ["1.0.0", "1.1.0", "2.0.0"]
+                        - name: rstudio
+                          versions: ["1.0.0", "1.1.0"]
+                    - id: internal
+                      name: Internal catalog
+                      packages:
+                        - name: internal-tool
+                          versions: ["0.1.0"]
+        "500":
+          description: Internal error
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
   /services/{releaseId}/install:
     put:
       tags: [services]
@@ -166,6 +206,42 @@ components:
       schema: { type: string }
       description: Resume SSE from a specific event id (client reconnection)
   schemas:
+    Catalog:
+      type: object
+      required: [id, name, packages]
+      properties:
+        id:
+          type: string
+          description: Catalog id
+        name:
+          $ref: "#/components/schemas/LocalizedString"
+          description: The name of the catalog
+        description:
+          $ref: "#/components/schemas/LocalizedString"
+          description: The description of the catalog
+        location:
+          type: string
+          description: Where to find the catalog
+        status:
+          type: string
+          description: Is the catalog a test or a production catalog
+          enum: [PROD, TEST]
+        highlightedCharts:
+          type: array
+          description: names of important packages of the catalog to highlight in the UI
+          items:
+            type: string
+        visible:
+          type: object
+          required: [user, project]
+          properties:
+            user:
+              type: boolean
+              description: Should this catalog be visible in user context ?
+            project:
+              type: boolean
+              description: Should this catalog be visible in project context ?
+          description: Describes if the catalog is visible in user or project context
     ServiceInstallRequest:
       type: object
       required: [packageName, options, catalogId, name]
@@ -316,6 +392,35 @@ components:
         failed: { type: boolean }
         error: { type: string }
 
+    LocalizedString:
+      description: A string or a map of localized strings by language code
+      oneOf:
+        - type: string
+        - type: object
+          additionalProperties:
+            type: string
+          properties:
+            en:
+              type: string
+            fr:
+              type: string
+            zh-CN:
+              type: string
+            no:
+              type: string
+            fi:
+              type: string
+            nl:
+              type: string
+            it:
+              type: string
+            es:
+              type: string
+            de:
+              type: string
+          example:
+            en: "Hello"
+            fr: "Bonjour"
     Problem:
       type: object
       properties:

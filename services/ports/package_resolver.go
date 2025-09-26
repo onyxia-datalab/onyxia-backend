@@ -12,5 +12,5 @@ type PackageResolver interface {
 		catalogID string,
 		packageName string,
 		version string,
-	) (domain.PackageRef, error)
+	) (domain.PackageVersion, error)
 }

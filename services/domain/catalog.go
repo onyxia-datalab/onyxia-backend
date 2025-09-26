@@ -10,6 +10,6 @@ const (
 type Catalog struct {
 	ID       string
 	Type     CatalogType
-	RepoURL  string
+	URL      string
 	Packages []PackageRef // used only for OCI catalogs
 }

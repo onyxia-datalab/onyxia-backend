@@ -17,7 +17,7 @@ var _ ports.PackageResolver = (*HelmPackageResolver)(nil)
 func (r *HelmPackageResolver) ResolvePackage(
 	ctx context.Context,
 	catalogID, pkgName, version string,
-) (domain.PackageRef, error) {
+) (domain.PackageVersion, error) {
 
 	for _, cat := range r.catalogs {
 		if cat.ID != catalogID {
@@ -27,44 +27,49 @@ func (r *HelmPackageResolver) ResolvePackage(
 		switch cat.Type {
 		case domain.CatalogTypeOCI:
 			for _, p := range cat.Packages {
-				if p.PackageName != pkgName {
+				if p.Name != pkgName {
 					continue
 				}
 				for _, v := range p.Versions {
 					if v == version {
-						return domain.PackageRef{
-							PackageName: pkgName,
-							Versions:    []string{version},
+						return domain.PackageVersion{
+							Package: domain.Package{
+								Name:      pkgName,
+								CatalogID: catalogID,
+							},
+							Version: version,
 						}, nil
 					}
 				}
-				return domain.PackageRef{}, fmt.Errorf(
+				return domain.PackageVersion{}, fmt.Errorf(
 					"version %q not found for package %q in catalog %q",
 					version, pkgName, catalogID,
 				)
 			}
-			return domain.PackageRef{}, fmt.Errorf(
+			return domain.PackageVersion{}, fmt.Errorf(
 				"package %q not found in OCI catalog %q",
 				pkgName, catalogID,
 			)
 
 		case domain.CatalogTypeHelm:
 			// Version existence is not validated here
-			return domain.PackageRef{
-				PackageName: pkgName,
-				Versions:    []string{version},
-				RepoURL:     cat.RepoURL,
+			return domain.PackageVersion{
+				Package: domain.Package{
+					Name:      pkgName,
+					CatalogID: catalogID,
+				},
+				Version: version,
 			}, nil
 
 		default:
-			return domain.PackageRef{}, fmt.Errorf(
+			return domain.PackageVersion{}, fmt.Errorf(
 				"catalog %q has unsupported type %q",
 				catalogID, cat.Type,
 			)
 		}
 	}
 
-	return domain.PackageRef{}, fmt.Errorf(
+	return domain.PackageVersion{}, fmt.Errorf(
 		"catalog %q not found",
 		catalogID,
 	)
