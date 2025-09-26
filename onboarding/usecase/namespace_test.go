@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-func TestCreateNamespace_Success(t *testing.T) {
+func TestCreateNamespaceSuccess(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
@@ -39,7 +39,7 @@ func TestCreateNamespace_Success(t *testing.T) {
 	)
 }
 
-func TestCreateNamespace_AlreadyExists(t *testing.T) {
+func TestCreateNamespaceAlreadyExists(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
@@ -61,7 +61,7 @@ func TestCreateNamespace_AlreadyExists(t *testing.T) {
 	)
 }
 
-func TestCreateNamespace_Failure(t *testing.T) {
+func TestCreateNamespaceFailure(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
@@ -83,7 +83,7 @@ func TestCreateNamespace_Failure(t *testing.T) {
 	)
 }
 
-func TestGetNamespaceAnnotations_Disabled(t *testing.T) {
+func TestGetNamespaceAnnotationsDisabled(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = false
 
@@ -92,7 +92,7 @@ func TestGetNamespaceAnnotations_Disabled(t *testing.T) {
 	assert.Nil(t, annotations, "Expected nil when annotations are disabled")
 }
 
-func TestGetNamespaceAnnotations_StaticOnly(t *testing.T) {
+func TestGetNamespaceAnnotationsStaticOnly(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Static = map[string]string{
@@ -105,7 +105,7 @@ func TestGetNamespaceAnnotations_StaticOnly(t *testing.T) {
 	assert.Equal(t, "static-value", annotations["static-key"])
 }
 
-func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
+func TestGetNamespaceAnnotationsLastLoginTimestamp(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Dynamic.LastLoginTimestamp = true
@@ -121,7 +121,7 @@ func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
 	assert.LessOrEqual(t, ms, after)
 }
 
-func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
+func TestGetNamespaceAnnotationsUserAttributes(t *testing.T) {
 
 	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{
@@ -142,7 +142,7 @@ func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
 	assert.Equal(t, "value2", annotations["user-attr2"])
 }
 
-func TestGetNamespaceAnnotations_AllAnnotations(t *testing.T) {
+func TestGetNamespaceAnnotationsAllAnnotations(t *testing.T) {
 
 	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{

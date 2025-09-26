@@ -17,7 +17,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-func TestEnsure_Create(t *testing.T) {
+func TestEnsureCreate(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -35,7 +35,7 @@ func TestEnsure_Create(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(data, got.Data))
 }
 
-func TestEnsure_UpdateOnExists(t *testing.T) {
+func TestEnsureUpdateOnExists(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -60,7 +60,7 @@ func TestEnsure_UpdateOnExists(t *testing.T) {
 	assert.Equal(t, newData, got.Data)
 }
 
-func TestEnsure_RetryOnConflict(t *testing.T) {
+func TestEnsureRetryOnConflict(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -96,7 +96,7 @@ func TestEnsure_RetryOnConflict(t *testing.T) {
 	assert.Equal(t, newData, got.Data)
 }
 
-func TestEnsure_RecreateIfDeletedDuringUpdate(t *testing.T) {
+func TestEnsureRecreateIfDeletedDuringUpdate(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -142,7 +142,7 @@ func TestEnsure_RecreateIfDeletedDuringUpdate(t *testing.T) {
 	assert.Equal(t, newData, got.Data)
 }
 
-func TestDelete_IgnoresNotFound(t *testing.T) {
+func TestDeleteIgnoresNotFound(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -151,7 +151,7 @@ func TestDelete_IgnoresNotFound(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestRead_ReturnsEmptyMapWhenNil(t *testing.T) {
+func TestReadReturnsEmptyMapWhenNil(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewSimpleClientset()
 	gw := NewOnyxiaSecretGtw(cs)

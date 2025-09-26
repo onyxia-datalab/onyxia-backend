@@ -36,7 +36,7 @@ func defaultCallbacks() ports.HelmStartCallbacks {
 	}
 }
 
-func TestStartInstall_EmptyArgs(t *testing.T) {
+func TestStartInstallEmptyArgs(t *testing.T) {
 	i := newAdapter(t, defaultCallbacks())
 
 	err := i.StartInstall(
@@ -50,7 +50,7 @@ func TestStartInstall_EmptyArgs(t *testing.T) {
 
 }
 
-func TestStartInstall_LocateChart_Error(t *testing.T) {
+func TestStartInstallLocateChartError(t *testing.T) {
 	i := newAdapter(t, defaultCallbacks())
 
 	// Chart inexistant → act.LocateChart renvoie une erreur (pré-flight)
@@ -72,7 +72,7 @@ func TestStartInstall_LocateChart_Error(t *testing.T) {
 	assert.Contains(t, err.Error(), "locating chart")
 }
 
-func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
+func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 	i := newAdapter(t, defaultCallbacks())
 
 	tmp := t.TempDir()
@@ -97,7 +97,7 @@ func TestStartInstall_Loader_Error_WhenPathIsNotAChart(t *testing.T) {
 	assert.Contains(t, err.Error(), "loading chart")
 }
 
-func TestStartInstall_NoCallbacks_OnPreflightErrors(t *testing.T) {
+func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 
 	startCalled := false
 	successCalled := false

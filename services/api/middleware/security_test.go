@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBuildSecurityHandler_NoAuthMode(t *testing.T) {
+func TestBuildSecurityHandlerNoAuthMode(t *testing.T) {
 	reader, writer := usercontext.NewUserContext()
 
 	sec, err := BuildSecurityHandler(

@@ -17,7 +17,7 @@ func observedZap(level zapcore.Level) (*zap.Logger, *observer.ObservedLogs) {
 	return zap.New(core), logs
 }
 
-func TestNewLogger_UsesProvidedZapAndEnrichesFromContext(t *testing.T) {
+func TestNewLoggerUsesProvidedZapAndEnrichesFromContext(t *testing.T) {
 	zl, logs := observedZap(zapcore.InfoLevel)
 
 	attrFn := func(ctx context.Context) []slog.Attr {
@@ -72,7 +72,7 @@ func TestNewLogger_UsesProvidedZapAndEnrichesFromContext(t *testing.T) {
 	}
 }
 
-func TestNewLogger_AppliesHandlerOptions_NameAndCaller(t *testing.T) {
+func TestNewLoggerAppliesHandlerOptionsNameAndCaller(t *testing.T) {
 	zl, logs := observedZap(zapcore.InfoLevel)
 
 	logger, flush, err := NewLogger(zl, nil,
@@ -99,7 +99,7 @@ func TestNewLogger_AppliesHandlerOptions_NameAndCaller(t *testing.T) {
 	}
 }
 
-func TestNewLogger_FlushDoesNotErrorWithObserver(t *testing.T) {
+func TestNewLoggerFlushDoesNotErrorWithObserver(t *testing.T) {
 	zl, _ := observedZap(zapcore.InfoLevel)
 	logger, flush, err := NewLogger(zl, nil)
 	if err != nil {

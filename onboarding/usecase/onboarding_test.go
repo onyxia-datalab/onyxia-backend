@@ -12,7 +12,7 @@ import (
 )
 
 // ✅ Test `Onboard` Success (Namespace & Quota Applied)
-func Test_Onboard_Success(t *testing.T) {
+func TestOnboardSuccess(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled:      true,
@@ -37,7 +37,7 @@ func Test_Onboard_Success(t *testing.T) {
 }
 
 // ✅ Test `Onboard` Success (Quotas Disabled)
-func Test_Onboard_QuotasDisabled(t *testing.T) {
+func TestOnboardQuotasDisabled(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{Enabled: false}
 	usecase := setupUsecase(mockService, quotas)
@@ -54,7 +54,7 @@ func Test_Onboard_QuotasDisabled(t *testing.T) {
 }
 
 // ❌ Test `Onboard` (Namespace Creation Fails)
-func Test_Onboard_CreateNamespaceFails(t *testing.T) {
+func TestOnboardCreateNamespaceFails(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{Enabled: true}
 	usecase := setupUsecase(mockService, quotas)
@@ -74,7 +74,7 @@ func Test_Onboard_CreateNamespaceFails(t *testing.T) {
 }
 
 // ❌ Test `Onboard` (Quota Application Fails)
-func Test_Onboard_ApplyResourceQuotasFails(t *testing.T) {
+func TestOnboardApplyResourceQuotasFails(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{Enabled: true, Default: domain.Quota{MemoryRequest: "10Gi"}}
 	usecase := setupUsecase(mockService, quotas)
@@ -100,7 +100,7 @@ func Test_Onboard_ApplyResourceQuotasFails(t *testing.T) {
 }
 
 // ✅ Test `Onboard` Success (Namespace Already Exists)
-func Test_Onboard_NamespaceAlreadyExists(t *testing.T) {
+func TestOnboardNamespaceAlreadyExists(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{Enabled: true, Default: domain.Quota{MemoryRequest: "10Gi"}}
 	usecase := setupUsecase(mockService, quotas)

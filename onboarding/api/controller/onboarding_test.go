@@ -24,7 +24,7 @@ func (m *MockOnboardingUsecase) Onboard(ctx context.Context, req domain.Onboardi
 	return args.Error(0)
 }
 
-func TestOnboard_Success_NoGroup(t *testing.T) {
+func TestOnboardSuccessNoGroup(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
 	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Username: "test-user",
@@ -42,7 +42,7 @@ func TestOnboard_Success_NoGroup(t *testing.T) {
 	assert.IsType(t, &api.OnboardOK{}, res)
 }
 
-func TestOnboard_GetUserFails(t *testing.T) {
+func TestOnboardGetUserFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
 	ctx, userCtxReader, _ := usercontext.NewTestUserContext(nil)
 
@@ -55,7 +55,7 @@ func TestOnboard_GetUserFails(t *testing.T) {
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 
-func TestOnboard_GroupValidationFails(t *testing.T) {
+func TestOnboardGroupValidationFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
 	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Username: "u",
@@ -72,7 +72,7 @@ func TestOnboard_GroupValidationFails(t *testing.T) {
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 
-func TestOnboard_OnboardingFails(t *testing.T) {
+func TestOnboardOnboardingFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
 	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Username: "u",
