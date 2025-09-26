@@ -68,11 +68,12 @@ func (i *Helm) StartInstall(
 	act.Namespace = i.settings.Namespace()
 	act.Version = pkg.Version
 
-	cp, err := act.LocateChart(chartRef, i.settings)
+	chartPath, err := act.LocateChart(chartRef, i.settings)
 	if err != nil {
 		return fmt.Errorf("locating chart %q: %w", chartRef, err)
 	}
-	ch, err := loader.Load(cp)
+
+	chart, err := loader.Load(chartPath)
 	if err != nil {
 		return fmt.Errorf("loading chart: %w", err)
 	}
@@ -94,12 +95,12 @@ func (i *Helm) StartInstall(
 		slog.InfoContext(ctx, "helm install started",
 			"release", releaseName,
 			"chart", chartRef,
-			"chartPath", cp,
+			"chartPath", chartPath,
 			"namespace", i.settings.Namespace(),
 			"disableHooks", act.DisableHooks,
 			"timeout", act.Timeout,
 		)
-		_, runErr := act.RunWithContext(ctx, ch, valMap)
+		_, runErr := act.RunWithContext(ctx, chart, valMap)
 		if runErr != nil {
 			i.global.OnError(releaseName, chartRef, runErr)
 			opts.Callbacks.OnError(releaseName, chartRef, runErr)
