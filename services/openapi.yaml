@@ -3,214 +3,433 @@ info:
   title: Onyxia services API for a region
   description: Onyxia services API is responsible to provide service catalog and to run, modify delete services
   version: 0.0.0
+
+security:
+  - oidc: []
+tags:
+  - name: services
+    description: Service lifecycle (install)
+  - name: events
+    description: Event streams (SSE)
+  - name: catalogs
+    description: Service catalogs
 paths:
-  "/my-lab/app":
-    get:
-      summary: Get the description of an installed service.
-      description:
-        Get the description of an installed service in the namespace. With
-        Kubernetes backend, an installed service can be seen as a Helm chart. Its
-        unique identifier will be the release name on the namespace.
-      operationId: getApp
-      parameters:
-        - name: ONYXIA-PROJECT
-          in: header
-          description: Project associated with the namespace, defaults to user project.
-          schema:
-            type: string
-            description: Generated project id.
-            example: project-id-example
-        - name: serviceId
-          in: query
-          description: Unique ID of the installed service in that namespace.
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/Service"
-      security:
-        - oidc: []
-  "/my-lab/services":
+  /services/catalogs:
     get:
       tags:
-        - My lab
-      summary: List the services installed in a namespace.
-      description:
-        List the services installed in a namespace. With a Kubernetes backend,
-        utilize Helm to list all installed services in a namespace.
-      operationId: getMyServices
-      parameters:
-        - name: ONYXIA-PROJECT
-          in: header
-          description: Project associated with the namespace, defaults to user project.
-          schema:
-            type: string
-            description: Generated project id.
-            example: project-id-example
-        - name: groupId
-          in: query
-          description: Deprectated.
-          required: false
-          deprecated: true
-          schema:
-            type: string
+        - catalogs
+      operationId: getMyCatalogs
+      summary: List available catalogs and packages for installing for the user.
+      description: >
+        Returns the list of catalogs and packages available for the user.
+        The list of packages is filtered by user permissions if user is authenticated. Otherwise we return the public catalog.
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ServicesListing"
-      security:
-        - oidc: []
+                type: array
+                items:
+                  $ref: "#/components/schemas/Catalog"
+              examples:
+                default:
+                  value:
+                    - id: public
+                      name: Public catalog
+                      packages:
+                        - name: jupyter-python
+                          versions: ["1.0.0", "1.1.0", "2.0.0"]
+                        - name: rstudio
+                          versions: ["1.0.0", "1.1.0"]
+                    - id: internal
+                      name: Internal catalog
+                      packages:
+                        - name: internal-tool
+                          versions: ["0.1.0"]
+        "500":
+          description: Internal error
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /services/{releaseId}/install:
+    put:
+      tags: [services]
+      operationId: installService
+      summary: Trigger service installation (async)
+      description: >
+        Starts an install for the given releaseId. Returns 202 with URLs for SSE streams.
+        Idempotent if the release already exists (returns 202 with same event URLs).
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Project identifier in Onyxia
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInstallRequest"
+            examples:
+              jupyter:
+                value:
+                  chart: jupyter-python
+                  repoUrl: https://inseefrlab.github.io/helm-charts-interactive-services
+                  version: ""
+                  values:
+                    ingress:
+                      enabled: true
+                      hostname: user-xxxx.user.lab.sspcloud.fr
+      responses:
+        "202":
+          description: Accepted – installation running
+          headers:
+            Location:
+              description: Canonical location for watch release stream
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallAccepted"
+              examples:
+                default:
+                  value:
+                    eventsUrl:
+                      release: /events/jupyter-python-626146/watch-release
+                      resources: /events/jupyter-python-626146/watch-resources
+        "400":
+          description: Bad request
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: Conflict another install already exists with the same releaseId
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "500":
+          description: Internal error
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /events/{releaseId}/watch-release:
+    get:
+      tags: [events]
+      operationId: watchRelease
+      summary: Release-level status stream (SSE)
+      description: >
+        Server-Sent Events (text/event-stream).
+        Emits: "status", "log" (optional), and "done".
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - $ref: "#/components/parameters/lastEventId"
+      responses:
+        "200":
+          description: SSE stream
+          headers:
+            Cache-Control: { schema: { type: string }, description: no-cache }
+            Connection: { schema: { type: string }, description: keep-alive }
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                x-oas-doc-schema:
+                  $ref: "#/components/schemas/SSEFrameRelease"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Unknown releaseId
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /events/{releaseId}/watch-resources:
+    get:
+      tags: [events]
+      operationId: watchResources
+      summary: Kubernetes resources status stream (SSE)
+      description: >
+        Server-Sent Events (text/event-stream).
+        Filters resources by labelSelector: app.kubernetes.io/instance={releaseId}.
+        Emits: "resource" (add/update/delete), "progress" (aggregated readiness), "done".
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - $ref: "#/components/parameters/lastEventId"
+      responses:
+        "200":
+          description: SSE stream
+          headers:
+            Cache-Control: { schema: { type: string }, description: no-cache }
+            Connection: { schema: { type: string }, description: keep-alive }
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                x-oas-doc-schema:
+                  $ref: "#/components/schemas/SSEFrameResources"
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Unknown releaseId
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 components:
+  parameters:
+    releaseId:
+      in: path
+      name: releaseId
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+      description: Logical release identifier
+    lastEventId:
+      in: header
+      name: Last-Event-Id
+      required: false
+      schema: { type: string }
+      description: Resume SSE from a specific event id (client reconnection)
   schemas:
-    Task:
+    Catalog:
       type: object
-      description: Pod/task of a service
+      required: [id, name, packages]
       properties:
         id:
           type: string
-          description: Unique task ID (e.g., pod name)
-        status:
-          type: string
-        startedAt:
-          type: string
-          format: date-time
-        finishedAt:
-          type: string
-          format: date-time
-        logs:
-          type: string
-          description: Logs or log URL
-
-    Monitoring:
-      type: object
-      description: Monitoring info (placeholder)
-
-    HealthCheckResult:
-      type: object
-      description: Health check result (placeholder)
-
-    Group:
-      type: object
-      description: Group entry in services listing (placeholder)
-
-    Service:
-      type: object
-      properties:
-        id:
-          type: string
-          description: This is the name of the chart helm. This should be removed in v1.0
+          description: Catalog id
         name:
+          $ref: "#/components/schemas/LocalizedString"
+          description: The name of the catalog
+        description:
+          $ref: "#/components/schemas/LocalizedString"
+          description: The description of the catalog
+        location:
           type: string
-          description: This is the name of the chart helm.
-        instances:
-          type: integer
-          format: int32
-          description: This is fixed to 1. This should be removed in v1.0
-        cpus:
-          type: number
-          format: double
-          description: This is fixed to 0. This should be removed in v1.0
-        mem:
-          type: number
-          format: double
-          description: This is fixed to 0. This should be removed in v1.0
+          description: Where to find the catalog
         status:
           type: string
-          description: "State of the release (can be: unknown, deployed, uninstalled, superseded, failed, uninstalling, pending-install, pending-upgrade or pending-rollback)"
-        urls:
+          description: Is the catalog a test or a production catalog
+          enum: [PROD, TEST]
+        highlightedCharts:
           type: array
-          description: Urls are coming from ingress object
+          description: names of important packages of the catalog to highlight in the UI
           items:
             type: string
-        internalUrls:
-          type: array
-          description: This should be removed in v1.0
-          items:
-            type: string
-        env:
+        visible:
           type: object
-          additionalProperties:
-            type: string
-          description: Contains helm get values. This should be re-ingeneer in v1.0
-        tasks:
-          type: array
-          description: Task represents pods running. This should be re-ingeneer in v1.0
-          items:
-            $ref: "#/components/schemas/Task"
-        subtitle:
-          type: string
-          description: This should be removed in v1.0
-        monitoring:
-          $ref: "#/components/schemas/Monitoring"
-          description: This should be removed in v1.0
-        postInstallInstructions:
-          type: string
-          description: Contains helm get notes.
-        namespace:
-          type: string
-          description: Namespace of the helm release
-        revision:
-          type: string
-          description: Version of the helm release
-        updated:
-          type: string
-          description: Last updated time
-        appVersion:
-          type: string
-          description: Version of the app. Often non relevant
-        chart:
-          type: string
-          description: Chart name and version
-        startedAt:
-          type: integer
-          format: int64
-          description: This should be removed in v1.0
-        suspendable:
-          type: boolean
-          description: Is this service suspendable ?
-        suspended:
-          type: boolean
-          description: Is this service suspended ?
+          required: [user, project]
+          properties:
+            user:
+              type: boolean
+              description: Should this catalog be visible in user context ?
+            project:
+              type: boolean
+              description: Should this catalog be visible in project context ?
+          description: Describes if the catalog is visible in user or project context
+    ServiceInstallRequest:
+      type: object
+      required: [packageName, options, catalogId, name]
+      properties:
         catalogId:
           type: string
-          description: CatalogId
-        owner:
+          description: Catalog where the package of the service is taken from.
+        packageName:
           type: string
-          description: userID who starts the service
-        friendlyName:
+          description: Package name that will be used to create the service, necessary for package recovering (verify package)
+        packageVersion:
           type: string
-          description: friendly name of the service
+          format: semver
+          description: Version of the helm package, put version into creation, if not null
+        version:
+          type: string
+          description: Chart version (empty for latest)
+        options:
+          type: object
+          additionalProperties: true
+          description: Options of package (values.yaml for helm)
         share:
           type: boolean
-          description: Is this service shared ?
-        labels:
+          default: false
+          description: When true, all users of the namespace will list this service.
+        friendlyName:
+          type: string
+          description: Friendly name for the service
+        name:
+          type: string
+          description: A chosen name for the service
+    InstallAccepted:
+      type: object
+      required: [eventsUrl]
+      properties:
+        eventsUrl:
           type: object
+          required: [release, resources]
+          properties:
+            release:
+              type: string
+              example: /events/jupyter-python-626146/watch-release
+            resources:
+              type: string
+              example: /events/jupyter-python-626146/watch-resources
+    SSEFrameRelease:
+      type: object
+      required: [event, data]
+      properties:
+        id:
+          type: string
+          description: Optional event id for Last-Event-ID resume.
+        event:
+          type: string
+          description: Release stream event name
+          enum: [status, log, done]
+        data:
+          $ref: "#/components/schemas/ReleaseEventData"
+      description: >
+        Wire format per frame:
+        "id: <id>\n" (optional) + "event: <event>\n" + "data: <JSON(data)>\n\n".
+    ReleaseEventData:
+      type: object
+      description: >
+        Payload for /watch-release events. Fields present depend on `event`:
+        - status: generic connection/heartbeat messages
+        - phase/revision: release status
+        - msg: optional log line
+        - error: error when terminal status=failed
+      properties:
+        status:
+          type: string
+          description: Free-form status (e.g., "connected", "heartbeat").
+        phase:
+          type: string
+          enum:
+            [
+              pending,
+              installing,
+              upgrading,
+              deployed,
+              failed,
+              uninstalling,
+              deleted,
+              unknown,
+            ]
+        revision:
+          type: integer
+          minimum: 1
+          description: Release revision if known.
+        msg:
+          type: string
+          description: Optional log line (for `event=log`).
+        error:
+          type: string
+          description: Error message when terminal status is failed.
+    SSEFrameResources:
+      type: object
+      required: [event, data]
+      properties:
+        id:
+          type: string
+          description: Optional event id for Last-Event-ID resume.
+        event:
+          type: string
+          description: Resources stream event name
+          enum: [status, resource, progress, done]
+        data:
+          $ref: "#/components/schemas/ResourcesEventData"
+      description: >
+        Wire format per frame:
+        "id: <id>\n" (optional) + "event: <event>\n" + "data: <JSON(data)>\n\n".
+
+    ResourcesEventData:
+      type: object
+      description: >
+        Payload for /watch-resources events. Fields present depend on `event`:
+        - status: generic connection/heartbeat
+        - kind/name/namespace/action: per-resource change (add/update/delete)
+        - *Ready/*Total counters: aggregated readiness
+        - done/failed/message/summary: terminal/summary information
+      properties:
+        # generic
+        status:
+          type: string
+          description: Free-form status (e.g., "connected", "heartbeat").
+        # per-resource event
+        kind: { type: string, example: Pod }
+        name: { type: string }
+        namespace: { type: string }
+        action: { type: string, enum: [add, update, delete] }
+        # aggregated progress
+        podsReady: { type: integer, minimum: 0 }
+        podsTotal: { type: integer, minimum: 0 }
+        jobsComplete: { type: integer, minimum: 0 }
+        jobsTotal: { type: integer, minimum: 0 }
+        deploymentsReady: { type: integer, minimum: 0 }
+        deploymentsTotal: { type: integer, minimum: 0 }
+        statefulSetsReady: { type: integer, minimum: 0 }
+        statefulSetsTotal: { type: integer, minimum: 0 }
+        daemonSetsReady: { type: integer, minimum: 0 }
+        daemonSetsTotal: { type: integer, minimum: 0 }
+        message:
+          type: string
+          description: Optional human-readable summary.
+        # terminal hints
+        done: { type: boolean }
+        failed: { type: boolean }
+        error: { type: string }
+
+    LocalizedString:
+      description: A string or a map of localized strings by language code
+      oneOf:
+        - type: string
+        - type: object
           additionalProperties:
             type: string
-        controllers:
-          type: array
-          items:
-            $ref: "#/components/schemas/HealthCheckResult"
-
-    ServicesListing:
+          properties:
+            en:
+              type: string
+            fr:
+              type: string
+            zh-CN:
+              type: string
+            no:
+              type: string
+            fi:
+              type: string
+            nl:
+              type: string
+            it:
+              type: string
+            es:
+              type: string
+            de:
+              type: string
+          example:
+            en: "Hello"
+            fr: "Bonjour"
+    Problem:
       type: object
       properties:
-        apps:
-          type: array
-          items:
-            $ref: "#/components/schemas/Service"
-        groups:
-          type: array
-          items:
-            $ref: "#/components/schemas/Group"
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+      additionalProperties: true
   securitySchemes:
     oidc:
       type: oauth2

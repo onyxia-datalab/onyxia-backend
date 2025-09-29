@@ -1,8 +1,8 @@
 # Project-wide metadata
+APIS := onboarding services
 BUILD := $(shell git rev-parse --short HEAD)
 DOCKER_REGISTRY := inseefrlab
 
-BINARIES := onyxia-onboarding onyxia-services
 GOBIN := $(shell pwd)/bin
 
 # Docker arch handling
@@ -93,7 +93,7 @@ lint:
 ## test: Run all unit tests
 test:
 	@echo "✅ Running tests..."
-	go test ./... -v
+	go test ./...
 
 # --- BUILD -------------------------------------------------------------------
 
@@ -109,11 +109,12 @@ build:
 		go build -ldflags "-X=main.Version=$$version -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
 
-.PHONY: run-%
+.PHONY: $(addprefix run-,$(APIS))
 ## run-<api>: Run specific API (example: make run-onboarding)
-run-%:
-	@echo "🚀 Running onyxia-$*..."
-	go run ./cmd/onyxia-$*/main.go
+$(foreach api,$(APIS),\
+  $(eval run-$(api): ; \
+	@echo "🚀 Running onyxia-$(api)..."; \
+	go run ./cmd/onyxia-$(api)/main.go))
 
 .PHONY: clean
 ## clean: Clean all build artifacts
@@ -132,38 +133,44 @@ ifeq ($(MULTIARCH), 1)
 	docker buildx create --use --name multiarch-builder || true
 endif
 
-.PHONY: docker-build-%
-## docker-build-<api>: Build Docker image for API (example: make docker-build-onboarding)
-docker-build-%: docker-setup-builder
-	@echo "🐳 Building Docker image for onyxia-$*..."
-	@VERSION=$$( { $(call sh_get_version,$*); } ); \
+.PHONY: $(addprefix docker-build-,$(APIS))
+## docker-build-<api>: Build Docker image for API
+$(foreach api,$(APIS),\
+  $(eval docker-build-$(api): docker-setup-builder ; \
+	@echo "🐳 Building Docker image for onyxia-$(api)..."; \
+	VERSION=$$( { $(call sh_get_version,$(api)); } ); \
 	if [ -z "$$VERSION" ]; then \
-	  echo "❌ No version tag found for '$*' (expected tags like '$*-vX.Y.Z')"; exit 1; \
+	  echo "❌ No version tag found for '$(api)' (expected tags like '$(api)-vX.Y.Z')"; exit 1; \
 	fi; \
 	echo "→ version=$$VERSION"; \
 	docker buildx build \
 		--platform $(DOCKER_PLATFORMS) \
-		--tag $(DOCKER_REGISTRY)/onyxia-$*:$$VERSION \
-		--tag $(DOCKER_REGISTRY)/onyxia-$*:latest \
+		--tag $(DOCKER_REGISTRY)/onyxia-$(api):$$VERSION \
+		--tag $(DOCKER_REGISTRY)/onyxia-$(api):latest \
 		--build-arg VERSION="$$VERSION" \
 		--build-arg BUILD_SHA="$(BUILD)" \
-		-f $*/Dockerfile \
+		-f $(api)/Dockerfile \
 		$(if $(filter 1,$(MULTIARCH)),,--load) \
-		$(if $(PUSH),--push,) .
+		$(if $(PUSH),--push,) .))
 
-.PHONY: docker-push-%
+.PHONY: $(addprefix docker-push-,$(APIS))
 ## docker-push-<api>: Push Docker image to registry
-docker-push-%:
-	@$(MAKE) docker-build-$* PUSH=1
+$(foreach api,$(APIS),\
+  $(eval docker-push-$(api): ; \
+	@$(MAKE) docker-build-$(api) PUSH=1))
 
-.PHONY: docker-run-%
+.PHONY: $(addprefix docker-run-,$(APIS))
 ## docker-run-<api>: Run Docker container
-docker-run-%:
-	@docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$*:latest
+$(foreach api,$(APIS),\
+  $(eval docker-run-$(api): ; \
+	@echo "🧪 Running Docker image onyxia-$(api) on port 8080..."; \
+	docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$(api):latest))
+
 
 .PHONY: docker-clean
+## docker-clean: Remove all local docker images for project APIs
 docker-clean:
-	@echo "🗑️  Removing all local docker images for project binaries..."
-	@for bin in $(BINARIES); do \
-		docker images "$(DOCKER_REGISTRY)/$$bin" --format '{{.Repository}}:{{.Tag}}' | xargs -r docker rmi -f || true; \
+	@echo "🗑️  Removing all local docker images for project APIs..."
+	@for api in $(APIS); do \
+		docker images "$(DOCKER_REGISTRY)/onyxia-$$api" --format '{{.Repository}}:{{.Tag}}' | xargs -r docker rmi -f || true; \
 	done

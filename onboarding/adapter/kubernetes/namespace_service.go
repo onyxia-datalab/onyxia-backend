@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -22,7 +22,7 @@ type KubernetesNamespaceService struct {
 	clientset k8s.Interface
 }
 
-func NewKubernetesNamespaceService(clientset k8s.Interface) interfaces.NamespaceService {
+func NewKubernetesNamespaceService(clientset k8s.Interface) port.NamespaceService {
 	return &KubernetesNamespaceService{
 		clientset: clientset,
 	}
@@ -33,7 +33,7 @@ func (s *KubernetesNamespaceService) CreateNamespace(
 	name string,
 	annotations map[string]string,
 	labels map[string]string,
-) (interfaces.NamespaceCreationResult, error) {
+) (port.NamespaceCreationResult, error) {
 	namespacesClient := s.clientset.CoreV1().Namespaces()
 
 	namespace := &v1.Namespace{
@@ -49,7 +49,7 @@ func (s *KubernetesNamespaceService) CreateNamespace(
 	if errors.IsAlreadyExists(err) {
 
 		if len(annotations) == 0 {
-			return interfaces.NamespaceAlreadyExists, nil
+			return port.NamespaceAlreadyExists, nil
 		}
 
 		// 🔹 We update annotations (even if it might be unnecessary)
@@ -79,21 +79,21 @@ func (s *KubernetesNamespaceService) CreateNamespace(
 		if err != nil {
 			return "", fmt.Errorf("failed to update namespace annotations: %w", err)
 		}
-		return interfaces.NamespaceAnnotationsUpdated, nil
+		return port.NamespaceAnnotationsUpdated, nil
 	}
 
 	if err != nil {
 		return "", fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	return interfaces.NamespaceCreated, nil
+	return port.NamespaceCreated, nil
 }
 
 func (s *KubernetesNamespaceService) ApplyResourceQuotas(
 	ctx context.Context,
 	namespace string,
 	quota *domain.Quota,
-) (interfaces.QuotaApplicationResult, error) {
+) (port.QuotaApplicationResult, error) {
 	quotasClient := s.clientset.CoreV1().ResourceQuotas(namespace)
 
 	hardLimits, err := convertQuotaToResourceMap(*quota)
@@ -104,7 +104,7 @@ func (s *KubernetesNamespaceService) ApplyResourceQuotas(
 
 	// ✅ If no valid quotas exist, return early
 	if len(hardLimits) == 0 {
-		return interfaces.QuotaUnchanged, nil
+		return port.QuotaUnchanged, nil
 	}
 
 	resourceQuota := &v1.ResourceQuota{
@@ -124,12 +124,12 @@ func (s *KubernetesNamespaceService) ApplyResourceQuotas(
 	if err == nil {
 		// Ignore quota if marked as ignored
 		if ignore, ok := existingQuota.Annotations[IgnoreQuotaAnnotation]; ok && ignore == "true" {
-			return interfaces.QuotaIgnored, nil
+			return port.QuotaIgnored, nil
 		}
 
 		// If quota is unchanged, return early
 		if !quotasAreDifferent(existingQuota, resourceQuota) {
-			return interfaces.QuotaUnchanged, nil
+			return port.QuotaUnchanged, nil
 		}
 
 		// Update existing quota
@@ -142,7 +142,7 @@ func (s *KubernetesNamespaceService) ApplyResourceQuotas(
 			)
 		}
 
-		return interfaces.QuotaUpdated, nil
+		return port.QuotaUpdated, nil
 	}
 
 	// If quota doesn't exist, create it
@@ -151,7 +151,7 @@ func (s *KubernetesNamespaceService) ApplyResourceQuotas(
 		if err != nil {
 			return "", fmt.Errorf("failed to create resource quota: %w", err)
 		}
-		return interfaces.QuotaCreated, nil
+		return port.QuotaCreated, nil
 	}
 
 	return "", fmt.Errorf(

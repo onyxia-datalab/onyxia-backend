@@ -3,142 +3,371 @@
 package api
 
 import (
-	"time"
+	"math/bits"
+	"strconv"
 
 	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 
 	"github.com/ogen-go/ogen/json"
+	"github.com/ogen-go/ogen/validate"
 )
 
 // Encode implements json.Marshaler.
-func (s *Group) Encode(e *jx.Encoder) {
+func (s *InstallAccepted) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *Group) encodeFields(e *jx.Encoder) {
+func (s *InstallAccepted) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("eventsUrl")
+		s.EventsUrl.Encode(e)
+	}
 }
 
-var jsonFieldsNameOfGroup = [0]string{}
+var jsonFieldsNameOfInstallAccepted = [1]string{
+	0: "eventsUrl",
+}
 
-// Decode decodes Group from json.
-func (s *Group) Decode(d *jx.Decoder) error {
+// Decode decodes InstallAccepted from json.
+func (s *InstallAccepted) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode Group to nil")
+		return errors.New("invalid: unable to decode InstallAccepted to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "eventsUrl":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.EventsUrl.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"eventsUrl\"")
+			}
 		default:
 			return d.Skip()
 		}
+		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode Group")
+		return errors.Wrap(err, "decode InstallAccepted")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInstallAccepted) {
+					name = jsonFieldsNameOfInstallAccepted[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *Group) MarshalJSON() ([]byte, error) {
+func (s *InstallAccepted) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *Group) UnmarshalJSON(data []byte) error {
+func (s *InstallAccepted) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-func (s *HealthCheckResult) Encode(e *jx.Encoder) {
+func (s *InstallAcceptedEventsUrl) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *HealthCheckResult) encodeFields(e *jx.Encoder) {
+func (s *InstallAcceptedEventsUrl) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("release")
+		e.Str(s.Release)
+	}
+	{
+		e.FieldStart("resources")
+		e.Str(s.Resources)
+	}
 }
 
-var jsonFieldsNameOfHealthCheckResult = [0]string{}
+var jsonFieldsNameOfInstallAcceptedEventsUrl = [2]string{
+	0: "release",
+	1: "resources",
+}
 
-// Decode decodes HealthCheckResult from json.
-func (s *HealthCheckResult) Decode(d *jx.Decoder) error {
+// Decode decodes InstallAcceptedEventsUrl from json.
+func (s *InstallAcceptedEventsUrl) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode HealthCheckResult to nil")
+		return errors.New("invalid: unable to decode InstallAcceptedEventsUrl to nil")
 	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "release":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Release = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"release\"")
+			}
+		case "resources":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Resources = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"resources\"")
+			}
 		default:
 			return d.Skip()
 		}
+		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode HealthCheckResult")
+		return errors.Wrap(err, "decode InstallAcceptedEventsUrl")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInstallAcceptedEventsUrl) {
+					name = jsonFieldsNameOfInstallAcceptedEventsUrl[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *HealthCheckResult) MarshalJSON() ([]byte, error) {
+func (s *InstallAcceptedEventsUrl) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *HealthCheckResult) UnmarshalJSON(data []byte) error {
+func (s *InstallAcceptedEventsUrl) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *Monitoring) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
+// Encode encodes InstallServiceBadRequest as json.
+func (s *InstallServiceBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
 }
 
-// encodeFields encodes fields.
-func (s *Monitoring) encodeFields(e *jx.Encoder) {
-}
-
-var jsonFieldsNameOfMonitoring = [0]string{}
-
-// Decode decodes Monitoring from json.
-func (s *Monitoring) Decode(d *jx.Decoder) error {
+// Decode decodes InstallServiceBadRequest from json.
+func (s *InstallServiceBadRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode Monitoring to nil")
+		return errors.New("invalid: unable to decode InstallServiceBadRequest to nil")
 	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		default:
-			return d.Skip()
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
 		}
-	}); err != nil {
-		return errors.Wrap(err, "decode Monitoring")
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
 	}
-
+	*s = InstallServiceBadRequest(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *Monitoring) MarshalJSON() ([]byte, error) {
+func (s *InstallServiceBadRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *Monitoring) UnmarshalJSON(data []byte) error {
+func (s *InstallServiceBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InstallServiceConflict as json.
+func (s *InstallServiceConflict) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes InstallServiceConflict from json.
+func (s *InstallServiceConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InstallServiceConflict to nil")
+	}
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = InstallServiceConflict(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InstallServiceConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InstallServiceConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InstallServiceForbidden as json.
+func (s *InstallServiceForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes InstallServiceForbidden from json.
+func (s *InstallServiceForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InstallServiceForbidden to nil")
+	}
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = InstallServiceForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InstallServiceForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InstallServiceForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InstallServiceInternalServerError as json.
+func (s *InstallServiceInternalServerError) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes InstallServiceInternalServerError from json.
+func (s *InstallServiceInternalServerError) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InstallServiceInternalServerError to nil")
+	}
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = InstallServiceInternalServerError(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InstallServiceInternalServerError) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InstallServiceInternalServerError) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -178,210 +407,37 @@ func (s *OptBool) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes time.Time as json.
-func (o OptDateTime) Encode(e *jx.Encoder, format func(*jx.Encoder, time.Time)) {
+// Encode encodes int as json.
+func (o OptInt) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
-	format(e, o.Value)
+	e.Int(int(o.Value))
 }
 
-// Decode decodes time.Time from json.
-func (o *OptDateTime) Decode(d *jx.Decoder, format func(*jx.Decoder) (time.Time, error)) error {
+// Decode decodes int from json.
+func (o *OptInt) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptDateTime to nil")
+		return errors.New("invalid: unable to decode OptInt to nil")
 	}
 	o.Set = true
-	v, err := format(d)
+	v, err := d.Int()
 	if err != nil {
 		return err
 	}
-	o.Value = v
+	o.Value = int(v)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptDateTime) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e, json.EncodeDateTime)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptDateTime) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d, json.DecodeDateTime)
-}
-
-// Encode encodes float64 as json.
-func (o OptFloat64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Float64(float64(o.Value))
-}
-
-// Decode decodes float64 from json.
-func (o *OptFloat64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptFloat64 to nil")
-	}
-	o.Set = true
-	v, err := d.Float64()
-	if err != nil {
-		return err
-	}
-	o.Value = float64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptFloat64) MarshalJSON() ([]byte, error) {
+func (s OptInt) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptFloat64) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes int32 as json.
-func (o OptInt32) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Int32(int32(o.Value))
-}
-
-// Decode decodes int32 from json.
-func (o *OptInt32) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInt32 to nil")
-	}
-	o.Set = true
-	v, err := d.Int32()
-	if err != nil {
-		return err
-	}
-	o.Value = int32(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInt32) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInt32) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes int64 as json.
-func (o OptInt64) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Int64(int64(o.Value))
-}
-
-// Decode decodes int64 from json.
-func (o *OptInt64) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptInt64 to nil")
-	}
-	o.Set = true
-	v, err := d.Int64()
-	if err != nil {
-		return err
-	}
-	o.Value = int64(v)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptInt64) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptInt64) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ServiceEnv as json.
-func (o OptServiceEnv) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes ServiceEnv from json.
-func (o *OptServiceEnv) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptServiceEnv to nil")
-	}
-	o.Set = true
-	o.Value = make(ServiceEnv)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptServiceEnv) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptServiceEnv) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ServiceLabels as json.
-func (o OptServiceLabels) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	o.Value.Encode(e)
-}
-
-// Decode decodes ServiceLabels from json.
-func (o *OptServiceLabels) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptServiceLabels to nil")
-	}
-	o.Set = true
-	o.Value = make(ServiceLabels)
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptServiceLabels) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptServiceLabels) UnmarshalJSON(data []byte) error {
+func (s *OptInt) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -421,43 +477,60 @@ func (s *OptString) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes url.URL as json.
+func (o OptURI) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	json.EncodeURI(e, o.Value)
+}
+
+// Decode decodes url.URL from json.
+func (o *OptURI) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptURI to nil")
+	}
+	o.Set = true
+	v, err := json.DecodeURI(d)
+	if err != nil {
+		return err
+	}
+	o.Value = v
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptURI) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptURI) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
-func (s *Service) Encode(e *jx.Encoder) {
+func (s *Problem) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *Service) encodeFields(e *jx.Encoder) {
+func (s *Problem) encodeFields(e *jx.Encoder) {
 	{
-		if s.ID.Set {
-			e.FieldStart("id")
-			s.ID.Encode(e)
+		if s.Type.Set {
+			e.FieldStart("type")
+			s.Type.Encode(e)
 		}
 	}
 	{
-		if s.Name.Set {
-			e.FieldStart("name")
-			s.Name.Encode(e)
-		}
-	}
-	{
-		if s.Instances.Set {
-			e.FieldStart("instances")
-			s.Instances.Encode(e)
-		}
-	}
-	{
-		if s.Cpus.Set {
-			e.FieldStart("cpus")
-			s.Cpus.Encode(e)
-		}
-	}
-	{
-		if s.Mem.Set {
-			e.FieldStart("mem")
-			s.Mem.Encode(e)
+		if s.Title.Set {
+			e.FieldStart("title")
+			s.Title.Encode(e)
 		}
 	}
 	{
@@ -467,236 +540,62 @@ func (s *Service) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Urls != nil {
-			e.FieldStart("urls")
-			e.ArrStart()
-			for _, elem := range s.Urls {
-				e.Str(elem)
-			}
-			e.ArrEnd()
+		if s.Detail.Set {
+			e.FieldStart("detail")
+			s.Detail.Encode(e)
 		}
 	}
 	{
-		if s.InternalUrls != nil {
-			e.FieldStart("internalUrls")
-			e.ArrStart()
-			for _, elem := range s.InternalUrls {
-				e.Str(elem)
-			}
-			e.ArrEnd()
+		if s.Instance.Set {
+			e.FieldStart("instance")
+			s.Instance.Encode(e)
 		}
 	}
-	{
-		if s.Env.Set {
-			e.FieldStart("env")
-			s.Env.Encode(e)
-		}
-	}
-	{
-		if s.Tasks != nil {
-			e.FieldStart("tasks")
-			e.ArrStart()
-			for _, elem := range s.Tasks {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.Subtitle.Set {
-			e.FieldStart("subtitle")
-			s.Subtitle.Encode(e)
-		}
-	}
-	{
-		if s.Monitoring != nil {
-			e.FieldStart("monitoring")
-			s.Monitoring.Encode(e)
-		}
-	}
-	{
-		if s.PostInstallInstructions.Set {
-			e.FieldStart("postInstallInstructions")
-			s.PostInstallInstructions.Encode(e)
-		}
-	}
-	{
-		if s.Namespace.Set {
-			e.FieldStart("namespace")
-			s.Namespace.Encode(e)
-		}
-	}
-	{
-		if s.Revision.Set {
-			e.FieldStart("revision")
-			s.Revision.Encode(e)
-		}
-	}
-	{
-		if s.Updated.Set {
-			e.FieldStart("updated")
-			s.Updated.Encode(e)
-		}
-	}
-	{
-		if s.AppVersion.Set {
-			e.FieldStart("appVersion")
-			s.AppVersion.Encode(e)
-		}
-	}
-	{
-		if s.Chart.Set {
-			e.FieldStart("chart")
-			s.Chart.Encode(e)
-		}
-	}
-	{
-		if s.StartedAt.Set {
-			e.FieldStart("startedAt")
-			s.StartedAt.Encode(e)
-		}
-	}
-	{
-		if s.Suspendable.Set {
-			e.FieldStart("suspendable")
-			s.Suspendable.Encode(e)
-		}
-	}
-	{
-		if s.Suspended.Set {
-			e.FieldStart("suspended")
-			s.Suspended.Encode(e)
-		}
-	}
-	{
-		if s.CatalogId.Set {
-			e.FieldStart("catalogId")
-			s.CatalogId.Encode(e)
-		}
-	}
-	{
-		if s.Owner.Set {
-			e.FieldStart("owner")
-			s.Owner.Encode(e)
-		}
-	}
-	{
-		if s.FriendlyName.Set {
-			e.FieldStart("friendlyName")
-			s.FriendlyName.Encode(e)
-		}
-	}
-	{
-		if s.Share.Set {
-			e.FieldStart("share")
-			s.Share.Encode(e)
-		}
-	}
-	{
-		if s.Labels.Set {
-			e.FieldStart("labels")
-			s.Labels.Encode(e)
-		}
-	}
-	{
-		if s.Controllers != nil {
-			e.FieldStart("controllers")
-			e.ArrStart()
-			for _, elem := range s.Controllers {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
+	for k, elem := range s.AdditionalProps {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
 		}
 	}
 }
 
-var jsonFieldsNameOfService = [27]string{
-	0:  "id",
-	1:  "name",
-	2:  "instances",
-	3:  "cpus",
-	4:  "mem",
-	5:  "status",
-	6:  "urls",
-	7:  "internalUrls",
-	8:  "env",
-	9:  "tasks",
-	10: "subtitle",
-	11: "monitoring",
-	12: "postInstallInstructions",
-	13: "namespace",
-	14: "revision",
-	15: "updated",
-	16: "appVersion",
-	17: "chart",
-	18: "startedAt",
-	19: "suspendable",
-	20: "suspended",
-	21: "catalogId",
-	22: "owner",
-	23: "friendlyName",
-	24: "share",
-	25: "labels",
-	26: "controllers",
+var jsonFieldsNameOfProblem = [5]string{
+	0: "type",
+	1: "title",
+	2: "status",
+	3: "detail",
+	4: "instance",
 }
 
-// Decode decodes Service from json.
-func (s *Service) Decode(d *jx.Decoder) error {
+// Decode decodes Problem from json.
+func (s *Problem) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode Service to nil")
+		return errors.New("invalid: unable to decode Problem to nil")
 	}
+	s.AdditionalProps = map[string]jx.Raw{}
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "id":
+		case "type":
 			if err := func() error {
-				s.ID.Reset()
-				if err := s.ID.Decode(d); err != nil {
+				s.Type.Reset()
+				if err := s.Type.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
+				return errors.Wrap(err, "decode field \"type\"")
 			}
-		case "name":
+		case "title":
 			if err := func() error {
-				s.Name.Reset()
-				if err := s.Name.Decode(d); err != nil {
+				s.Title.Reset()
+				if err := s.Title.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"name\"")
-			}
-		case "instances":
-			if err := func() error {
-				s.Instances.Reset()
-				if err := s.Instances.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"instances\"")
-			}
-		case "cpus":
-			if err := func() error {
-				s.Cpus.Reset()
-				if err := s.Cpus.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"cpus\"")
-			}
-		case "mem":
-			if err := func() error {
-				s.Mem.Reset()
-				if err := s.Mem.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"mem\"")
+				return errors.Wrap(err, "decode field \"title\"")
 			}
 		case "status":
 			if err := func() error {
@@ -708,212 +607,244 @@ func (s *Service) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
-		case "urls":
+		case "detail":
 			if err := func() error {
-				s.Urls = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.Urls = append(s.Urls, elem)
-					return nil
-				}); err != nil {
+				s.Detail.Reset()
+				if err := s.Detail.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"urls\"")
+				return errors.Wrap(err, "decode field \"detail\"")
 			}
-		case "internalUrls":
+		case "instance":
 			if err := func() error {
-				s.InternalUrls = make([]string, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem string
-					v, err := d.Str()
-					elem = string(v)
-					if err != nil {
-						return err
-					}
-					s.InternalUrls = append(s.InternalUrls, elem)
-					return nil
-				}); err != nil {
+				s.Instance.Reset()
+				if err := s.Instance.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"internalUrls\"")
+				return errors.Wrap(err, "decode field \"instance\"")
 			}
-		case "env":
+		default:
+			var elem jx.Raw
 			if err := func() error {
-				s.Env.Reset()
-				if err := s.Env.Decode(d); err != nil {
+				v, err := d.RawAppend(nil)
+				elem = jx.Raw(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"env\"")
+				return errors.Wrapf(err, "decode field %q", k)
 			}
-		case "tasks":
-			if err := func() error {
-				s.Tasks = make([]Task, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem Task
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Tasks = append(s.Tasks, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"tasks\"")
+			s.AdditionalProps[string(k)] = elem
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode Problem")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *Problem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *Problem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s ProblemAdditional) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s ProblemAdditional) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes ProblemAdditional from json.
+func (s *ProblemAdditional) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProblemAdditional to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
 			}
-		case "subtitle":
-			if err := func() error {
-				s.Subtitle.Reset()
-				if err := s.Subtitle.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"subtitle\"")
-			}
-		case "monitoring":
-			if err := func() error {
-				s.Monitoring = nil
-				var elem Monitoring
-				if err := elem.Decode(d); err != nil {
-					return err
-				}
-				s.Monitoring = &elem
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"monitoring\"")
-			}
-		case "postInstallInstructions":
-			if err := func() error {
-				s.PostInstallInstructions.Reset()
-				if err := s.PostInstallInstructions.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"postInstallInstructions\"")
-			}
-		case "namespace":
-			if err := func() error {
-				s.Namespace.Reset()
-				if err := s.Namespace.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"namespace\"")
-			}
-		case "revision":
-			if err := func() error {
-				s.Revision.Reset()
-				if err := s.Revision.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"revision\"")
-			}
-		case "updated":
-			if err := func() error {
-				s.Updated.Reset()
-				if err := s.Updated.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"updated\"")
-			}
-		case "appVersion":
-			if err := func() error {
-				s.AppVersion.Reset()
-				if err := s.AppVersion.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"appVersion\"")
-			}
-		case "chart":
-			if err := func() error {
-				s.Chart.Reset()
-				if err := s.Chart.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"chart\"")
-			}
-		case "startedAt":
-			if err := func() error {
-				s.StartedAt.Reset()
-				if err := s.StartedAt.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"startedAt\"")
-			}
-		case "suspendable":
-			if err := func() error {
-				s.Suspendable.Reset()
-				if err := s.Suspendable.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"suspendable\"")
-			}
-		case "suspended":
-			if err := func() error {
-				s.Suspended.Reset()
-				if err := s.Suspended.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"suspended\"")
-			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProblemAdditional")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProblemAdditional) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProblemAdditional) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ServiceInstallRequest) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ServiceInstallRequest) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("catalogId")
+		e.Str(s.CatalogId)
+	}
+	{
+		e.FieldStart("packageName")
+		e.Str(s.PackageName)
+	}
+	{
+		if s.PackageVersion.Set {
+			e.FieldStart("packageVersion")
+			s.PackageVersion.Encode(e)
+		}
+	}
+	{
+		if s.Version.Set {
+			e.FieldStart("version")
+			s.Version.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("options")
+		s.Options.Encode(e)
+	}
+	{
+		if s.Share.Set {
+			e.FieldStart("share")
+			s.Share.Encode(e)
+		}
+	}
+	{
+		if s.FriendlyName.Set {
+			e.FieldStart("friendlyName")
+			s.FriendlyName.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+}
+
+var jsonFieldsNameOfServiceInstallRequest = [8]string{
+	0: "catalogId",
+	1: "packageName",
+	2: "packageVersion",
+	3: "version",
+	4: "options",
+	5: "share",
+	6: "friendlyName",
+	7: "name",
+}
+
+// Decode decodes ServiceInstallRequest from json.
+func (s *ServiceInstallRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ServiceInstallRequest to nil")
+	}
+	var requiredBitSet [1]uint8
+	s.setDefaults()
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
 		case "catalogId":
+			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.CatalogId.Reset()
-				if err := s.CatalogId.Decode(d); err != nil {
+				v, err := d.Str()
+				s.CatalogId = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"catalogId\"")
 			}
-		case "owner":
+		case "packageName":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.Owner.Reset()
-				if err := s.Owner.Decode(d); err != nil {
+				v, err := d.Str()
+				s.PackageName = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"owner\"")
+				return errors.Wrap(err, "decode field \"packageName\"")
 			}
-		case "friendlyName":
+		case "packageVersion":
 			if err := func() error {
-				s.FriendlyName.Reset()
-				if err := s.FriendlyName.Decode(d); err != nil {
+				s.PackageVersion.Reset()
+				if err := s.PackageVersion.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"friendlyName\"")
+				return errors.Wrap(err, "decode field \"packageVersion\"")
+			}
+		case "version":
+			if err := func() error {
+				s.Version.Reset()
+				if err := s.Version.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"version\"")
+			}
+		case "options":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Options.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"options\"")
 			}
 		case "share":
 			if err := func() error {
@@ -925,84 +856,113 @@ func (s *Service) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"share\"")
 			}
-		case "labels":
+		case "friendlyName":
 			if err := func() error {
-				s.Labels.Reset()
-				if err := s.Labels.Decode(d); err != nil {
+				s.FriendlyName.Reset()
+				if err := s.FriendlyName.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"labels\"")
+				return errors.Wrap(err, "decode field \"friendlyName\"")
 			}
-		case "controllers":
+		case "name":
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
-				s.Controllers = make([]HealthCheckResult, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem HealthCheckResult
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Controllers = append(s.Controllers, elem)
-					return nil
-				}); err != nil {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"controllers\"")
+				return errors.Wrap(err, "decode field \"name\"")
 			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode Service")
+		return errors.Wrap(err, "decode ServiceInstallRequest")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b10010011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfServiceInstallRequest) {
+					name = jsonFieldsNameOfServiceInstallRequest[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *Service) MarshalJSON() ([]byte, error) {
+func (s *ServiceInstallRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *Service) UnmarshalJSON(data []byte) error {
+func (s *ServiceInstallRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-func (s ServiceEnv) Encode(e *jx.Encoder) {
+func (s ServiceInstallRequestOptions) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields implements json.Marshaler.
-func (s ServiceEnv) encodeFields(e *jx.Encoder) {
+func (s ServiceInstallRequestOptions) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
-		e.Str(elem)
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
 	}
 }
 
-// Decode decodes ServiceEnv from json.
-func (s *ServiceEnv) Decode(d *jx.Decoder) error {
+// Decode decodes ServiceInstallRequestOptions from json.
+func (s *ServiceInstallRequestOptions) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ServiceEnv to nil")
+		return errors.New("invalid: unable to decode ServiceInstallRequestOptions to nil")
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem string
+		var elem jx.Raw
 		if err := func() error {
-			v, err := d.Str()
-			elem = string(v)
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
 			if err != nil {
 				return err
 			}
@@ -1013,310 +973,21 @@ func (s *ServiceEnv) Decode(d *jx.Decoder) error {
 		m[string(k)] = elem
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ServiceEnv")
+		return errors.Wrap(err, "decode ServiceInstallRequestOptions")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s ServiceEnv) MarshalJSON() ([]byte, error) {
+func (s ServiceInstallRequestOptions) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ServiceEnv) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s ServiceLabels) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s ServiceLabels) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		e.Str(elem)
-	}
-}
-
-// Decode decodes ServiceLabels from json.
-func (s *ServiceLabels) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ServiceLabels to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem string
-		if err := func() error {
-			v, err := d.Str()
-			elem = string(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode ServiceLabels")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ServiceLabels) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ServiceLabels) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *ServicesListing) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *ServicesListing) encodeFields(e *jx.Encoder) {
-	{
-		if s.Apps != nil {
-			e.FieldStart("apps")
-			e.ArrStart()
-			for _, elem := range s.Apps {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
-		}
-	}
-	{
-		if s.Groups != nil {
-			e.FieldStart("groups")
-			e.ArrStart()
-			for _, elem := range s.Groups {
-				elem.Encode(e)
-			}
-			e.ArrEnd()
-		}
-	}
-}
-
-var jsonFieldsNameOfServicesListing = [2]string{
-	0: "apps",
-	1: "groups",
-}
-
-// Decode decodes ServicesListing from json.
-func (s *ServicesListing) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ServicesListing to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "apps":
-			if err := func() error {
-				s.Apps = make([]Service, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem Service
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Apps = append(s.Apps, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"apps\"")
-			}
-		case "groups":
-			if err := func() error {
-				s.Groups = make([]Group, 0)
-				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem Group
-					if err := elem.Decode(d); err != nil {
-						return err
-					}
-					s.Groups = append(s.Groups, elem)
-					return nil
-				}); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"groups\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode ServicesListing")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *ServicesListing) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ServicesListing) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *Task) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *Task) encodeFields(e *jx.Encoder) {
-	{
-		if s.ID.Set {
-			e.FieldStart("id")
-			s.ID.Encode(e)
-		}
-	}
-	{
-		if s.Status.Set {
-			e.FieldStart("status")
-			s.Status.Encode(e)
-		}
-	}
-	{
-		if s.StartedAt.Set {
-			e.FieldStart("startedAt")
-			s.StartedAt.Encode(e, json.EncodeDateTime)
-		}
-	}
-	{
-		if s.FinishedAt.Set {
-			e.FieldStart("finishedAt")
-			s.FinishedAt.Encode(e, json.EncodeDateTime)
-		}
-	}
-	{
-		if s.Logs.Set {
-			e.FieldStart("logs")
-			s.Logs.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfTask = [5]string{
-	0: "id",
-	1: "status",
-	2: "startedAt",
-	3: "finishedAt",
-	4: "logs",
-}
-
-// Decode decodes Task from json.
-func (s *Task) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode Task to nil")
-	}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			if err := func() error {
-				s.ID.Reset()
-				if err := s.ID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
-			}
-		case "status":
-			if err := func() error {
-				s.Status.Reset()
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
-			}
-		case "startedAt":
-			if err := func() error {
-				s.StartedAt.Reset()
-				if err := s.StartedAt.Decode(d, json.DecodeDateTime); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"startedAt\"")
-			}
-		case "finishedAt":
-			if err := func() error {
-				s.FinishedAt.Reset()
-				if err := s.FinishedAt.Decode(d, json.DecodeDateTime); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"finishedAt\"")
-			}
-		case "logs":
-			if err := func() error {
-				s.Logs.Reset()
-				if err := s.Logs.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"logs\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode Task")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *Task) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *Task) UnmarshalJSON(data []byte) error {
+func (s *ServiceInstallRequestOptions) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

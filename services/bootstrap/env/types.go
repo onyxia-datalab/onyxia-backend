@@ -1,13 +1,4 @@
-package bootstrap
-
-import (
-	_ "embed"
-
-	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
-)
-
-//go:embed env.default.yaml
-var defaultConfig []byte
+package env
 
 type Server struct {
 	Port        int    `mapstructure:"port"        json:"port"`
@@ -28,13 +19,15 @@ type Security struct {
 	CORSAllowedOrigins []string `mapstructure:"corsAllowedOrigins" json:"corsAllowedOrigins"`
 }
 
-type Env struct {
-	AuthenticationMode string   `mapstructure:"authenticationMode" json:"authenticationMode"`
-	Server             Server   `mapstructure:"server"             json:"server"`
-	OIDC               OIDC     `mapstructure:"oidc"               json:"oidc"`
-	Security           Security `mapstructure:"security"           json:"security"`
+type Kubernetes struct {
+	NamespacePrefix      string `mapstructure:"namespacePrefix"      json:"namespacePrefix"`
+	GroupNamespacePrefix string `mapstructure:"groupNamespacePrefix" json:"groupNamespacePrefix"`
 }
-
-func NewEnv() (Env, error) {
-	return configloader.Load[Env](defaultConfig, "env.yaml")
+type Env struct {
+	AuthenticationMode string     `mapstructure:"authenticationMode" json:"authenticationMode"`
+	Server             Server     `mapstructure:"server"             json:"server"`
+	OIDC               OIDC       `mapstructure:"oidc"               json:"oidc"`
+	Security           Security   `mapstructure:"security"           json:"security"`
+	Catalogs           []Catalog  `mapstructure:"catalogs"           json:"catalogs"`
+	Kubernetes         Kubernetes `mapstructure:"kubernetes"         json:"kubernetes"`
 }

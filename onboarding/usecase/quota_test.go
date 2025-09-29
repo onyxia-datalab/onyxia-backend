@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestApplyQuotas_Success(t *testing.T) {
+func TestApplyQuotasSuccess(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -20,7 +20,7 @@ func TestApplyQuotas_Success(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaCreated, nil)
+		Return(port.QuotaCreated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -38,7 +38,7 @@ func TestApplyQuotas_Success(t *testing.T) {
 	)
 }
 
-func TestApplyQuotas_AlreadyUpToDate(t *testing.T) {
+func TestApplyQuotasAlreadyUpToDate(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -47,7 +47,7 @@ func TestApplyQuotas_AlreadyUpToDate(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaUnchanged, nil)
+		Return(port.QuotaUnchanged, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -65,7 +65,7 @@ func TestApplyQuotas_AlreadyUpToDate(t *testing.T) {
 	)
 }
 
-func TestApplyQuotas_QuotasDisabled(t *testing.T) {
+func TestApplyQuotasQuotasDisabled(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{Enabled: false}
 	usecase := setupPrivateUsecase(mockService, quotas)
@@ -80,7 +80,7 @@ func TestApplyQuotas_QuotasDisabled(t *testing.T) {
 	mockService.AssertNotCalled(t, "ApplyResourceQuotas")
 }
 
-func TestApplyQuotas_QuotaUpdated(t *testing.T) {
+func TestApplyQuotasQuotaUpdated(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -89,7 +89,7 @@ func TestApplyQuotas_QuotaUpdated(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaUpdated, nil)
+		Return(port.QuotaUpdated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -107,7 +107,7 @@ func TestApplyQuotas_QuotaUpdated(t *testing.T) {
 	)
 }
 
-func TestApplyQuotas_QuotaIgnored(t *testing.T) {
+func TestApplyQuotasQuotaIgnored(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -116,7 +116,7 @@ func TestApplyQuotas_QuotaIgnored(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaIgnored, nil)
+		Return(port.QuotaIgnored, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -133,7 +133,7 @@ func TestApplyQuotas_QuotaIgnored(t *testing.T) {
 		&quotas.Default,
 	)
 }
-func TestApplyQuotas_Failure(t *testing.T) {
+func TestApplyQuotasFailure(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -142,7 +142,7 @@ func TestApplyQuotas_Failure(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(interfaces.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
+		Return(port.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
@@ -159,7 +159,7 @@ func TestApplyQuotas_Failure(t *testing.T) {
 	)
 }
 
-func TestGetQuota_GroupQuota(t *testing.T) {
+func TestGetQuotaGroupQuota(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled:      true,
@@ -176,7 +176,7 @@ func TestGetQuota_GroupQuota(t *testing.T) {
 	assert.Equal(t, &quotas.Group, quota)
 }
 
-func TestGetGroupQuota_FallbackToDefault(t *testing.T) {
+func TestGetGroupQuotaFallbackToDefault(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled:      true,
@@ -200,7 +200,7 @@ func TestGetGroupQuota_FallbackToDefault(t *testing.T) {
 	)
 }
 
-func TestGetQuota_UserQuota(t *testing.T) {
+func TestGetQuotaUserQuota(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled:     true,
@@ -216,7 +216,7 @@ func TestGetQuota_UserQuota(t *testing.T) {
 	assert.Equal(t, &quotas.User, quota)
 }
 
-func TestGetQuota_DefaultQuota(t *testing.T) {
+func TestGetQuotaDefaultQuota(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -231,7 +231,7 @@ func TestGetQuota_DefaultQuota(t *testing.T) {
 	assert.Equal(t, &quotas.Default, quota)
 }
 
-func TestGetQuota_RoleQuota(t *testing.T) {
+func TestGetQuotaRoleQuota(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -252,7 +252,7 @@ func TestGetQuota_RoleQuota(t *testing.T) {
 	assert.Equal(t, &expectedQuota, quota, "Expected 'admin' role quota")
 }
 
-func TestGetQuota_RoleQuota_AppliesFirstMatch(t *testing.T) {
+func TestGetQuotaRoleQuotaAppliesFirstMatch(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,
@@ -274,7 +274,7 @@ func TestGetQuota_RoleQuota_AppliesFirstMatch(t *testing.T) {
 	assert.Equal(t, &expectedQuota, quota, "Expected the first matching role's quota")
 }
 
-func TestGetQuota_UserQuota_WhenNoRoleMatches(t *testing.T) {
+func TestGetQuotaUserQuotaWhenNoRoleMatches(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled:     true,
@@ -298,7 +298,7 @@ func TestGetQuota_UserQuota_WhenNoRoleMatches(t *testing.T) {
 	assert.Equal(t, &expectedQuota, quota, "Expected fallback to user quota when no role matches")
 }
 
-func TestGetQuota_DefaultQuota_WhenNoRoleAndUserQuotaDisabled(t *testing.T) {
+func TestGetQuotaDefaultQuotaWhenNoRoleAndUserQuotaDisabled(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	quotas := domain.Quotas{
 		Enabled: true,

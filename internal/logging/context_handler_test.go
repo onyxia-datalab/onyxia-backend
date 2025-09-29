@@ -38,7 +38,7 @@ func (s *stubHandler) Handle(ctx context.Context, r slog.Record) error {
 func (s *stubHandler) WithAttrs(attrs []slog.Attr) slog.Handler { return s }
 func (s *stubHandler) WithGroup(name string) slog.Handler       { return s }
 
-func TestNewContextAttrsHandler_ReturnsBaseWhenNil(t *testing.T) {
+func TestNewContextAttrsHandlerReturnsBaseWhenNil(t *testing.T) {
 	base := &stubHandler{}
 	h := newContextAttrsHandler(base, nil)
 	if h != base {
@@ -46,7 +46,7 @@ func TestNewContextAttrsHandler_ReturnsBaseWhenNil(t *testing.T) {
 	}
 }
 
-func TestHandle_AddsAttributesFromAttrFunc(t *testing.T) {
+func TestHandleAddsAttributesFromAttrFunc(t *testing.T) {
 	base := &stubHandler{enabled: true}
 	attrFn := func(ctx context.Context) []slog.Attr {
 		return []slog.Attr{
@@ -70,7 +70,7 @@ func TestHandle_AddsAttributesFromAttrFunc(t *testing.T) {
 	}
 }
 
-func TestHandle_NoAttributesWhenAttrFuncReturnsEmpty(t *testing.T) {
+func TestHandleNoAttributesWhenAttrFuncReturnsEmpty(t *testing.T) {
 	base := &stubHandler{enabled: true}
 	attrFn := func(ctx context.Context) []slog.Attr { return nil }
 	h := newContextAttrsHandler(base, attrFn)
@@ -84,7 +84,7 @@ func TestHandle_NoAttributesWhenAttrFuncReturnsEmpty(t *testing.T) {
 	}
 }
 
-func TestEnabled_DelegatesToNext(t *testing.T) {
+func TestEnabledDelegatesToNext(t *testing.T) {
 	base := &stubHandler{enabled: false}
 	h := newContextAttrsHandler(base, func(ctx context.Context) []slog.Attr { return nil })
 
@@ -101,7 +101,7 @@ func TestEnabled_DelegatesToNext(t *testing.T) {
 	}
 }
 
-func TestWithAttrs_PreservesAttrFunc(t *testing.T) {
+func TestWithAttrsPreservesAttrFunc(t *testing.T) {
 	base := &stubHandler{enabled: true}
 	attrFn := func(ctx context.Context) []slog.Attr { return []slog.Attr{slog.String("k", "v")} }
 	wrap := newContextAttrsHandler(base, attrFn)
@@ -116,7 +116,7 @@ func TestWithAttrs_PreservesAttrFunc(t *testing.T) {
 	}
 }
 
-func TestWithGroup_PreservesAttrFunc(t *testing.T) {
+func TestWithGroupPreservesAttrFunc(t *testing.T) {
 	base := &stubHandler{enabled: true}
 	attrFn := func(ctx context.Context) []slog.Attr { return []slog.Attr{slog.String("k", "v")} }
 	wrap := newContextAttrsHandler(base, attrFn)

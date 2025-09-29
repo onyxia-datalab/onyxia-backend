@@ -13,23 +13,32 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
-// GetApp implements getApp operation.
+// InstallService implements installService operation.
 //
-// Get the description of an installed service in the namespace. With Kubernetes backend, an
-// installed service can be seen as a Helm chart. Its unique identifier will be the release name on
-// the namespace.
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
+// the release already exists (returns 202 with same event URLs).
 //
-// GET /my-lab/app
-func (UnimplementedHandler) GetApp(ctx context.Context, params GetAppParams) (r *Service, _ error) {
+// PUT /services/{releaseId}/install
+func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
-// GetMyServices implements getMyServices operation.
+// WatchRelease implements watchRelease operation.
 //
-// List the services installed in a namespace. With a Kubernetes backend, utilize Helm to list all
-// installed services in a namespace.
+// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 //
-// GET /my-lab/services
-func (UnimplementedHandler) GetMyServices(ctx context.Context, params GetMyServicesParams) (r *ServicesListing, _ error) {
+// GET /events/{releaseId}/watch-release
+func (UnimplementedHandler) WatchRelease(ctx context.Context, params WatchReleaseParams) (r WatchReleaseRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// WatchResources implements watchResources operation.
+//
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
+// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
+// "done".
+//
+// GET /events/{releaseId}/watch-resources
+func (UnimplementedHandler) WatchResources(ctx context.Context, params WatchResourcesParams) (r WatchResourcesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

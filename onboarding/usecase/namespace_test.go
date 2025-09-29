@@ -9,12 +9,12 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/interfaces"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-func TestCreateNamespace_Success(t *testing.T) {
+func TestCreateNamespaceSuccess(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
@@ -24,7 +24,7 @@ func TestCreateNamespace_Success(t *testing.T) {
 		userNamespace, // name
 		mock.Anything, // annotations
 		mock.Anything, // labels
-	).Return(interfaces.NamespaceCreated, nil)
+	).Return(port.NamespaceCreated, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
@@ -39,14 +39,14 @@ func TestCreateNamespace_Success(t *testing.T) {
 	)
 }
 
-func TestCreateNamespace_AlreadyExists(t *testing.T) {
+func TestCreateNamespaceAlreadyExists(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
 	mockService.On(
 		"CreateNamespace",
 		mock.Anything, userNamespace, mock.Anything, mock.Anything,
-	).Return(interfaces.NamespaceAlreadyExists, nil)
+	).Return(port.NamespaceAlreadyExists, nil)
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
@@ -61,14 +61,14 @@ func TestCreateNamespace_AlreadyExists(t *testing.T) {
 	)
 }
 
-func TestCreateNamespace_Failure(t *testing.T) {
+func TestCreateNamespaceFailure(t *testing.T) {
 	mockService := new(MockNamespaceService)
 	usecase := setupPrivateUsecase(mockService, domain.Quotas{})
 
 	mockService.On(
 		"CreateNamespace",
 		mock.Anything, userNamespace, mock.Anything, mock.Anything,
-	).Return(interfaces.NamespaceCreationResult(""), errors.New("failed to create namespace"))
+	).Return(port.NamespaceCreationResult(""), errors.New("failed to create namespace"))
 
 	err := usecase.createNamespace(context.Background(), userNamespace)
 
@@ -83,7 +83,7 @@ func TestCreateNamespace_Failure(t *testing.T) {
 	)
 }
 
-func TestGetNamespaceAnnotations_Disabled(t *testing.T) {
+func TestGetNamespaceAnnotationsDisabled(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = false
 
@@ -92,7 +92,7 @@ func TestGetNamespaceAnnotations_Disabled(t *testing.T) {
 	assert.Nil(t, annotations, "Expected nil when annotations are disabled")
 }
 
-func TestGetNamespaceAnnotations_StaticOnly(t *testing.T) {
+func TestGetNamespaceAnnotationsStaticOnly(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Static = map[string]string{
@@ -105,7 +105,7 @@ func TestGetNamespaceAnnotations_StaticOnly(t *testing.T) {
 	assert.Equal(t, "static-value", annotations["static-key"])
 }
 
-func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
+func TestGetNamespaceAnnotationsLastLoginTimestamp(t *testing.T) {
 	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
 	usecase.namespace.Annotation.Enabled = true
 	usecase.namespace.Annotation.Dynamic.LastLoginTimestamp = true
@@ -121,8 +121,9 @@ func TestGetNamespaceAnnotations_LastLoginTimestamp(t *testing.T) {
 	assert.LessOrEqual(t, ms, after)
 }
 
-func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
-	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
+func TestGetNamespaceAnnotationsUserAttributes(t *testing.T) {
+
+	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 			"user-attr2": "value2",
@@ -141,8 +142,9 @@ func TestGetNamespaceAnnotations_UserAttributes(t *testing.T) {
 	assert.Equal(t, "value2", annotations["user-attr2"])
 }
 
-func TestGetNamespaceAnnotations_AllAnnotations(t *testing.T) {
-	ctx, reader := newCtxAndReaderWithUser(&usercontext.User{
+func TestGetNamespaceAnnotationsAllAnnotations(t *testing.T) {
+
+	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{
 		Attributes: map[string]any{
 			"user-attr1": "value1",
 		},

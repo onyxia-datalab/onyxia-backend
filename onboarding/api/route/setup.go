@@ -25,7 +25,7 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 
 	onboardingController := SetupOnboardingController(app)
 
-	handler := &MyHandler{onboardImpl: onboardingController.Onboard}
+	handler := NewHandler(onboardingController)
 
 	srv, err := oas.NewServer(
 		handler,
