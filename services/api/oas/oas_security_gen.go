@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-faster/errors"
-
 	"github.com/ogen-go/ogen/ogenerrors"
 )
 
@@ -34,6 +33,7 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 }
 
 var oauth2ScopesOidc = map[string][]string{
+	GetMyCatalogsOperation:  {},
 	InstallServiceOperation: {},
 	WatchReleaseOperation:   {},
 	WatchResourcesOperation: {},

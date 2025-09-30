@@ -8,6 +8,13 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// GetMyCatalogs implements getMyCatalogs operation.
+	//
+	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
+	// by user permissions if user is authenticated. Otherwise we return the public catalog.
+	//
+	// GET /services/catalogs
+	GetMyCatalogs(ctx context.Context) (GetMyCatalogsRes, error)
 	// InstallService implements installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if

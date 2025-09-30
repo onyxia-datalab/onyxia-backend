@@ -150,6 +150,32 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'c': // Prefix: "catalogs"
+					origElem := elem
+					if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleGetMyCatalogsRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, "GET")
+						}
+
+						return
+					}
+
+					elem = origElem
+				}
 				// Param: "releaseId"
 				// Match until "/"
 				idx := strings.IndexByte(elem, '/')
@@ -374,6 +400,36 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 
+				if len(elem) == 0 {
+					break
+				}
+				switch elem[0] {
+				case 'c': // Prefix: "catalogs"
+					origElem := elem
+					if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = GetMyCatalogsOperation
+							r.summary = "List available catalogs and packages for installing for the user."
+							r.operationID = "getMyCatalogs"
+							r.pathPattern = "/services/catalogs"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+
+					elem = origElem
+				}
 				// Param: "releaseId"
 				// Match until "/"
 				idx := strings.IndexByte(elem, '/')

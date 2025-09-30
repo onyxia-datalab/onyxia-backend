@@ -20,5 +20,5 @@ func decodeOnboardResponse(resp *http.Response) (res OnboardRes, _ error) {
 		// Code 403.
 		return &OnboardForbidden{}, nil
 	}
-	return res, validate.UnexpectedStatusCode(resp.StatusCode)
+	return res, validate.UnexpectedStatusCodeWithResponse(resp)
 }

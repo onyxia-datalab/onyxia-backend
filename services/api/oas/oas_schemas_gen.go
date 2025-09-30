@@ -6,8 +6,171 @@ import (
 	"io"
 	"net/url"
 
+	"github.com/go-faster/errors"
 	"github.com/go-faster/jx"
 )
+
+// Ref: #/components/schemas/Catalog
+type Catalog struct {
+	// Catalog id.
+	ID string `json:"id"`
+	// The name of the catalog.
+	Name LocalizedString `json:"name"`
+	// The description of the catalog.
+	Description OptLocalizedString `json:"description"`
+	// Where to find the catalog.
+	Location OptString `json:"location"`
+	// Is the catalog a test or a production catalog.
+	Status OptCatalogStatus `json:"status"`
+	// Names of important packages of the catalog to highlight in the UI.
+	HighlightedCharts []string `json:"highlightedCharts"`
+	// Describes if the catalog is visible in user or project context.
+	Visible OptCatalogVisible `json:"visible"`
+}
+
+// GetID returns the value of ID.
+func (s *Catalog) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *Catalog) GetName() LocalizedString {
+	return s.Name
+}
+
+// GetDescription returns the value of Description.
+func (s *Catalog) GetDescription() OptLocalizedString {
+	return s.Description
+}
+
+// GetLocation returns the value of Location.
+func (s *Catalog) GetLocation() OptString {
+	return s.Location
+}
+
+// GetStatus returns the value of Status.
+func (s *Catalog) GetStatus() OptCatalogStatus {
+	return s.Status
+}
+
+// GetHighlightedCharts returns the value of HighlightedCharts.
+func (s *Catalog) GetHighlightedCharts() []string {
+	return s.HighlightedCharts
+}
+
+// GetVisible returns the value of Visible.
+func (s *Catalog) GetVisible() OptCatalogVisible {
+	return s.Visible
+}
+
+// SetID sets the value of ID.
+func (s *Catalog) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *Catalog) SetName(val LocalizedString) {
+	s.Name = val
+}
+
+// SetDescription sets the value of Description.
+func (s *Catalog) SetDescription(val OptLocalizedString) {
+	s.Description = val
+}
+
+// SetLocation sets the value of Location.
+func (s *Catalog) SetLocation(val OptString) {
+	s.Location = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Catalog) SetStatus(val OptCatalogStatus) {
+	s.Status = val
+}
+
+// SetHighlightedCharts sets the value of HighlightedCharts.
+func (s *Catalog) SetHighlightedCharts(val []string) {
+	s.HighlightedCharts = val
+}
+
+// SetVisible sets the value of Visible.
+func (s *Catalog) SetVisible(val OptCatalogVisible) {
+	s.Visible = val
+}
+
+// Is the catalog a test or a production catalog.
+type CatalogStatus string
+
+const (
+	CatalogStatusPROD CatalogStatus = "PROD"
+	CatalogStatusTEST CatalogStatus = "TEST"
+)
+
+// AllValues returns all CatalogStatus values.
+func (CatalogStatus) AllValues() []CatalogStatus {
+	return []CatalogStatus{
+		CatalogStatusPROD,
+		CatalogStatusTEST,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s CatalogStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case CatalogStatusPROD:
+		return []byte(s), nil
+	case CatalogStatusTEST:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *CatalogStatus) UnmarshalText(data []byte) error {
+	switch CatalogStatus(data) {
+	case CatalogStatusPROD:
+		*s = CatalogStatusPROD
+		return nil
+	case CatalogStatusTEST:
+		*s = CatalogStatusTEST
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Describes if the catalog is visible in user or project context.
+type CatalogVisible struct {
+	// Should this catalog be visible in user context ?.
+	User bool `json:"user"`
+	// Should this catalog be visible in project context ?.
+	Project bool `json:"project"`
+}
+
+// GetUser returns the value of User.
+func (s *CatalogVisible) GetUser() bool {
+	return s.User
+}
+
+// GetProject returns the value of Project.
+func (s *CatalogVisible) GetProject() bool {
+	return s.Project
+}
+
+// SetUser sets the value of User.
+func (s *CatalogVisible) SetUser(val bool) {
+	s.User = val
+}
+
+// SetProject sets the value of Project.
+func (s *CatalogVisible) SetProject(val bool) {
+	s.Project = val
+}
+
+type GetMyCatalogsOKApplicationJSON []Catalog
+
+func (*GetMyCatalogsOKApplicationJSON) getMyCatalogsRes() {}
 
 // Ref: #/components/schemas/InstallAccepted
 type InstallAccepted struct {
@@ -98,6 +261,196 @@ type InstallServiceUnauthorized struct{}
 
 func (*InstallServiceUnauthorized) installServiceRes() {}
 
+// A string or a map of localized strings by language code.
+// Ref: #/components/schemas/LocalizedString
+// LocalizedString represents sum type.
+type LocalizedString struct {
+	Type             LocalizedStringType // switch on this field
+	String           string
+	LocalizedString1 LocalizedString1
+}
+
+// LocalizedStringType is oneOf type of LocalizedString.
+type LocalizedStringType string
+
+// Possible values for LocalizedStringType.
+const (
+	StringLocalizedString           LocalizedStringType = "string"
+	LocalizedString1LocalizedString LocalizedStringType = "LocalizedString1"
+)
+
+// IsString reports whether LocalizedString is string.
+func (s LocalizedString) IsString() bool { return s.Type == StringLocalizedString }
+
+// IsLocalizedString1 reports whether LocalizedString is LocalizedString1.
+func (s LocalizedString) IsLocalizedString1() bool { return s.Type == LocalizedString1LocalizedString }
+
+// SetString sets LocalizedString to string.
+func (s *LocalizedString) SetString(v string) {
+	s.Type = StringLocalizedString
+	s.String = v
+}
+
+// GetString returns string and true boolean if LocalizedString is string.
+func (s LocalizedString) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringLocalizedString returns new LocalizedString from string.
+func NewStringLocalizedString(v string) LocalizedString {
+	var s LocalizedString
+	s.SetString(v)
+	return s
+}
+
+// SetLocalizedString1 sets LocalizedString to LocalizedString1.
+func (s *LocalizedString) SetLocalizedString1(v LocalizedString1) {
+	s.Type = LocalizedString1LocalizedString
+	s.LocalizedString1 = v
+}
+
+// GetLocalizedString1 returns LocalizedString1 and true boolean if LocalizedString is LocalizedString1.
+func (s LocalizedString) GetLocalizedString1() (v LocalizedString1, ok bool) {
+	if !s.IsLocalizedString1() {
+		return v, false
+	}
+	return s.LocalizedString1, true
+}
+
+// NewLocalizedString1LocalizedString returns new LocalizedString from LocalizedString1.
+func NewLocalizedString1LocalizedString(v LocalizedString1) LocalizedString {
+	var s LocalizedString
+	s.SetLocalizedString1(v)
+	return s
+}
+
+type LocalizedString1 struct {
+	En              OptString `json:"en"`
+	Fr              OptString `json:"fr"`
+	ZhMinusCN       OptString `json:"zh-CN"`
+	No              OptString `json:"no"`
+	Fi              OptString `json:"fi"`
+	Nl              OptString `json:"nl"`
+	It              OptString `json:"it"`
+	Es              OptString `json:"es"`
+	De              OptString `json:"de"`
+	AdditionalProps LocalizedString1Additional
+}
+
+// GetEn returns the value of En.
+func (s *LocalizedString1) GetEn() OptString {
+	return s.En
+}
+
+// GetFr returns the value of Fr.
+func (s *LocalizedString1) GetFr() OptString {
+	return s.Fr
+}
+
+// GetZhMinusCN returns the value of ZhMinusCN.
+func (s *LocalizedString1) GetZhMinusCN() OptString {
+	return s.ZhMinusCN
+}
+
+// GetNo returns the value of No.
+func (s *LocalizedString1) GetNo() OptString {
+	return s.No
+}
+
+// GetFi returns the value of Fi.
+func (s *LocalizedString1) GetFi() OptString {
+	return s.Fi
+}
+
+// GetNl returns the value of Nl.
+func (s *LocalizedString1) GetNl() OptString {
+	return s.Nl
+}
+
+// GetIt returns the value of It.
+func (s *LocalizedString1) GetIt() OptString {
+	return s.It
+}
+
+// GetEs returns the value of Es.
+func (s *LocalizedString1) GetEs() OptString {
+	return s.Es
+}
+
+// GetDe returns the value of De.
+func (s *LocalizedString1) GetDe() OptString {
+	return s.De
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *LocalizedString1) GetAdditionalProps() LocalizedString1Additional {
+	return s.AdditionalProps
+}
+
+// SetEn sets the value of En.
+func (s *LocalizedString1) SetEn(val OptString) {
+	s.En = val
+}
+
+// SetFr sets the value of Fr.
+func (s *LocalizedString1) SetFr(val OptString) {
+	s.Fr = val
+}
+
+// SetZhMinusCN sets the value of ZhMinusCN.
+func (s *LocalizedString1) SetZhMinusCN(val OptString) {
+	s.ZhMinusCN = val
+}
+
+// SetNo sets the value of No.
+func (s *LocalizedString1) SetNo(val OptString) {
+	s.No = val
+}
+
+// SetFi sets the value of Fi.
+func (s *LocalizedString1) SetFi(val OptString) {
+	s.Fi = val
+}
+
+// SetNl sets the value of Nl.
+func (s *LocalizedString1) SetNl(val OptString) {
+	s.Nl = val
+}
+
+// SetIt sets the value of It.
+func (s *LocalizedString1) SetIt(val OptString) {
+	s.It = val
+}
+
+// SetEs sets the value of Es.
+func (s *LocalizedString1) SetEs(val OptString) {
+	s.Es = val
+}
+
+// SetDe sets the value of De.
+func (s *LocalizedString1) SetDe(val OptString) {
+	s.De = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *LocalizedString1) SetAdditionalProps(val LocalizedString1Additional) {
+	s.AdditionalProps = val
+}
+
+type LocalizedString1Additional map[string]string
+
+func (s *LocalizedString1Additional) init() LocalizedString1Additional {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
+}
+
 type Oidc struct {
 	Token  string
 	Scopes []string
@@ -169,6 +522,98 @@ func (o OptBool) Or(d bool) bool {
 	return d
 }
 
+// NewOptCatalogStatus returns new OptCatalogStatus with value set to v.
+func NewOptCatalogStatus(v CatalogStatus) OptCatalogStatus {
+	return OptCatalogStatus{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCatalogStatus is optional CatalogStatus.
+type OptCatalogStatus struct {
+	Value CatalogStatus
+	Set   bool
+}
+
+// IsSet returns true if OptCatalogStatus was set.
+func (o OptCatalogStatus) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCatalogStatus) Reset() {
+	var v CatalogStatus
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCatalogStatus) SetTo(v CatalogStatus) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCatalogStatus) Get() (v CatalogStatus, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCatalogStatus) Or(d CatalogStatus) CatalogStatus {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptCatalogVisible returns new OptCatalogVisible with value set to v.
+func NewOptCatalogVisible(v CatalogVisible) OptCatalogVisible {
+	return OptCatalogVisible{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptCatalogVisible is optional CatalogVisible.
+type OptCatalogVisible struct {
+	Value CatalogVisible
+	Set   bool
+}
+
+// IsSet returns true if OptCatalogVisible was set.
+func (o OptCatalogVisible) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptCatalogVisible) Reset() {
+	var v CatalogVisible
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptCatalogVisible) SetTo(v CatalogVisible) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptCatalogVisible) Get() (v CatalogVisible, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptCatalogVisible) Or(d CatalogVisible) CatalogVisible {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInt returns new OptInt with value set to v.
 func NewOptInt(v int) OptInt {
 	return OptInt{
@@ -209,6 +654,52 @@ func (o OptInt) Get() (v int, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptLocalizedString returns new OptLocalizedString with value set to v.
+func NewOptLocalizedString(v LocalizedString) OptLocalizedString {
+	return OptLocalizedString{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptLocalizedString is optional LocalizedString.
+type OptLocalizedString struct {
+	Value LocalizedString
+	Set   bool
+}
+
+// IsSet returns true if OptLocalizedString was set.
+func (o OptLocalizedString) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptLocalizedString) Reset() {
+	var v LocalizedString
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptLocalizedString) SetTo(v LocalizedString) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptLocalizedString) Get() (v LocalizedString, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptLocalizedString) Or(d LocalizedString) LocalizedString {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -377,6 +868,7 @@ func (s *Problem) SetAdditionalProps(val ProblemAdditional) {
 	s.AdditionalProps = val
 }
 
+func (*Problem) getMyCatalogsRes()  {}
 func (*Problem) watchReleaseRes()   {}
 func (*Problem) watchResourcesRes() {}
 

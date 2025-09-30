@@ -13,6 +13,16 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// GetMyCatalogs implements getMyCatalogs operation.
+//
+// Returns the list of catalogs and packages available for the user. The list of packages is filtered
+// by user permissions if user is authenticated. Otherwise we return the public catalog.
+//
+// GET /services/catalogs
+func (UnimplementedHandler) GetMyCatalogs(ctx context.Context) (r GetMyCatalogsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // InstallService implements installService operation.
 //
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
