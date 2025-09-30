@@ -22,10 +22,12 @@ func TestResolvePackage(t *testing.T) {
 						Versions: []string{"1.0.0", "2.0.0"},
 					},
 				},
+				URL: "https://oci.example.com",
 			},
 			{
 				ID:   "helm-cat",
 				Type: domain.CatalogTypeHelm,
+				URL:  "https://charts.example.com/",
 			},
 			{
 				ID:   "weird-cat",
@@ -64,14 +66,21 @@ func TestResolvePackage(t *testing.T) {
 		require.Equal(t, "mypkg", pkg.Name)
 		require.Equal(t, "2.0.0", pkg.Version)
 		require.Equal(t, "oci-cat", pkg.CatalogID)
+		require.Equal(
+			t,
+			"https://oci.example.com/mypkg",
+			pkg.ChartRef(),
+		)
 	})
 
-	t.Run("Helm catalog returns package without version validation", func(t *testing.T) {
+	t.Run("Helm catalog returns package and sets RepoURL", func(t *testing.T) {
 		pkg, err := resolver.ResolvePackage(ctx, "helm-cat", "somepkg", "123")
 		require.NoError(t, err)
 		require.Equal(t, "somepkg", pkg.Name)
 		require.Equal(t, "123", pkg.Version)
 		require.Equal(t, "helm-cat", pkg.CatalogID)
+		require.Equal(t, "https://charts.example.com/", pkg.RepoURL)
+		require.Equal(t, "https://charts.example.com/somepkg", pkg.ChartRef())
 	})
 }
 

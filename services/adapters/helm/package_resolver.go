@@ -28,7 +28,7 @@ func (r *HelmPackageResolver) ResolvePackage(
 	case domain.CatalogTypeOCI:
 		return resolveOCI(cat, pkgName, version)
 	case domain.CatalogTypeHelm:
-		return resolveHelm(catalogID, pkgName, version), nil
+		return resolveHelm(cat, pkgName, version), nil
 	default:
 		return domain.PackageVersion{}, fmt.Errorf(
 			"catalog %q has unsupported type %q",
@@ -74,12 +74,13 @@ func resolveOCI(cat domain.Catalog, pkgName, version string) (domain.PackageVers
 	)
 }
 
-func resolveHelm(catalogID, pkgName, version string) domain.PackageVersion {
+func resolveHelm(cat domain.Catalog, pkgName, version string) domain.PackageVersion {
 	return domain.PackageVersion{
 		Package: domain.Package{
 			Name:      pkgName,
-			CatalogID: catalogID,
+			CatalogID: cat.ID,
 		},
 		Version: version,
+		RepoURL: cat.URL,
 	}
 }

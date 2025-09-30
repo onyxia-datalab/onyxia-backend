@@ -33,7 +33,6 @@ func (uc *ServiceLifecycle) Start(
 ) (domain.StartResponse, error) {
 
 	// 1) Get the package from catalog + packageName + packageVersion
-
 	pkg, err := uc.packageResolver.ResolvePackage(ctx, req.CatalogID, req.PackageName, req.Version)
 
 	if err != nil {
