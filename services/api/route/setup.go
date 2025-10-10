@@ -29,7 +29,13 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to setup install controller: %w", err)
 	}
 
-	h := NewHandler(installCtrl)
+	catalogCtrl, err := SetupCatalogController(app)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup catalog controller: %w", err)
+	}
+
+	h := NewHandler(installCtrl, catalogCtrl)
 
 	srv, err := oas.NewServer(
 		h,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/stretchr/testify/require"
 )
@@ -12,22 +13,22 @@ func TestResolvePackage(t *testing.T) {
 	ctx := context.Background()
 
 	resolver := &HelmPackageResolver{
-		catalogs: []domain.Catalog{
+		catalogsConfig: []env.CatalogConfig{
 			{
-				ID:   "oci-cat",
-				Type: domain.CatalogTypeOCI,
-				Packages: []domain.PackageRef{
+				ID:       "oci-cat",
+				Type:     env.CatalogTypeOCI,
+				Location: "https://oci.example.com",
+				Packages: []env.OCIPackage{
 					{
-						Package:  domain.Package{Name: "mypkg", CatalogID: "oci-cat"},
+						Name:     "mypkg",
 						Versions: []string{"1.0.0", "2.0.0"},
 					},
 				},
-				URL: "https://oci.example.com",
 			},
 			{
-				ID:   "helm-cat",
-				Type: domain.CatalogTypeHelm,
-				URL:  "https://charts.example.com/",
+				ID:       "helm-cat",
+				Type:     env.CatalogTypeHelm,
+				Location: "https://charts.example.com/",
 			},
 			{
 				ID:   "weird-cat",
@@ -85,17 +86,6 @@ func TestResolvePackage(t *testing.T) {
 }
 
 func TestChartRefHelpers(t *testing.T) {
-	t.Run("PackageRef.ChartRef trims trailing slash", func(t *testing.T) {
-		cat := domain.Catalog{URL: "https://charts.example.com/"}
-		ref := domain.PackageRef{
-			Package: domain.Package{
-				CatalogID: "cat1",
-				Name:      "mypkg",
-			},
-		}
-		require.Equal(t, "https://charts.example.com/mypkg", ref.ChartRef(cat))
-	})
-
 	t.Run("PackageVersion.ChartRef trims trailing slash", func(t *testing.T) {
 		pv := domain.PackageVersion{
 			Package: domain.Package{

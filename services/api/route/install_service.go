@@ -43,12 +43,10 @@ func SetupInstallController(
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
-	var packageResolver ports.PackageResolver
-
 	serviceLifecycleUc := usecase.NewServiceLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
 		helmRealeaseGtw,
-		packageResolver,
+		helm.NewPackageResolver(app.Env.CatalogsConfig),
 	)
 
 	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader)

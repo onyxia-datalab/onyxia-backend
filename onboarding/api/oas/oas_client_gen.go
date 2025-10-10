@@ -105,7 +105,7 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("onboard"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/onboarding"),
+		semconv.URLTemplateKey.String("/onboarding"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 

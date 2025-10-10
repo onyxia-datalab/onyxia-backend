@@ -5,10 +5,10 @@ import (
 	"fmt"
 )
 
-func ValidateCatalogs(catalogs []Catalog) error {
+func ValidateCatalogsConfig(catalogs []CatalogConfig) error {
 	seen := make(map[string]struct{}, len(catalogs))
 	for _, c := range catalogs {
-		if err := ValidateCatalog(c); err != nil {
+		if err := ValidateCatalogConfig(c); err != nil {
 			return err
 		}
 		if _, dup := seen[c.ID]; dup {
@@ -19,7 +19,7 @@ func ValidateCatalogs(catalogs []Catalog) error {
 	return nil
 }
 
-func ValidateCatalog(c Catalog) error {
+func ValidateCatalogConfig(c CatalogConfig) error {
 
 	if err := validateCommon(c); err != nil {
 		return err
@@ -46,7 +46,7 @@ func ValidateCatalog(c Catalog) error {
 	return nil
 }
 
-func validateCommon(cc Catalog) error {
+func validateCommon(cc CatalogConfig) error {
 	// Status enum
 	switch cc.Status {
 	case StatusProd, StatusTest:
@@ -96,7 +96,7 @@ func validateCommon(cc Catalog) error {
 	return nil
 }
 
-func validateOCI(o Catalog) error {
+func validateOCI(o CatalogConfig) error {
 	if len(o.Packages) == 0 {
 		return fmt.Errorf("catalog %q: oci.packages must not be empty", o.ID)
 	}

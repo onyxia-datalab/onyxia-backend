@@ -9,13 +9,19 @@ import (
 )
 
 type Handler struct {
-	install *controller.InstallController
+	install  *controller.InstallController
+	catalogs *controller.CatalogController
 }
+
+
 
 var _ api.Handler = (*Handler)(nil)
 
-func NewHandler(install *controller.InstallController) *Handler {
-	return &Handler{install: install}
+func NewHandler(
+	install *controller.InstallController,
+	catalogs *controller.CatalogController,
+) *Handler {
+	return &Handler{install: install, catalogs: catalogs}
 }
 
 func (h *Handler) InstallService(
@@ -24,6 +30,10 @@ func (h *Handler) InstallService(
 	p api.InstallServiceParams,
 ) (api.InstallServiceRes, error) {
 	return h.install.InstallService(ctx, req, p)
+}
+
+func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, error) {
+	return h.catalogs.GetMyCatalogs(ctx)
 }
 
 // Keep stubs explicit until implemented (or embed api.UnimplementedHandler if you prefer 501s)
@@ -38,5 +48,19 @@ func (h *Handler) WatchResources(
 	ctx context.Context,
 	p api.WatchResourcesParams,
 ) (api.WatchResourcesRes, error) {
+	return nil, ht.ErrNotImplemented
+}
+
+func (h *Handler) GetMyPackage(
+	ctx context.Context,
+	p api.GetMyPackageParams,
+) (api.GetMyPackageRes, error) {
+	return nil, ht.ErrNotImplemented
+}
+
+func (h *Handler) SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(
+	ctx context.Context,
+	p api.SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams,
+) (api.SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
 	return nil, ht.ErrNotImplemented
 }

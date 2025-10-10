@@ -1,11 +1,14 @@
 openapi: 3.1.0
 info:
   title: Onyxia services API for a region
-  description: Onyxia services API is responsible to provide service catalog and to run, modify delete services
+  description: >
+    Onyxia services API is responsible to provide service catalog and to run,
+    modify and delete services.
   version: 0.0.0
 
 security:
   - oidc: []
+
 tags:
   - name: services
     description: Service lifecycle (install)
@@ -13,16 +16,89 @@ tags:
     description: Event streams (SSE)
   - name: catalogs
     description: Service catalogs
+
 paths:
-  /services/catalogs:
+  /catalogs/{catalogId}/packages/{packageName}:
     get:
-      tags:
-        - catalogs
+      security:
+        - oidc: []
+      tags: [catalogs]
+      operationId: getMyPackage
+      summary: Get detailed information about a package in a catalog
+      description: >
+        Returns detailed information about a package in a catalog, including
+        available versions.
+      parameters:
+        - name: catalogId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Catalog identifier
+        - name: packageName
+          in: path
+          required: true
+          schema: { type: string }
+          description: Package name
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DetailedPackage" }
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /schemas/{catalogId}/packageName/{packageName}/versions/{version}:
+    get:
+      security:
+        - oidc: []
+      summary: Get the values.schema.json of a versioned package
+      description: >
+        Returns the values.schema.json of a versioned package. The schema is
+        enhanced by user permissions and roles.
+      parameters:
+        - name: catalogId
+          in: path
+          required: true
+          schema: { type: string }
+          description: Catalog identifier
+        - name: packageName
+          in: path
+          required: true
+          schema: { type: string }
+          description: Package name
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+            format: semver
+          description: Package version (semver)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /catalogs:
+    get:
+      security:
+        - {}
+        - oidc: []
+      tags: [catalogs]
       operationId: getMyCatalogs
-      summary: List available catalogs and packages for installing for the user.
+      summary: List available catalogs and packages for installing for the user
       description: >
         Returns the list of catalogs and packages available for the user.
-        The list of packages is filtered by user permissions if user is authenticated. Otherwise we return the public catalog.
+        The list of packages is filtered by user permissions if the user is
+        authenticated. Otherwise returns the public catalog.
       responses:
         "200":
           description: OK
@@ -30,50 +106,31 @@ paths:
             application/json:
               schema:
                 type: array
-                items:
-                  $ref: "#/components/schemas/Catalog"
-              examples:
-                default:
-                  value:
-                    - id: public
-                      name: Public catalog
-                      packages:
-                        - name: jupyter-python
-                          versions: ["1.0.0", "1.1.0", "2.0.0"]
-                        - name: rstudio
-                          versions: ["1.0.0", "1.1.0"]
-                    - id: internal
-                      name: Internal catalog
-                      packages:
-                        - name: internal-tool
-                          versions: ["0.1.0"]
+                items: { $ref: "#/components/schemas/Catalog" }
         "500":
-          description: Internal error
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
-  /services/{releaseId}/install:
+          $ref: "#/components/responses/InternalError"
+
+  /{releaseId}/install:
     put:
       tags: [services]
       operationId: installService
       summary: Trigger service installation (async)
       description: >
-        Starts an install for the given releaseId. Returns 202 with URLs for SSE streams.
-        Idempotent if the release already exists (returns 202 with same event URLs).
+        Starts an install for the given releaseId. Returns 202 with URLs for SSE
+        streams. Idempotent if the release already exists (returns 202 with the
+        same event URLs).
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - name: X-Onyxia-Project
           in: header
           required: false
-          schema:
-            type: string
+          schema: { type: string }
           description: Project identifier in Onyxia
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/ServiceInstallRequest"
+            schema: { $ref: "#/components/schemas/ServiceInstallRequest" }
             examples:
               jupyter:
                 value:
@@ -93,8 +150,7 @@ paths:
               schema: { type: string, format: uri-reference }
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/InstallAccepted"
+              schema: { $ref: "#/components/schemas/InstallAccepted" }
               examples:
                 default:
                   value:
@@ -102,27 +158,16 @@ paths:
                       release: /events/jupyter-python-626146/watch-release
                       resources: /events/jupyter-python-626146/watch-resources
         "400":
-          description: Bad request
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/BadRequest"
         "401":
-          description: Unauthorized
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Forbidden
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/Forbidden"
         "409":
-          description: Conflict another install already exists with the same releaseId
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/Conflict"
         "500":
-          description: Internal error
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/InternalError"
+
   /events/{releaseId}/watch-release:
     get:
       tags: [events]
@@ -147,23 +192,21 @@ paths:
                 x-oas-doc-schema:
                   $ref: "#/components/schemas/SSEFrameRelease"
         "401":
-          description: Unauthorized
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Forbidden
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Unknown releaseId
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/NotFound"
+
   /events/{releaseId}/watch-resources:
     get:
       tags: [events]
       operationId: watchResources
       summary: Kubernetes resources status stream (SSE)
       description: >
-        Server-Sent Events (text/event-stream).
-        Filters resources by labelSelector: app.kubernetes.io/instance={releaseId}.
-        Emits: "resource" (add/update/delete), "progress" (aggregated readiness), "done".
+        Server-Sent Events (text/event-stream). Filters resources by
+        labelSelector: app.kubernetes.io/instance={releaseId}. Emits: "resource"
+        (add/update/delete), "progress" (aggregated readiness), "done".
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - $ref: "#/components/parameters/lastEventId"
@@ -180,14 +223,12 @@ paths:
                 x-oas-doc-schema:
                   $ref: "#/components/schemas/SSEFrameResources"
         "401":
-          description: Unauthorized
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Forbidden
+          $ref: "#/components/responses/Forbidden"
         "404":
-          description: Unknown releaseId
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+          $ref: "#/components/responses/NotFound"
+
 components:
   parameters:
     releaseId:
@@ -205,74 +246,142 @@ components:
       required: false
       schema: { type: string }
       description: Resume SSE from a specific event id (client reconnection)
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: Conflict — resource already exists or operation already running
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    InternalError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
   schemas:
     Catalog:
       type: object
       required: [id, name, packages]
       properties:
-        id:
-          type: string
-          description: Catalog id
+        id: { type: string, description: Catalog id }
         name:
           $ref: "#/components/schemas/LocalizedString"
           description: The name of the catalog
         description:
           $ref: "#/components/schemas/LocalizedString"
           description: The description of the catalog
-        location:
-          type: string
-          description: Where to find the catalog
         status:
           type: string
-          description: Is the catalog a test or a production catalog
           enum: [PROD, TEST]
-        highlightedCharts:
+          description: Is the catalog a test or a production catalog
+        highlightedPackages:
           type: array
-          description: names of important packages of the catalog to highlight in the UI
-          items:
-            type: string
+          description: Names of important packages of the catalog to highlight in the UI
+          items: { type: string }
         visible:
           type: object
           required: [user, project]
+          description: Describes if the catalog is visible in user or project context
           properties:
             user:
               type: boolean
-              description: Should this catalog be visible in user context ?
+              description: Should this catalog be visible in user context?
             project:
               type: boolean
-              description: Should this catalog be visible in project context ?
-          description: Describes if the catalog is visible in user or project context
+              description: Should this catalog be visible in project context?
+        packages:
+          type: array
+          description: List of packages available in the catalog
+          items: { $ref: "#/components/schemas/Package" }
+
+    Package:
+      type: object
+      required: [name, icon]
+      properties:
+        name: { type: string, description: Package name }
+        description:
+          { type: string, description: The description of the package }
+        icon: { type: string, format: uri, description: URL to an icon }
+        home: { type: string, format: uri, description: URL to the home page }
+
+    DetailedPackage:
+      allOf:
+        - $ref: "#/components/schemas/Package"
+        - type: object
+          required: [versions]
+          properties:
+            versions:
+              type: array
+              description: List of versions available for the package
+              items:
+                type: object
+                required: [version]
+                properties:
+                  version:
+                    type: string
+                    format: semver
+                    description: Version string of the Helm chart
+
     ServiceInstallRequest:
       type: object
       required: [packageName, options, catalogId, name]
       properties:
         catalogId:
-          type: string
-          description: Catalog where the package of the service is taken from.
+          {
+            type: string,
+            description: Catalog where the package is taken from.,
+          }
         packageName:
-          type: string
-          description: Package name that will be used to create the service, necessary for package recovering (verify package)
+          {
+            type: string,
+            description: Package name used to create the service.,
+          }
         packageVersion:
-          type: string
-          format: semver
-          description: Version of the helm package, put version into creation, if not null
+          {
+            type: string,
+            format: semver,
+            description: Version of the Helm package.,
+          }
         version:
-          type: string
-          description: Chart version (empty for latest)
+          { type: string, description: Chart version (empty for latest). }
         options:
-          type: object
-          additionalProperties: true
-          description: Options of package (values.yaml for helm)
+          {
+            type: object,
+            additionalProperties: true,
+            description: Options of package (values.yaml for Helm).,
+          }
         share:
-          type: boolean
-          default: false
-          description: When true, all users of the namespace will list this service.
+          {
+            type: boolean,
+            default: false,
+            description: When true,
+            visible to all users of the namespace.,
+          }
         friendlyName:
-          type: string
-          description: Friendly name for the service
-        name:
-          type: string
-          description: A chosen name for the service
+          { type: string, description: Friendly name for the service. }
+        name: { type: string, description: A chosen name for the service. }
+
     InstallAccepted:
       type: object
       required: [eventsUrl]
@@ -282,39 +391,40 @@ components:
           required: [release, resources]
           properties:
             release:
-              type: string
-              example: /events/jupyter-python-626146/watch-release
+              {
+                type: string,
+                example: /events/jupyter-python-626146/watch-release,
+              }
             resources:
-              type: string
-              example: /events/jupyter-python-626146/watch-resources
+              {
+                type: string,
+                example: /events/jupyter-python-626146/watch-resources,
+              }
+
     SSEFrameRelease:
       type: object
       required: [event, data]
       properties:
         id:
-          type: string
-          description: Optional event id for Last-Event-ID resume.
+          {
+            type: string,
+            description: Optional event id for Last-Event-ID resume.,
+          }
         event:
           type: string
           description: Release stream event name
           enum: [status, log, done]
-        data:
-          $ref: "#/components/schemas/ReleaseEventData"
+        data: { $ref: "#/components/schemas/ReleaseEventData" }
       description: >
         Wire format per frame:
         "id: <id>\n" (optional) + "event: <event>\n" + "data: <JSON(data)>\n\n".
+
     ReleaseEventData:
       type: object
       description: >
-        Payload for /watch-release events. Fields present depend on `event`:
-        - status: generic connection/heartbeat messages
-        - phase/revision: release status
-        - msg: optional log line
-        - error: error when terminal status=failed
+        Payload for /watch-release events.
       properties:
-        status:
-          type: string
-          description: Free-form status (e.g., "connected", "heartbeat").
+        status: { type: string, description: Free-form status. }
         phase:
           type: string
           enum:
@@ -328,52 +438,28 @@ components:
               deleted,
               unknown,
             ]
-        revision:
-          type: integer
-          minimum: 1
-          description: Release revision if known.
-        msg:
-          type: string
-          description: Optional log line (for `event=log`).
-        error:
-          type: string
-          description: Error message when terminal status is failed.
+        revision: { type: integer, minimum: 1 }
+        msg: { type: string }
+        error: { type: string }
+
     SSEFrameResources:
       type: object
       required: [event, data]
       properties:
-        id:
-          type: string
-          description: Optional event id for Last-Event-ID resume.
+        id: { type: string }
         event:
           type: string
-          description: Resources stream event name
           enum: [status, resource, progress, done]
-        data:
-          $ref: "#/components/schemas/ResourcesEventData"
-      description: >
-        Wire format per frame:
-        "id: <id>\n" (optional) + "event: <event>\n" + "data: <JSON(data)>\n\n".
+        data: { $ref: "#/components/schemas/ResourcesEventData" }
 
     ResourcesEventData:
       type: object
-      description: >
-        Payload for /watch-resources events. Fields present depend on `event`:
-        - status: generic connection/heartbeat
-        - kind/name/namespace/action: per-resource change (add/update/delete)
-        - *Ready/*Total counters: aggregated readiness
-        - done/failed/message/summary: terminal/summary information
       properties:
-        # generic
-        status:
-          type: string
-          description: Free-form status (e.g., "connected", "heartbeat").
-        # per-resource event
+        status: { type: string }
         kind: { type: string, example: Pod }
         name: { type: string }
         namespace: { type: string }
         action: { type: string, enum: [add, update, delete] }
-        # aggregated progress
         podsReady: { type: integer, minimum: 0 }
         podsTotal: { type: integer, minimum: 0 }
         jobsComplete: { type: integer, minimum: 0 }
@@ -384,10 +470,7 @@ components:
         statefulSetsTotal: { type: integer, minimum: 0 }
         daemonSetsReady: { type: integer, minimum: 0 }
         daemonSetsTotal: { type: integer, minimum: 0 }
-        message:
-          type: string
-          description: Optional human-readable summary.
-        # terminal hints
+        message: { type: string }
         done: { type: boolean }
         failed: { type: boolean }
         error: { type: string }
@@ -397,30 +480,21 @@ components:
       oneOf:
         - type: string
         - type: object
-          additionalProperties:
-            type: string
+          additionalProperties: { type: string }
           properties:
-            en:
-              type: string
-            fr:
-              type: string
-            zh-CN:
-              type: string
-            no:
-              type: string
-            fi:
-              type: string
-            nl:
-              type: string
-            it:
-              type: string
-            es:
-              type: string
-            de:
-              type: string
+            en: { type: string }
+            fr: { type: string }
+            zh-CN: { type: string }
+            no: { type: string }
+            fi: { type: string }
+            nl: { type: string }
+            it: { type: string }
+            es: { type: string }
+            de: { type: string }
           example:
             en: "Hello"
             fr: "Bonjour"
+
     Problem:
       type: object
       properties:
@@ -430,6 +504,7 @@ components:
         detail: { type: string }
         instance: { type: string }
       additionalProperties: true
+
   securitySchemes:
     oidc:
       type: oauth2

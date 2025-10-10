@@ -16,20 +16,39 @@ var _ Handler = UnimplementedHandler{}
 // GetMyCatalogs implements getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
-// by user permissions if user is authenticated. Otherwise we return the public catalog.
+// by user permissions if the user is authenticated. Otherwise returns the public catalog.
 //
-// GET /services/catalogs
+// GET /catalogs
 func (UnimplementedHandler) GetMyCatalogs(ctx context.Context) (r GetMyCatalogsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetMyPackage implements getMyPackage operation.
+//
+// Returns detailed information about a package in a catalog, including available versions.
+//
+// GET /catalogs/{catalogId}/packages/{packageName}
+func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackageParams) (r GetMyPackageRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
 // InstallService implements installService operation.
 //
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-// the release already exists (returns 202 with same event URLs).
+// the release already exists (returns 202 with the same event URLs).
 //
-// PUT /services/{releaseId}/install
+// PUT /{releaseId}/install
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
+//
+// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+// and roles.
+//
+// GET /schemas/{catalogId}/packageName/{packageName}/versions/{version}
+func (UnimplementedHandler) SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (r SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

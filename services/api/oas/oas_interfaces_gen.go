@@ -5,8 +5,16 @@ type GetMyCatalogsRes interface {
 	getMyCatalogsRes()
 }
 
+type GetMyPackageRes interface {
+	getMyPackageRes()
+}
+
 type InstallServiceRes interface {
 	installServiceRes()
+}
+
+type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes interface {
+	schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes()
 }
 
 type WatchReleaseRes interface {
