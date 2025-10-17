@@ -479,18 +479,10 @@ components:
       description: A string or a map of localized strings by language code
       oneOf:
         - type: string
+          example: "Hello"
         - type: object
-          additionalProperties: { type: string }
-          properties:
-            en: { type: string }
-            fr: { type: string }
-            zh-CN: { type: string }
-            no: { type: string }
-            fi: { type: string }
-            nl: { type: string }
-            it: { type: string }
-            es: { type: string }
-            de: { type: string }
+          additionalProperties:
+            type: string
           example:
             en: "Hello"
             fr: "Bonjour"

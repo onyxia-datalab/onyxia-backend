@@ -1226,230 +1226,14 @@ func (s *LocalizedString) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *LocalizedString1) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *LocalizedString1) encodeFields(e *jx.Encoder) {
-	{
-		if s.En.Set {
-			e.FieldStart("en")
-			s.En.Encode(e)
-		}
-	}
-	{
-		if s.Fr.Set {
-			e.FieldStart("fr")
-			s.Fr.Encode(e)
-		}
-	}
-	{
-		if s.ZhMinusCN.Set {
-			e.FieldStart("zh-CN")
-			s.ZhMinusCN.Encode(e)
-		}
-	}
-	{
-		if s.No.Set {
-			e.FieldStart("no")
-			s.No.Encode(e)
-		}
-	}
-	{
-		if s.Fi.Set {
-			e.FieldStart("fi")
-			s.Fi.Encode(e)
-		}
-	}
-	{
-		if s.Nl.Set {
-			e.FieldStart("nl")
-			s.Nl.Encode(e)
-		}
-	}
-	{
-		if s.It.Set {
-			e.FieldStart("it")
-			s.It.Encode(e)
-		}
-	}
-	{
-		if s.Es.Set {
-			e.FieldStart("es")
-			s.Es.Encode(e)
-		}
-	}
-	{
-		if s.De.Set {
-			e.FieldStart("de")
-			s.De.Encode(e)
-		}
-	}
-	for k, elem := range s.AdditionalProps {
-		e.FieldStart(k)
-
-		e.Str(elem)
-	}
-}
-
-var jsonFieldsNameOfLocalizedString1 = [9]string{
-	0: "en",
-	1: "fr",
-	2: "zh-CN",
-	3: "no",
-	4: "fi",
-	5: "nl",
-	6: "it",
-	7: "es",
-	8: "de",
-}
-
-// Decode decodes LocalizedString1 from json.
-func (s *LocalizedString1) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode LocalizedString1 to nil")
-	}
-	s.AdditionalProps = map[string]string{}
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "en":
-			if err := func() error {
-				s.En.Reset()
-				if err := s.En.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"en\"")
-			}
-		case "fr":
-			if err := func() error {
-				s.Fr.Reset()
-				if err := s.Fr.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"fr\"")
-			}
-		case "zh-CN":
-			if err := func() error {
-				s.ZhMinusCN.Reset()
-				if err := s.ZhMinusCN.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"zh-CN\"")
-			}
-		case "no":
-			if err := func() error {
-				s.No.Reset()
-				if err := s.No.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"no\"")
-			}
-		case "fi":
-			if err := func() error {
-				s.Fi.Reset()
-				if err := s.Fi.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"fi\"")
-			}
-		case "nl":
-			if err := func() error {
-				s.Nl.Reset()
-				if err := s.Nl.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"nl\"")
-			}
-		case "it":
-			if err := func() error {
-				s.It.Reset()
-				if err := s.It.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"it\"")
-			}
-		case "es":
-			if err := func() error {
-				s.Es.Reset()
-				if err := s.Es.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"es\"")
-			}
-		case "de":
-			if err := func() error {
-				s.De.Reset()
-				if err := s.De.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"de\"")
-			}
-		default:
-			var elem string
-			if err := func() error {
-				v, err := d.Str()
-				elem = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrapf(err, "decode field %q", k)
-			}
-			s.AdditionalProps[string(k)] = elem
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode LocalizedString1")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *LocalizedString1) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *LocalizedString1) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s LocalizedString1Additional) Encode(e *jx.Encoder) {
+func (s LocalizedString1) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields implements json.Marshaler.
-func (s LocalizedString1Additional) encodeFields(e *jx.Encoder) {
+func (s LocalizedString1) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
@@ -1457,10 +1241,10 @@ func (s LocalizedString1Additional) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes LocalizedString1Additional from json.
-func (s *LocalizedString1Additional) Decode(d *jx.Decoder) error {
+// Decode decodes LocalizedString1 from json.
+func (s *LocalizedString1) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode LocalizedString1Additional to nil")
+		return errors.New("invalid: unable to decode LocalizedString1 to nil")
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
@@ -1478,21 +1262,21 @@ func (s *LocalizedString1Additional) Decode(d *jx.Decoder) error {
 		m[string(k)] = elem
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode LocalizedString1Additional")
+		return errors.Wrap(err, "decode LocalizedString1")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s LocalizedString1Additional) MarshalJSON() ([]byte, error) {
+func (s LocalizedString1) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *LocalizedString1Additional) UnmarshalJSON(data []byte) error {
+func (s *LocalizedString1) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

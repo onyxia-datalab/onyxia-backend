@@ -2,12 +2,14 @@ package domain
 
 import (
 	"context"
+
+	"github.com/onyxia-datalab/onyxia-backend/internal/utils"
 )
 
 type Catalog struct {
 	ID                  string
-	Name                map[string]string
-	Description         map[string]string
+	Name                utils.LocalizedString
+	Description         utils.LocalizedString
 	Status              CatalogStatus
 	HighlightedPackages []string
 	Visible             CatalogVisibility

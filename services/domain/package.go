@@ -2,12 +2,16 @@ package domain
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 type Package struct {
-	CatalogID string
-	Name      string
+	CatalogID   string
+	Name        string
+	Description string
+	HomeUrl     url.URL
+	IconUrl     url.URL
 }
 
 type PackageRef struct {

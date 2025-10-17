@@ -13,8 +13,6 @@ type Handler struct {
 	catalogs *controller.CatalogController
 }
 
-
-
 var _ api.Handler = (*Handler)(nil)
 
 func NewHandler(
