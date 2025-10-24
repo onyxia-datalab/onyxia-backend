@@ -1,5 +1,6 @@
 # Project-wide metadata
 APIS := onboarding services
+BINARIES := $(addprefix onyxia-,$(APIS))
 BUILD := $(shell git rev-parse --short HEAD)
 DOCKER_REGISTRY := inseefrlab
 
@@ -25,10 +26,9 @@ ifeq ($(MULTIARCH), 1)
 endif
 
 
-# Shell helper: prints latest version (X.Y.Z) for a given component name ($1)
 define sh_get_version
-tag=$$(git tag -l "$1-v*" --sort=-version:refname | head -n1); \
-if [ -n "$$tag" ]; then printf '%s' "$${tag#"$1-v"}"; fi
+tag=$$(git tag -l "v*" --sort=-version:refname | head -n1); \
+if [ -n "$$tag" ]; then printf '%s' "$${tag#v}"; fi
 endef
 
 # --- HELP ---------------------------------------------------------------------
@@ -104,7 +104,7 @@ build:
 	@mkdir -p $(GOBIN)
 	@for bin in $(BINARIES); do \
 		comp=$${bin#onyxia-}; \
-		version=$$( { $(call sh_get_version,$$comp); } ); \
+		version=$$( { $(call sh_get_version); } ); \
 		echo "📦 Building $$bin (version: $$version)..."; \
 		go build -ldflags "-X=main.Version=$$version -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
@@ -138,7 +138,7 @@ endif
 $(foreach api,$(APIS),\
   $(eval docker-build-$(api): docker-setup-builder ; \
 	@echo "🐳 Building Docker image for onyxia-$(api)..."; \
-	VERSION=$$( { $(call sh_get_version,$(api)); } ); \
+	VERSION=$$( { $(call sh_get_version); } ); \
 	if [ -z "$$VERSION" ]; then \
 	  echo "❌ No version tag found for '$(api)' (expected tags like '$(api)-vX.Y.Z')"; exit 1; \
 	fi; \
