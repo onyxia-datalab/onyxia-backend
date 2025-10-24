@@ -23,6 +23,10 @@ func (s *onboardingUsecase) applyQuotas(
 
 	quotaToApply := s.getQuota(ctx, req, namespace)
 
+	slog.InfoContext(ctx,
+		"🔹 Applying quota",
+		slog.Any("quota", quotaToApply),
+	)
 	result, err := s.namespaceService.ApplyResourceQuotas(ctx, namespace, quotaToApply)
 	if err != nil {
 		slog.ErrorContext(ctx, "❌ Failed to apply quotas",
