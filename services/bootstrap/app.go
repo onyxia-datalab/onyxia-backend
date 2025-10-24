@@ -8,7 +8,6 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/kube"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
-	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
 type Application struct {
@@ -16,7 +15,6 @@ type Application struct {
 	K8sClient         *kube.Client
 	UserContextReader usercontext.Reader
 	UserContextWriter usercontext.Writer
-	Catalogs          []domain.Catalog
 }
 
 func NewApplication(ctx context.Context) (*Application, error) {
@@ -38,45 +36,14 @@ func NewApplication(ctx context.Context) (*Application, error) {
 
 	_ = k8sClient.Ping(ctx)
 
-	catalogs := convertToDomainCatalogs(env.Catalogs)
-
 	app := &Application{
 		Env:               &env,
 		K8sClient:         k8sClient,
 		UserContextReader: userReader,
 		UserContextWriter: userWriter,
-		Catalogs:          catalogs,
 	}
 
 	slog.Info("Application initialized successfully")
 
 	return app, nil
-}
-
-func convertToDomainCatalogs(catalogs []env.Catalog) []domain.Catalog {
-	out := make([]domain.Catalog, 0, len(catalogs))
-
-	for _, c := range catalogs {
-		dc := domain.Catalog{
-			ID:   c.ID,
-			Type: domain.CatalogType(c.Type),
-			URL:  c.Location,
-		}
-
-		if c.Type == env.CatalogTypeOCI {
-			for _, p := range c.Packages {
-				dc.Packages = append(dc.Packages, domain.PackageRef{
-					Package: domain.Package{
-						CatalogID: c.ID,
-						Name:      p.Name,
-					},
-					Versions: append([]string(nil), p.Versions...),
-				})
-			}
-		}
-
-		out = append(out, dc)
-	}
-
-	return out
 }

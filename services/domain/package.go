@@ -2,12 +2,16 @@ package domain
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
 type Package struct {
-	CatalogID string
-	Name      string
+	CatalogID   string
+	Name        string
+	Description string
+	HomeUrl     url.URL
+	IconUrl     url.URL
 }
 
 type PackageRef struct {
@@ -21,9 +25,6 @@ type PackageVersion struct {
 	RepoURL string
 }
 
-func (r PackageRef) ChartRef(catalog Catalog) string {
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(catalog.URL, "/"), r.Name)
-}
 func (r PackageVersion) ChartRef() string {
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(r.RepoURL, "/"), r.Name)
 }

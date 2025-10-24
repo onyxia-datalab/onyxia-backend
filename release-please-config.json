@@ -1,33 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "packages": {
-    "onboarding": {
-      "path": "onboarding",
-      "release-type": "go",
-      "package-name": "onboarding",
-      "component": "onboarding",
-      "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true,
-      "draft": false,
-      "prerelease": false,
-      "include-v-in-tag": true,
-      "initial-version": "0.1.12",
-      "include-component-in-tag": true
-    },
-    "services": {
-      "path": "services",
-      "release-type": "go",
-      "package-name": "services",
-      "component": "services",
-      "changelog-path": "CHANGELOG.md",
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true,
-      "draft": false,
-      "prerelease": false,
-      "include-v-in-tag": true,
-      "initial-version": "0.0.0",
-      "include-component-in-tag": true
-    }
-  }
+  "release-type": "go",
+  "include-v-in-tag": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "draft": false,
+  "prerelease": false,
+  "changelog-path": "CHANGELOG.md",
+  "initial-version": "0.0.0"
 }

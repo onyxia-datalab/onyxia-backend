@@ -4,15 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
 type HelmPackageResolver struct {
-	catalogs []domain.Catalog
+	catalogsConfig []env.CatalogConfig
 }
 
 var _ ports.PackageResolver = (*HelmPackageResolver)(nil)
+
+func NewPackageResolver(catalogs []env.CatalogConfig) ports.PackageResolver {
+	copyCatalogs := append([]env.CatalogConfig(nil), catalogs...)
+	return &HelmPackageResolver{catalogsConfig: copyCatalogs}
+}
 
 func (r *HelmPackageResolver) ResolvePackage(
 	ctx context.Context,
@@ -25,9 +31,9 @@ func (r *HelmPackageResolver) ResolvePackage(
 	}
 
 	switch cat.Type {
-	case domain.CatalogTypeOCI:
+	case env.CatalogTypeOCI:
 		return resolveOCI(cat, pkgName, version)
-	case domain.CatalogTypeHelm:
+	case env.CatalogTypeHelm:
 		return resolveHelm(cat, pkgName, version), nil
 	default:
 		return domain.PackageVersion{}, fmt.Errorf(
@@ -38,16 +44,16 @@ func (r *HelmPackageResolver) ResolvePackage(
 	}
 }
 
-func (r *HelmPackageResolver) findCatalog(catalogID string) (domain.Catalog, bool) {
-	for _, cat := range r.catalogs {
+func (r *HelmPackageResolver) findCatalog(catalogID string) (env.CatalogConfig, bool) {
+	for _, cat := range r.catalogsConfig {
 		if cat.ID == catalogID {
 			return cat, true
 		}
 	}
-	return domain.Catalog{}, false
+	return env.CatalogConfig{}, false
 }
 
-func resolveOCI(cat domain.Catalog, pkgName, version string) (domain.PackageVersion, error) {
+func resolveOCI(cat env.CatalogConfig, pkgName, version string) (domain.PackageVersion, error) {
 	for _, p := range cat.Packages {
 		if p.Name != pkgName {
 			continue
@@ -60,6 +66,7 @@ func resolveOCI(cat domain.Catalog, pkgName, version string) (domain.PackageVers
 						CatalogID: cat.ID,
 					},
 					Version: version,
+					RepoURL: cat.Location,
 				}, nil
 			}
 		}
@@ -74,13 +81,13 @@ func resolveOCI(cat domain.Catalog, pkgName, version string) (domain.PackageVers
 	)
 }
 
-func resolveHelm(cat domain.Catalog, pkgName, version string) domain.PackageVersion {
+func resolveHelm(cat env.CatalogConfig, pkgName, version string) domain.PackageVersion {
 	return domain.PackageVersion{
 		Package: domain.Package{
 			Name:      pkgName,
 			CatalogID: cat.ID,
 		},
 		Version: version,
-		RepoURL: cat.URL,
+		RepoURL: cat.Location,
 	}
 }

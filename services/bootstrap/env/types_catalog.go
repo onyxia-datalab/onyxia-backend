@@ -1,6 +1,6 @@
 package env
 
-type Catalog struct {
+type CatalogConfig struct {
 	Type CatalogType `json:"type"` // "helm" or "oci"`
 
 	// Common fields

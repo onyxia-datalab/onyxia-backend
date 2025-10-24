@@ -18,14 +18,14 @@ type Catalog struct {
 	Name LocalizedString `json:"name"`
 	// The description of the catalog.
 	Description OptLocalizedString `json:"description"`
-	// Where to find the catalog.
-	Location OptString `json:"location"`
 	// Is the catalog a test or a production catalog.
 	Status OptCatalogStatus `json:"status"`
 	// Names of important packages of the catalog to highlight in the UI.
-	HighlightedCharts []string `json:"highlightedCharts"`
+	HighlightedPackages []string `json:"highlightedPackages"`
 	// Describes if the catalog is visible in user or project context.
 	Visible OptCatalogVisible `json:"visible"`
+	// List of packages available in the catalog.
+	Packages []Package `json:"packages"`
 }
 
 // GetID returns the value of ID.
@@ -43,24 +43,24 @@ func (s *Catalog) GetDescription() OptLocalizedString {
 	return s.Description
 }
 
-// GetLocation returns the value of Location.
-func (s *Catalog) GetLocation() OptString {
-	return s.Location
-}
-
 // GetStatus returns the value of Status.
 func (s *Catalog) GetStatus() OptCatalogStatus {
 	return s.Status
 }
 
-// GetHighlightedCharts returns the value of HighlightedCharts.
-func (s *Catalog) GetHighlightedCharts() []string {
-	return s.HighlightedCharts
+// GetHighlightedPackages returns the value of HighlightedPackages.
+func (s *Catalog) GetHighlightedPackages() []string {
+	return s.HighlightedPackages
 }
 
 // GetVisible returns the value of Visible.
 func (s *Catalog) GetVisible() OptCatalogVisible {
 	return s.Visible
+}
+
+// GetPackages returns the value of Packages.
+func (s *Catalog) GetPackages() []Package {
+	return s.Packages
 }
 
 // SetID sets the value of ID.
@@ -78,24 +78,24 @@ func (s *Catalog) SetDescription(val OptLocalizedString) {
 	s.Description = val
 }
 
-// SetLocation sets the value of Location.
-func (s *Catalog) SetLocation(val OptString) {
-	s.Location = val
-}
-
 // SetStatus sets the value of Status.
 func (s *Catalog) SetStatus(val OptCatalogStatus) {
 	s.Status = val
 }
 
-// SetHighlightedCharts sets the value of HighlightedCharts.
-func (s *Catalog) SetHighlightedCharts(val []string) {
-	s.HighlightedCharts = val
+// SetHighlightedPackages sets the value of HighlightedPackages.
+func (s *Catalog) SetHighlightedPackages(val []string) {
+	s.HighlightedPackages = val
 }
 
 // SetVisible sets the value of Visible.
 func (s *Catalog) SetVisible(val OptCatalogVisible) {
 	s.Visible = val
+}
+
+// SetPackages sets the value of Packages.
+func (s *Catalog) SetPackages(val []Package) {
+	s.Packages = val
 }
 
 // Is the catalog a test or a production catalog.
@@ -142,9 +142,9 @@ func (s *CatalogStatus) UnmarshalText(data []byte) error {
 
 // Describes if the catalog is visible in user or project context.
 type CatalogVisible struct {
-	// Should this catalog be visible in user context ?.
+	// Should this catalog be visible in user context?.
 	User bool `json:"user"`
-	// Should this catalog be visible in project context ?.
+	// Should this catalog be visible in project context?.
 	Project bool `json:"project"`
 }
 
@@ -168,9 +168,99 @@ func (s *CatalogVisible) SetProject(val bool) {
 	s.Project = val
 }
 
+// Merged schema.
+// Ref: #/components/schemas/DetailedPackage
+type DetailedPackage struct {
+	// Package name.
+	Name string `json:"name"`
+	// The description of the package.
+	Description OptString `json:"description"`
+	// URL to an icon.
+	Icon url.URL `json:"icon"`
+	// URL to the home page.
+	Home OptURI `json:"home"`
+	// List of versions available for the package.
+	Versions []DetailedPackageVersionsItem `json:"versions"`
+}
+
+// GetName returns the value of Name.
+func (s *DetailedPackage) GetName() string {
+	return s.Name
+}
+
+// GetDescription returns the value of Description.
+func (s *DetailedPackage) GetDescription() OptString {
+	return s.Description
+}
+
+// GetIcon returns the value of Icon.
+func (s *DetailedPackage) GetIcon() url.URL {
+	return s.Icon
+}
+
+// GetHome returns the value of Home.
+func (s *DetailedPackage) GetHome() OptURI {
+	return s.Home
+}
+
+// GetVersions returns the value of Versions.
+func (s *DetailedPackage) GetVersions() []DetailedPackageVersionsItem {
+	return s.Versions
+}
+
+// SetName sets the value of Name.
+func (s *DetailedPackage) SetName(val string) {
+	s.Name = val
+}
+
+// SetDescription sets the value of Description.
+func (s *DetailedPackage) SetDescription(val OptString) {
+	s.Description = val
+}
+
+// SetIcon sets the value of Icon.
+func (s *DetailedPackage) SetIcon(val url.URL) {
+	s.Icon = val
+}
+
+// SetHome sets the value of Home.
+func (s *DetailedPackage) SetHome(val OptURI) {
+	s.Home = val
+}
+
+// SetVersions sets the value of Versions.
+func (s *DetailedPackage) SetVersions(val []DetailedPackageVersionsItem) {
+	s.Versions = val
+}
+
+func (*DetailedPackage) getMyPackageRes() {}
+
+type DetailedPackageVersionsItem struct {
+	// Version string of the Helm chart.
+	Version string `json:"version"`
+}
+
+// GetVersion returns the value of Version.
+func (s *DetailedPackageVersionsItem) GetVersion() string {
+	return s.Version
+}
+
+// SetVersion sets the value of Version.
+func (s *DetailedPackageVersionsItem) SetVersion(val string) {
+	s.Version = val
+}
+
 type GetMyCatalogsOKApplicationJSON []Catalog
 
 func (*GetMyCatalogsOKApplicationJSON) getMyCatalogsRes() {}
+
+type GetMyPackageInternalServerError Problem
+
+func (*GetMyPackageInternalServerError) getMyPackageRes() {}
+
+type GetMyPackageNotFound Problem
+
+func (*GetMyPackageNotFound) getMyPackageRes() {}
 
 // Ref: #/components/schemas/InstallAccepted
 type InstallAccepted struct {
@@ -256,8 +346,7 @@ type InstallServiceInternalServerError Problem
 
 func (*InstallServiceInternalServerError) installServiceRes() {}
 
-// InstallServiceUnauthorized is response for InstallService operation.
-type InstallServiceUnauthorized struct{}
+type InstallServiceUnauthorized Problem
 
 func (*InstallServiceUnauthorized) installServiceRes() {}
 
@@ -327,122 +416,9 @@ func NewLocalizedString1LocalizedString(v LocalizedString1) LocalizedString {
 	return s
 }
 
-type LocalizedString1 struct {
-	En              OptString `json:"en"`
-	Fr              OptString `json:"fr"`
-	ZhMinusCN       OptString `json:"zh-CN"`
-	No              OptString `json:"no"`
-	Fi              OptString `json:"fi"`
-	Nl              OptString `json:"nl"`
-	It              OptString `json:"it"`
-	Es              OptString `json:"es"`
-	De              OptString `json:"de"`
-	AdditionalProps LocalizedString1Additional
-}
+type LocalizedString1 map[string]string
 
-// GetEn returns the value of En.
-func (s *LocalizedString1) GetEn() OptString {
-	return s.En
-}
-
-// GetFr returns the value of Fr.
-func (s *LocalizedString1) GetFr() OptString {
-	return s.Fr
-}
-
-// GetZhMinusCN returns the value of ZhMinusCN.
-func (s *LocalizedString1) GetZhMinusCN() OptString {
-	return s.ZhMinusCN
-}
-
-// GetNo returns the value of No.
-func (s *LocalizedString1) GetNo() OptString {
-	return s.No
-}
-
-// GetFi returns the value of Fi.
-func (s *LocalizedString1) GetFi() OptString {
-	return s.Fi
-}
-
-// GetNl returns the value of Nl.
-func (s *LocalizedString1) GetNl() OptString {
-	return s.Nl
-}
-
-// GetIt returns the value of It.
-func (s *LocalizedString1) GetIt() OptString {
-	return s.It
-}
-
-// GetEs returns the value of Es.
-func (s *LocalizedString1) GetEs() OptString {
-	return s.Es
-}
-
-// GetDe returns the value of De.
-func (s *LocalizedString1) GetDe() OptString {
-	return s.De
-}
-
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *LocalizedString1) GetAdditionalProps() LocalizedString1Additional {
-	return s.AdditionalProps
-}
-
-// SetEn sets the value of En.
-func (s *LocalizedString1) SetEn(val OptString) {
-	s.En = val
-}
-
-// SetFr sets the value of Fr.
-func (s *LocalizedString1) SetFr(val OptString) {
-	s.Fr = val
-}
-
-// SetZhMinusCN sets the value of ZhMinusCN.
-func (s *LocalizedString1) SetZhMinusCN(val OptString) {
-	s.ZhMinusCN = val
-}
-
-// SetNo sets the value of No.
-func (s *LocalizedString1) SetNo(val OptString) {
-	s.No = val
-}
-
-// SetFi sets the value of Fi.
-func (s *LocalizedString1) SetFi(val OptString) {
-	s.Fi = val
-}
-
-// SetNl sets the value of Nl.
-func (s *LocalizedString1) SetNl(val OptString) {
-	s.Nl = val
-}
-
-// SetIt sets the value of It.
-func (s *LocalizedString1) SetIt(val OptString) {
-	s.It = val
-}
-
-// SetEs sets the value of Es.
-func (s *LocalizedString1) SetEs(val OptString) {
-	s.Es = val
-}
-
-// SetDe sets the value of De.
-func (s *LocalizedString1) SetDe(val OptString) {
-	s.De = val
-}
-
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *LocalizedString1) SetAdditionalProps(val LocalizedString1Additional) {
-	s.AdditionalProps = val
-}
-
-type LocalizedString1Additional map[string]string
-
-func (s *LocalizedString1Additional) init() LocalizedString1Additional {
+func (s *LocalizedString1) init() LocalizedString1 {
 	m := *s
 	if m == nil {
 		m = map[string]string{}
@@ -798,6 +774,58 @@ func (o OptURI) Or(d url.URL) url.URL {
 	return d
 }
 
+// Ref: #/components/schemas/Package
+type Package struct {
+	// Package name.
+	Name string `json:"name"`
+	// The description of the package.
+	Description OptString `json:"description"`
+	// URL to an icon.
+	Icon url.URL `json:"icon"`
+	// URL to the home page.
+	Home OptURI `json:"home"`
+}
+
+// GetName returns the value of Name.
+func (s *Package) GetName() string {
+	return s.Name
+}
+
+// GetDescription returns the value of Description.
+func (s *Package) GetDescription() OptString {
+	return s.Description
+}
+
+// GetIcon returns the value of Icon.
+func (s *Package) GetIcon() url.URL {
+	return s.Icon
+}
+
+// GetHome returns the value of Home.
+func (s *Package) GetHome() OptURI {
+	return s.Home
+}
+
+// SetName sets the value of Name.
+func (s *Package) SetName(val string) {
+	s.Name = val
+}
+
+// SetDescription sets the value of Description.
+func (s *Package) SetDescription(val OptString) {
+	s.Description = val
+}
+
+// SetIcon sets the value of Icon.
+func (s *Package) SetIcon(val url.URL) {
+	s.Icon = val
+}
+
+// SetHome sets the value of Home.
+func (s *Package) SetHome(val OptURI) {
+	s.Home = val
+}
+
 // Ref: #/components/schemas/Problem
 type Problem struct {
 	Type            OptURI    `json:"type"`
@@ -868,9 +896,7 @@ func (s *Problem) SetAdditionalProps(val ProblemAdditional) {
 	s.AdditionalProps = val
 }
 
-func (*Problem) getMyCatalogsRes()  {}
-func (*Problem) watchReleaseRes()   {}
-func (*Problem) watchResourcesRes() {}
+func (*Problem) getMyCatalogsRes() {}
 
 type ProblemAdditional map[string]jx.Raw
 
@@ -883,20 +909,43 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 	return m
 }
 
+type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest Problem
+
+func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
+type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError Problem
+
+func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
+type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK map[string]jx.Raw
+
+func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) init() SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
 // Ref: #/components/schemas/ServiceInstallRequest
 type ServiceInstallRequest struct {
-	// Catalog where the package of the service is taken from.
+	// Catalog where the package is taken from.
 	CatalogId string `json:"catalogId"`
-	// Package name that will be used to create the service, necessary for package recovering (verify
-	// package).
+	// Package name used to create the service.
 	PackageName string `json:"packageName"`
-	// Version of the helm package, put version into creation, if not null.
+	// Version of the Helm package.
 	PackageVersion OptString `json:"packageVersion"`
 	// Chart version (empty for latest).
 	Version OptString `json:"version"`
-	// Options of package (values.yaml for helm).
+	// Options of package (values.yaml for Helm).
 	Options ServiceInstallRequestOptions `json:"options"`
-	// When true, all users of the namespace will list this service.
+	// When true.
 	Share OptBool `json:"share"`
 	// Friendly name for the service.
 	FriendlyName OptString `json:"friendlyName"`
@@ -984,7 +1033,7 @@ func (s *ServiceInstallRequest) SetName(val string) {
 	s.Name = val
 }
 
-// Options of package (values.yaml for helm).
+// Options of package (values.yaml for Helm).
 type ServiceInstallRequestOptions map[string]jx.Raw
 
 func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
@@ -996,10 +1045,13 @@ func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 	return m
 }
 
-// WatchReleaseForbidden is response for WatchRelease operation.
-type WatchReleaseForbidden struct{}
+type WatchReleaseForbidden Problem
 
 func (*WatchReleaseForbidden) watchReleaseRes() {}
+
+type WatchReleaseNotFound Problem
+
+func (*WatchReleaseNotFound) watchReleaseRes() {}
 
 type WatchReleaseOK struct {
 	Data io.Reader
@@ -1054,15 +1106,17 @@ func (s *WatchReleaseOKHeaders) SetResponse(val WatchReleaseOK) {
 
 func (*WatchReleaseOKHeaders) watchReleaseRes() {}
 
-// WatchReleaseUnauthorized is response for WatchRelease operation.
-type WatchReleaseUnauthorized struct{}
+type WatchReleaseUnauthorized Problem
 
 func (*WatchReleaseUnauthorized) watchReleaseRes() {}
 
-// WatchResourcesForbidden is response for WatchResources operation.
-type WatchResourcesForbidden struct{}
+type WatchResourcesForbidden Problem
 
 func (*WatchResourcesForbidden) watchResourcesRes() {}
+
+type WatchResourcesNotFound Problem
+
+func (*WatchResourcesNotFound) watchResourcesRes() {}
 
 type WatchResourcesOK struct {
 	Data io.Reader
@@ -1117,7 +1171,6 @@ func (s *WatchResourcesOKHeaders) SetResponse(val WatchResourcesOK) {
 
 func (*WatchResourcesOKHeaders) watchResourcesRes() {}
 
-// WatchResourcesUnauthorized is response for WatchResources operation.
-type WatchResourcesUnauthorized struct{}
+type WatchResourcesUnauthorized Problem
 
 func (*WatchResourcesUnauthorized) watchResourcesRes() {}

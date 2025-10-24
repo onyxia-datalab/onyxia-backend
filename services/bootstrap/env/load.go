@@ -15,7 +15,7 @@ func New() (Env, error) {
 		return Env{}, err
 	}
 
-	if err := ValidateCatalogs(cfg.Catalogs); err != nil {
+	if err := ValidateCatalogsConfig(cfg.CatalogsConfig); err != nil {
 		return Env{}, err
 	}
 

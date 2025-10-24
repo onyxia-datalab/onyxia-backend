@@ -24,10 +24,10 @@ type Kubernetes struct {
 	GroupNamespacePrefix string `mapstructure:"groupNamespacePrefix" json:"groupNamespacePrefix"`
 }
 type Env struct {
-	AuthenticationMode string     `mapstructure:"authenticationMode" json:"authenticationMode"`
-	Server             Server     `mapstructure:"server"             json:"server"`
-	OIDC               OIDC       `mapstructure:"oidc"               json:"oidc"`
-	Security           Security   `mapstructure:"security"           json:"security"`
-	Catalogs           []Catalog  `mapstructure:"catalogs"           json:"catalogs"`
-	Kubernetes         Kubernetes `mapstructure:"kubernetes"         json:"kubernetes"`
+	AuthenticationMode string          `mapstructure:"authenticationMode" json:"authenticationMode"`
+	Server             Server          `mapstructure:"server"             json:"server"`
+	OIDC               OIDC            `mapstructure:"oidc"               json:"oidc"`
+	Security           Security        `mapstructure:"security"           json:"security"`
+	CatalogsConfig     []CatalogConfig `mapstructure:"catalogs"           json:"catalogs"`
+	Kubernetes         Kubernetes      `mapstructure:"kubernetes"         json:"kubernetes"`
 }
