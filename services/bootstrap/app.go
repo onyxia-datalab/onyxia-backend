@@ -38,7 +38,7 @@ func NewApplication(ctx context.Context) (*Application, error) {
 		slog.ErrorContext(ctx, "failed to reach Kubernetes API", "error", err)
 		return nil, fmt.Errorf("failed to reach Kubernetes API: %w", err)
 	}
-	
+
 	app := &Application{
 		Env:               &env,
 		K8sClient:         k8sClient,
