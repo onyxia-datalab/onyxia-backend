@@ -25,8 +25,8 @@ type HelmCatalogRepository struct {
 func NewCatalogRepo(
 	settings *cli.EnvSettings,
 	cfgs []env.CatalogConfig,
-) (*HelmCatalogRepository, error) 
-	repos := make(map[string]*repo.ChartRepository)
+) (*HelmCatalogRepository, error) {
+	var repos = make(map[string]*repo.ChartRepository)
 
 	//TODO There is issue catalog contain multiple packages
 	for _, cfg := range cfgs {

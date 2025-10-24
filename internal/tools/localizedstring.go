@@ -34,6 +34,15 @@ func NewLocalizedString(value interface{}) (LocalizedString, error) {
 			multi: v,
 		}, nil
 
+	case map[string]string:
+		if len(v) == 0 {
+			return LocalizedString{}, fmt.Errorf("multi-lang string cannot be empty")
+		}
+		return LocalizedString{
+			typ:   LocalizedStringTypeMulti,
+			multi: MultiLangString(v),
+		}, nil
+
 	case nil:
 		return LocalizedString{}, fmt.Errorf("nil value provided")
 
