@@ -33,7 +33,10 @@ func NewApplication(ctx context.Context) (*Application, error) {
 		return nil, fmt.Errorf("failed to initialize Kubernetes client: %w", err)
 	}
 
-	_ = k8sClient.Ping(ctx)
+	if err := k8sClient.Ping(ctx); err != nil {
+		slog.ErrorContext(ctx, "failed to reach Kubernetes API", "error", err)
+		return nil, fmt.Errorf("failed to reach Kubernetes API: %w", err)
+	}
 
 	app := &Application{
 		Env:               &env,
