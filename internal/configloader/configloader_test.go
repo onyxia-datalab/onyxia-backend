@@ -73,8 +73,10 @@ quota:
   count/pods: "1"
 `)
 
-	os.Setenv("QUOTA_REQUESTS_CPU", "999m")
-	defer os.Unsetenv("QUOTA_REQUESTS_CPU")
+	require.NoError(t, os.Setenv("QUOTA_REQUESTS_CPU", "999m"))
+	defer func() {
+		require.NoError(t, os.Unsetenv("QUOTA_REQUESTS_CPU"))
+	}()
 
 	cfg, err := Load[testConfig](defaultYAML, "")
 	require.NoError(t, err)

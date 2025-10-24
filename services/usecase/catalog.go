@@ -35,6 +35,7 @@ func (uc *Catalog) ListUserCatalog(ctx context.Context) ([]domain.Catalog, error
 	return catalog, nil
 }
 
+// nolint:unused
 func (uc *Catalog) listOCICatalog(ctx context.Context, cfg env.CatalogConfig) domain.Catalog {
 
 	name, err := tools.NewLocalizedString(cfg.Name)
