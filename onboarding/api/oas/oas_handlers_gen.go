@@ -39,14 +39,14 @@ func (c *codeRecorder) WriteHeader(status int) {
 //
 //	we can retain an option to explicitly create this RoleBinding if needed.
 //
-// POST /
+// POST /api/onboarding
 func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("onboard"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/"),
+		semconv.HTTPRouteKey.String("/api/onboarding"),
 	}
 
 	// Start a span for this request.

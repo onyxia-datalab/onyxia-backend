@@ -8,19 +8,19 @@ import (
 )
 
 type Handler struct {
-	onboard *controller.OnboardingController
+	onboarding *controller.OnboardingController
 }
 
 func NewHandler(
-	onboard *controller.OnboardingController) *Handler {
-	return &Handler{onboard: onboard}
+	onboarding *controller.OnboardingController) *Handler {
+	return &Handler{onboarding: onboarding}
 }
 
 func (h *Handler) Onboard(
 	ctx context.Context,
 	req *oas.OnboardingRequest,
 ) (oas.OnboardRes, error) {
-	return h.onboard.Onboard(ctx, req)
+	return h.onboarding.Onboard(ctx, req)
 }
 
 var _ oas.Handler = (*Handler)(nil)

@@ -10,8 +10,7 @@ import (
 var defaultConfig []byte
 
 type Server struct {
-	Port        int    `mapstructure:"port"        json:"port"`
-	ContextPath string `mapstructure:"contextPath" json:"contextPath"`
+	Port int `mapstructure:"port"        json:"port"`
 }
 
 type OIDC struct {

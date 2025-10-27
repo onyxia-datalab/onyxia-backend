@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	middleware "github.com/onyxia-datalab/onyxia-backend/onboarding/api/middleware"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/middleware"
 	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"

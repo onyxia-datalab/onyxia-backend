@@ -70,17 +70,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if env.Server.ContextPath == "/" {
-		r.Mount("/", apiHandler)
-	} else {
-		slog.Info("Mounting API with context path", slog.String("contextPath", env.Server.ContextPath))
-		r.Mount(
-			env.Server.ContextPath,
-			http.StripPrefix(env.Server.ContextPath, apiHandler),
-		)
-	}
-
-	slog.Info("API mounted", slog.String("contextPath", env.Server.ContextPath))
+	r.Mount("/", apiHandler)
 
 	address := fmt.Sprintf(":%d", env.Server.Port)
 
