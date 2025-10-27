@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.14...v0.1.15) (2025-10-27)
+
+
+### Bug Fixes
+
+* docker images ([9f76bf8](https://github.com/onyxia-datalab/onyxia-backend/commit/9f76bf8ede026dab9853fbddf8a480c07794f70c))
+
 ## [0.1.14](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.13...v0.1.14) (2025-10-27)
 
 
