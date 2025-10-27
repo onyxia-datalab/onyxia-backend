@@ -2,6 +2,7 @@
 APIS := onboarding services
 BINARIES := $(addprefix onyxia-,$(APIS))
 BUILD := $(shell git rev-parse --short HEAD)
+VERSION := $(shell git tag -l "v*" --sort=-version:refname | head -n1 | sed 's/^v//')
 DOCKER_REGISTRY := inseefrlab
 
 GOBIN := $(shell pwd)/bin
@@ -24,12 +25,6 @@ DOCKER_PLATFORMS := $(LOCAL_PLATFORM)
 ifeq ($(MULTIARCH), 1)
 	DOCKER_PLATFORMS := linux/amd64,linux/arm64
 endif
-
-
-define sh_get_version
-tag=$$(git tag -l "v*" --sort=-version:refname | head -n1); \
-if [ -n "$$tag" ]; then printf '%s' "$${tag#v}"; fi
-endef
 
 # --- HELP ---------------------------------------------------------------------
 
@@ -138,16 +133,12 @@ endif
 $(foreach api,$(APIS),\
   $(eval docker-build-$(api): docker-setup-builder ; \
 	@echo "🐳 Building Docker image for onyxia-$(api)..."; \
-	VERSION=$$( { $(call sh_get_version); } ); \
-	if [ -z "$$VERSION" ]; then \
-	  echo "❌ No version tag found for '$(api)' (expected tags like '$(api)-vX.Y.Z')"; exit 1; \
-	fi; \
-	echo "→ version=$$VERSION"; \
+	echo "→ version=$(VERSION)"; \
 	docker buildx build \
 		--platform $(DOCKER_PLATFORMS) \
-		--tag $(DOCKER_REGISTRY)/onyxia-$(api):$$VERSION \
+		--tag $(DOCKER_REGISTRY)/onyxia-$(api):$(VERSION) \
 		--tag $(DOCKER_REGISTRY)/onyxia-$(api):latest \
-		--build-arg VERSION="$$VERSION" \
+		--build-arg VERSION="$(VERSION)" \
 		--build-arg BUILD_SHA="$(BUILD)" \
 		-f $(api)/Dockerfile \
 		$(if $(filter 1,$(MULTIARCH)),,--load) \

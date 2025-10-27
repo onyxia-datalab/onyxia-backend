@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/onyxia-onboarding/main.go ./cmd/onyxia-onboarding/main.go
 COPY onboarding/ ./onboarding/
+COPY internal/ ./internal/
 
 # Build
 RUN --mount=type=cache,target=/root/.cache/go-build \

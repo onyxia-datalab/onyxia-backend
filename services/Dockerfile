@@ -14,6 +14,7 @@ RUN go mod download
 # Copy the go source
 COPY cmd/onyxia-services/main.go ./cmd/onyxia-services/main.go
 COPY services/ ./services/
+COPY internal/ ./internal/
 
 # Build
 RUN --mount=type=cache,target=/root/.cache/go-build \
