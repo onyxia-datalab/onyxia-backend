@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.16...v0.1.17) (2025-10-27)
+
+
+### Bug Fixes
+
+* remove support of `contextPath`as it can be broken ([3439c58](https://github.com/onyxia-datalab/onyxia-backend/commit/3439c589cd3dc7f7ffd03b04595d954481de822f))
+
 ## [0.1.16](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.15...v0.1.16) (2025-10-27)
 
 
