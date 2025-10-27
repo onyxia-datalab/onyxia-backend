@@ -36,7 +36,7 @@ type Invoker interface {
 	// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
 	//  we can retain an option to explicitly create this RoleBinding if needed.
 	//
-	// POST /onboarding
+	// POST /
 	Onboard(ctx context.Context, request *OnboardingRequest) (OnboardRes, error)
 }
 
@@ -95,7 +95,7 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 //
 //	we can retain an option to explicitly create this RoleBinding if needed.
 //
-// POST /onboarding
+// POST /
 func (c *Client) Onboard(ctx context.Context, request *OnboardingRequest) (OnboardRes, error) {
 	res, err := c.sendOnboard(ctx, request)
 	return res, err
@@ -105,7 +105,7 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("onboard"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/onboarding"),
+		semconv.URLTemplateKey.String("/"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -139,7 +139,7 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/onboarding"
+	pathParts[0] = "/"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"

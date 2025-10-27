@@ -48,9 +48,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/onboarding"
+		case '/': // Prefix: "/"
 
-			if l := len("/onboarding"); len(elem) >= l && elem[0:l] == "/onboarding" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -148,9 +148,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/onboarding"
+		case '/': // Prefix: "/"
 
-			if l := len("/onboarding"); len(elem) >= l && elem[0:l] == "/onboarding" {
+			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -163,7 +163,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					r.name = OnboardOperation
 					r.summary = "Init a user or a group"
 					r.operationID = "onboard"
-					r.pathPattern = "/onboarding"
+					r.pathPattern = "/"
 					r.args = args
 					r.count = 0
 					return r, true

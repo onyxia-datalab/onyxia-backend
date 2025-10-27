@@ -17,7 +17,7 @@ type Handler interface {
 	// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
 	//  we can retain an option to explicitly create this RoleBinding if needed.
 	//
-	// POST /onboarding
+	// POST /
 	Onboard(ctx context.Context, req *OnboardingRequest) (OnboardRes, error)
 }
 

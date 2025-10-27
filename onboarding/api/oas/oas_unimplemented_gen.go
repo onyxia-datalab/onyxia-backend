@@ -23,7 +23,7 @@ var _ Handler = UnimplementedHandler{}
 //
 //	we can retain an option to explicitly create this RoleBinding if needed.
 //
-// POST /onboarding
+// POST /
 func (UnimplementedHandler) Onboard(ctx context.Context, req *OnboardingRequest) (r OnboardRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

@@ -7,7 +7,7 @@ tags:
   - name: Onboarding
     description: Onboarding related services
 paths:
-  /onboarding:
+  /:
     post:
       tags:
         - Onboarding
