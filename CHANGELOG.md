@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.15...v0.1.16) (2025-10-27)
+
+
+### Bug Fixes
+
+* **onboarding:** remove onboarding prefix ([0b436b0](https://github.com/onyxia-datalab/onyxia-backend/commit/0b436b0272b442330a30ac438a2ada916fc19378))
+
 ## [0.1.15](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.14...v0.1.15) (2025-10-27)
 
 
