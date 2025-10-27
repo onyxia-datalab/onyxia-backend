@@ -99,9 +99,8 @@ build:
 	@mkdir -p $(GOBIN)
 	@for bin in $(BINARIES); do \
 		comp=$${bin#onyxia-}; \
-		version=$$( { $(call sh_get_version); } ); \
-		echo "📦 Building $$bin (version: $$version)..."; \
-		go build -ldflags "-X=main.Version=$$version -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
+		echo "📦 Building $$bin (version: $(VERSION))..."; \
+		go build -ldflags "-X=main.Version=$(VERSION) -X=main.Build=$(BUILD)" -o $(GOBIN)/$$bin ./cmd/$$bin; \
 	done
 
 .PHONY: $(addprefix run-,$(APIS))
