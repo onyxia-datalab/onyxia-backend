@@ -166,7 +166,15 @@ $(foreach api,$(APIS),\
 	@echo "🧪 Running Docker image onyxia-$(api) on port 8080..."; \
 	docker run -p 8080:8080 $(DOCKER_REGISTRY)/onyxia-$(api):latest))
 
-
+.PHONY: docker-push
+## docker-push: Build and push all Docker images for all APIs
+docker-push:
+	@echo "🚀 Building and pushing all Docker images..."
+	@for api in $(APIS); do \
+		echo "🐳 → Pushing $$api..."; \
+		$(MAKE) docker-push-$$api MULTIARCH=$(MULTIARCH); \
+	done
+	
 .PHONY: docker-clean
 ## docker-clean: Remove all local docker images for project APIs
 docker-clean:
