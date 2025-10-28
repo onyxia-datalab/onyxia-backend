@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.17...v0.1.18) (2025-10-28)
+
+
+### Bug Fixes
+
+* trigger release ([a2e44d7](https://github.com/onyxia-datalab/onyxia-backend/commit/a2e44d7561646be1e9f01e23f55f6c5d3f283fbf))
+
 ## [0.1.17](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.16...v0.1.17) (2025-10-27)
 
 
