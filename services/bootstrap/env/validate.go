@@ -3,6 +3,8 @@ package env
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 )
 
 func ValidateCatalogsConfig(catalogs []CatalogConfig) error {
@@ -91,6 +93,15 @@ func validateCommon(cc CatalogConfig) error {
 	}
 	if len(cc.Name) == 0 {
 		return fmt.Errorf("catalog %q: name is required", cc.ID)
+	}
+
+	for _, r := range cc.Restrictions {
+		if strings.TrimSpace(r.UserAttributeKey) == "" {
+			return fmt.Errorf("catalog %q: restriction missing userAttribute.key", cc.ID)
+		}
+		if _, err := regexp.Compile(r.Match); err != nil {
+			return fmt.Errorf("catalog %q: invalid restriction regex for key %q: %w", cc.ID, r.UserAttributeKey, err)
+		}
 	}
 
 	return nil
