@@ -71,11 +71,9 @@ func main() {
 	}
 
 	r.Mount(
-		env.Server.ContextPath,
-		http.StripPrefix(env.Server.ContextPath, apiHandler),
+		"/",
+		apiHandler,
 	)
-
-	slog.Info("API mounted", slog.String("contextPath", env.Server.ContextPath))
 
 	address := fmt.Sprintf(":%d", env.Server.Port)
 

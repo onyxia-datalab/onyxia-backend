@@ -102,11 +102,6 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 			}
 		}
 
-		apiCatalog.Visible = api.NewOptCatalogVisible(api.CatalogVisible{
-			User:    catalog.Visible.User,
-			Project: catalog.Visible.Project,
-		})
-
 		response = append(response, apiCatalog)
 	}
 

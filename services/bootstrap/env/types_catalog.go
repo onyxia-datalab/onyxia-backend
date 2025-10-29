@@ -14,7 +14,6 @@ type CatalogConfig struct {
 	SkipTLSVerify bool              `mapstructure:"skipTlsVerify"     json:"skipTlsVerify"`
 	CAFile        *string           `mapstructure:"caFile"            json:"caFile"`
 	AllowSharing  bool              `mapstructure:"allowSharing"      json:"allowSharing"`
-	Visible       Visibility        `mapstructure:"visible"           json:"visible"`
 	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
 	Username      *string           `mapstructure:"username"          json:"username"`
 	Password      *string           `mapstructure:"password"          json:"password"`
@@ -51,11 +50,6 @@ const (
 	MultipleServicesSkipPatches MultipleServicesMode = "skipPatches"
 	MultipleServicesMaxNumber   MultipleServicesMode = "maxNumber"
 )
-
-type Visibility struct {
-	User    bool `mapstructure:"user"    json:"user"`
-	Project bool `mapstructure:"project" json:"project"`
-}
 
 type Restriction struct {
 	UserAttributeKey string `mapstructure:"userAttribute.key"     json:"userAttributeKey"`
