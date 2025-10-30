@@ -13,12 +13,22 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
+//
+// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+// and roles.
+//
+// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+func (UnimplementedHandler) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (r APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetMyCatalogs implements getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
 // by user permissions if the user is authenticated. Otherwise returns the public catalog.
 //
-// GET /catalogs
+// GET /api/services/catalogs
 func (UnimplementedHandler) GetMyCatalogs(ctx context.Context) (r GetMyCatalogsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -27,7 +37,7 @@ func (UnimplementedHandler) GetMyCatalogs(ctx context.Context) (r GetMyCatalogsR
 //
 // Returns detailed information about a package in a catalog, including available versions.
 //
-// GET /catalogs/{catalogId}/packages/{packageName}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackageParams) (r GetMyPackageRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -37,18 +47,8 @@ func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackag
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 // the release already exists (returns 202 with the same event URLs).
 //
-// PUT /{releaseId}/install
+// PUT /api/services/{releaseId}/install
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// SchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-//
-// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-// and roles.
-//
-// GET /schemas/{catalogId}/packageName/{packageName}/versions/{version}
-func (UnimplementedHandler) SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (r SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -56,7 +56,7 @@ func (UnimplementedHandler) SchemasCatalogIdPackageNamePackageNameVersionsVersio
 //
 // Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 //
-// GET /events/{releaseId}/watch-release
+// GET /api/services/events/{releaseId}/watch-release
 func (UnimplementedHandler) WatchRelease(ctx context.Context, params WatchReleaseParams) (r WatchReleaseRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
@@ -67,7 +67,7 @@ func (UnimplementedHandler) WatchRelease(ctx context.Context, params WatchReleas
 // io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
 // "done".
 //
-// GET /events/{releaseId}/watch-resources
+// GET /api/services/events/{releaseId}/watch-resources
 func (UnimplementedHandler) WatchResources(ctx context.Context, params WatchResourcesParams) (r WatchResourcesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

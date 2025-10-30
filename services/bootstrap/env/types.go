@@ -1,7 +1,7 @@
 package env
 
 type Server struct {
-	Port        int    `mapstructure:"port"        json:"port"`
+	Port int `mapstructure:"port"        json:"port"`
 }
 
 type OIDC struct {

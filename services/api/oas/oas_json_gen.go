@@ -12,6 +12,140 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// Encode encodes APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest as json.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest from json.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest to nil")
+	}
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError as json.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) Encode(e *jx.Encoder) {
+	unwrapped := (*Problem)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError from json.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError to nil")
+	}
+	var unwrapped Problem
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK from json.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *Catalog) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -1871,140 +2005,6 @@ func (s ProblemAdditional) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProblemAdditional) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest as json.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) Encode(e *jx.Encoder) {
-	unwrapped := (*Problem)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest from json.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest to nil")
-	}
-	var unwrapped Problem
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError as json.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) Encode(e *jx.Encoder) {
-	unwrapped := (*Problem)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError from json.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError to nil")
-	}
-	var unwrapped Problem
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK from json.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

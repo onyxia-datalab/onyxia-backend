@@ -7,7 +7,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
-type CatalogRepository interface {
+type PackageRepository interface {
 	// Lists all packages for a given catalog.
 	// For Helm: reads index.yaml
 	// For OCI: uses cfg.Packages	ListPackages(ctx context.Context, cfg env.CatalogConfig) ([]domain.PackageRef, error)
@@ -19,4 +19,11 @@ type CatalogRepository interface {
 		cfg env.CatalogConfig,
 		name string,
 	) (*domain.PackageRef, error)
+
+	ResolvePackage(
+		ctx context.Context,
+		catalogID string,
+		packageName string,
+		version string,
+	) (domain.PackageVersion, error)
 }

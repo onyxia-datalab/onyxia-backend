@@ -55,10 +55,9 @@ func (h *Handler) GetMyPackage(
 ) (api.GetMyPackageRes, error) {
 	return nil, ht.ErrNotImplemented
 }
-
-func (h *Handler) SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(
+func (h *Handler) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(
 	ctx context.Context,
-	p api.SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams,
-) (api.SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
+	p api.APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams,
+) (api.APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
 	return nil, ht.ErrNotImplemented
 }

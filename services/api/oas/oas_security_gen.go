@@ -14,8 +14,6 @@ import (
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
 	// HandleOidc handles oidc security.
-	// OAuth2 access token (Bearer or DPoP-bound). When the token contains a cnf.jkt claim, clients must
-	// also send a per-request "DPoP" proof header (RFC 9449).
 	HandleOidc(ctx context.Context, operationName OperationName, t Oidc) (context.Context, error)
 }
 
@@ -34,41 +32,23 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 	return "", false
 }
 
-// operationRolesOidc is a private map storing roles per operation.
-var operationRolesOidc = map[string][]string{
+var oauth2ScopesOidc = map[string][]string{
+	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation: {},
 	GetMyCatalogsOperation:  {},
 	GetMyPackageOperation:   {},
 	InstallServiceOperation: {},
-	SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation: {},
 	WatchReleaseOperation:   {},
 	WatchResourcesOperation: {},
 }
 
-// GetRolesForOidc returns the required roles for the given operation.
-//
-// This is useful for authorization scenarios where you need to know which roles
-// are required for an operation.
-//
-// Example:
-//
-//	requiredRoles := GetRolesForOidc(AddPetOperation)
-//
-// Returns nil if the operation has no role requirements or if the operation is unknown.
-func GetRolesForOidc(operation string) []string {
-	roles, ok := operationRolesOidc[operation]
-	if !ok {
-		return nil
-	}
-	// Return a copy to prevent external modification
-	result := make([]string, len(roles))
-	copy(result, roles)
-	return result
-}
-
 func (s *Server) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
 	var t Oidc
-	t.Request = req
-	t.Roles = operationRolesOidc[operationName]
+	token, ok := findAuthorization(req.Header, "Bearer")
+	if !ok {
+		return ctx, false, nil
+	}
+	t.Token = token
+	t.Scopes = oauth2ScopesOidc[operationName]
 	rctx, err := s.sec.HandleOidc(ctx, operationName, t)
 	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
 		return nil, false, nil
@@ -81,14 +61,14 @@ func (s *Server) securityOidc(ctx context.Context, operationName OperationName, 
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
 	// Oidc provides oidc security value.
-	// OAuth2 access token (Bearer or DPoP-bound). When the token contains a cnf.jkt claim, clients must
-	// also send a per-request "DPoP" proof header (RFC 9449).
-	Oidc(ctx context.Context, operationName OperationName, req *http.Request) error
+	Oidc(ctx context.Context, operationName OperationName) (Oidc, error)
 }
 
 func (s *Client) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) error {
-	if err := s.sec.Oidc(ctx, operationName, req); err != nil {
+	t, err := s.sec.Oidc(ctx, operationName)
+	if err != nil {
 		return errors.Wrap(err, "security source \"Oidc\"")
 	}
+	req.Header.Set("Authorization", "Bearer "+t.Token)
 	return nil
 }

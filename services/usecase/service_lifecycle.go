@@ -12,9 +12,9 @@ import (
 )
 
 type ServiceLifecycle struct {
-	secrets         ports.OnyxiaSecretGateway
-	helm            ports.HelmReleasesGateway
-	packageResolver ports.PackageResolver
+	secrets ports.OnyxiaSecretGateway
+	helm    ports.HelmReleasesGateway
+	pkgRepo ports.PackageRepository
 }
 
 var _ domain.ServiceLifecycle = (*ServiceLifecycle)(nil)
@@ -22,9 +22,9 @@ var _ domain.ServiceLifecycle = (*ServiceLifecycle)(nil)
 func NewServiceLifecycle(
 	secrets ports.OnyxiaSecretGateway,
 	helm ports.HelmReleasesGateway,
-	packageResolver ports.PackageResolver,
+	pkgRepo ports.PackageRepository,
 ) *ServiceLifecycle {
-	return &ServiceLifecycle{secrets: secrets, helm: helm, packageResolver: packageResolver}
+	return &ServiceLifecycle{secrets: secrets, helm: helm, pkgRepo: pkgRepo}
 }
 
 func (uc *ServiceLifecycle) Start(
@@ -33,7 +33,7 @@ func (uc *ServiceLifecycle) Start(
 ) (domain.StartResponse, error) {
 
 	// 1) Get the package from catalog + packageName + packageVersion
-	pkg, err := uc.packageResolver.ResolvePackage(ctx, req.CatalogID, req.PackageName, req.Version)
+	pkg, err := uc.pkgRepo.ResolvePackage(ctx, req.CatalogID, req.PackageName, req.Version)
 
 	if err != nil {
 		return domain.StartResponse{}, fmt.Errorf("resolve package: %w", err)
