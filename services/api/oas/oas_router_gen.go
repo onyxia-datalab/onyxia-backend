@@ -49,9 +49,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/"
+		case '/': // Prefix: "/api/services/"
 
-			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -283,7 +283,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							// Leaf node.
 							switch r.Method {
 							case "GET":
-								s.handleSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRequest([3]string{
+								s.handleAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRequest([3]string{
 									args[0],
 									args[1],
 									args[2],
@@ -418,9 +418,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/"
+		case '/': // Prefix: "/api/services/"
 
-			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -444,7 +444,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.name = GetMyCatalogsOperation
 						r.summary = "List available catalogs and packages for installing for the user"
 						r.operationID = "getMyCatalogs"
-						r.pathPattern = "/catalogs"
+						r.pathPattern = "/api/services/catalogs"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -498,7 +498,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = GetMyPackageOperation
 								r.summary = "Get detailed information about a package in a catalog"
 								r.operationID = "getMyPackage"
-								r.pathPattern = "/catalogs/{catalogId}/packages/{packageName}"
+								r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}"
 								r.args = args
 								r.count = 2
 								return r, true
@@ -560,7 +560,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = WatchReleaseOperation
 								r.summary = "Release-level status stream (SSE)"
 								r.operationID = "watchRelease"
-								r.pathPattern = "/events/{releaseId}/watch-release"
+								r.pathPattern = "/api/services/events/{releaseId}/watch-release"
 								r.args = args
 								r.count = 1
 								return r, true
@@ -584,7 +584,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = WatchResourcesOperation
 								r.summary = "Kubernetes resources status stream (SSE)"
 								r.operationID = "watchResources"
-								r.pathPattern = "/events/{releaseId}/watch-resources"
+								r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
 								r.args = args
 								r.count = 1
 								return r, true
@@ -661,10 +661,10 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							// Leaf node.
 							switch method {
 							case "GET":
-								r.name = SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation
+								r.name = APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation
 								r.summary = "Get the values.schema.json of a versioned package"
 								r.operationID = ""
-								r.pathPattern = "/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
+								r.pathPattern = "/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
 								r.args = args
 								r.count = 3
 								return r, true
@@ -707,7 +707,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.name = InstallServiceOperation
 						r.summary = "Trigger service installation (async)"
 						r.operationID = "installService"
-						r.pathPattern = "/{releaseId}/install"
+						r.pathPattern = "/api/services/{releaseId}/install"
 						r.args = args
 						r.count = 1
 						return r, true

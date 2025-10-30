@@ -12,7 +12,6 @@ type Catalog struct {
 	Description         tools.LocalizedString
 	Status              CatalogStatus
 	HighlightedPackages []string
-	Visible             CatalogVisibility
 	Packages            []Package
 }
 
@@ -22,11 +21,6 @@ const (
 	CatalogStatusProd CatalogStatus = "PROD"
 	CatalogStatusTest CatalogStatus = "TEST"
 )
-
-type CatalogVisibility struct {
-	User    bool
-	Project bool
-}
 
 type CatalogService interface {
 	ListPublicCatalogs(ctx context.Context) ([]Catalog, error)

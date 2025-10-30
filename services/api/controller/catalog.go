@@ -11,14 +11,14 @@ import (
 
 type CatalogController struct {
 	catalogs   domain.CatalogService
-	userGetter usercontext.UserGetter
+	userReader usercontext.Reader
 }
 
 func NewCatalogController(
 	catalogs domain.CatalogService,
-	userGetter usercontext.UserGetter,
+	userReader usercontext.Reader,
 ) *CatalogController {
-	return &CatalogController{catalogs: catalogs, userGetter: userGetter}
+	return &CatalogController{catalogs: catalogs, userReader: userReader}
 }
 
 func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, error) {
@@ -29,7 +29,7 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 		err      error
 	)
 
-	if _, authenticated := cc.userGetter.GetUser(ctx); authenticated {
+	if _, authenticated := cc.userReader.GetUser(ctx); authenticated {
 		catalogs, err = cc.catalogs.ListUserCatalog(ctx)
 	} else {
 		catalogs, err = cc.catalogs.ListPublicCatalogs(ctx)
@@ -101,11 +101,6 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 				)
 			}
 		}
-
-		apiCatalog.Visible = api.NewOptCatalogVisible(api.CatalogVisible{
-			User:    catalog.Visible.User,
-			Project: catalog.Visible.Project,
-		})
 
 		response = append(response, apiCatalog)
 	}

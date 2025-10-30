@@ -14,6 +14,180 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams is parameters of GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
+type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams struct {
+	// Catalog identifier.
+	CatalogId string
+	// Package name.
+	PackageName string
+	// Package version (semver).
+	Version string
+}
+
+func unpackAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(packed middleware.Parameters) (params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "catalogId",
+			In:   "path",
+		}
+		params.CatalogId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "packageName",
+			In:   "path",
+		}
+		params.PackageName = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "version",
+			In:   "path",
+		}
+		params.Version = packed[key].(string)
+	}
+	return params
+}
+
+func decodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(args [3]string, argsEscaped bool, r *http.Request) (params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams, _ error) {
+	// Decode path: catalogId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "catalogId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.CatalogId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "catalogId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: packageName.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "packageName",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.PackageName = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "packageName",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: version.
+	if err := func() error {
+		param := args[2]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[2])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "version",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.Version = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "version",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetMyPackageParams is parameters of getMyPackage operation.
 type GetMyPackageParams struct {
 	// Catalog identifier.
@@ -261,180 +435,6 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 		return params, &ogenerrors.DecodeParamError{
 			Name: "X-Onyxia-Project",
 			In:   "header",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams is parameters of GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams struct {
-	// Catalog identifier.
-	CatalogId string
-	// Package name.
-	PackageName string
-	// Package version (semver).
-	Version string
-}
-
-func unpackSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(packed middleware.Parameters) (params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "catalogId",
-			In:   "path",
-		}
-		params.CatalogId = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "packageName",
-			In:   "path",
-		}
-		params.PackageName = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "version",
-			In:   "path",
-		}
-		params.Version = packed[key].(string)
-	}
-	return params
-}
-
-func decodeSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(args [3]string, argsEscaped bool, r *http.Request) (params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams, _ error) {
-	// Decode path: catalogId.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "catalogId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.CatalogId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "catalogId",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: packageName.
-	if err := func() error {
-		param := args[1]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "packageName",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.PackageName = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "packageName",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: version.
-	if err := func() error {
-		param := args[2]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[2])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "version",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.Version = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "version",
-			In:   "path",
 			Err:  err,
 		}
 	}

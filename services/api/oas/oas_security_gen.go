@@ -33,10 +33,10 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 }
 
 var oauth2ScopesOidc = map[string][]string{
+	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation: {},
 	GetMyCatalogsOperation:  {},
 	GetMyPackageOperation:   {},
 	InstallServiceOperation: {},
-	SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation: {},
 	WatchReleaseOperation:   {},
 	WatchResourcesOperation: {},
 }

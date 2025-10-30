@@ -43,10 +43,15 @@ func SetupInstallController(
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	serviceLifecycleUc := usecase.NewServiceLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
 		helmRealeaseGtw,
-		helm.NewPackageResolver(app.Env.CatalogsConfig),
+		pkgRepo,
 	)
 
 	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader)
