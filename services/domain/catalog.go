@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
-	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 )
 
 type Catalog struct {
@@ -25,6 +24,5 @@ const (
 
 type CatalogService interface {
 	ListPublicCatalogs(ctx context.Context) ([]Catalog, error)
-	ListUserCatalog(ctx context.Context, user usercontext.Reader,
-	) ([]Catalog, error)
+	ListUserCatalog(ctx context.Context) ([]Catalog, error)
 }

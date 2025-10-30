@@ -13,10 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const (
-	testUserName = "test-user"
-	testGroup    = "sspcloud-dev"
-)
+// ---------- Mock Repository ----------
 
 type MockCatalogRepository struct{ mock.Mock }
 
@@ -47,20 +44,40 @@ func (m *MockCatalogRepository) GetPackage(
 }
 
 // ---------- Setup Helper ----------
-func setupCatalogUsecase(cfgs []env.CatalogConfig, repo ports.CatalogRepository) *Catalog {
-	return NewCatalogService(cfgs, repo)
+
+// setupCatalogUsecase abstracts away mocks, readers, and context initialization.
+func setupCatalogUsecase(
+	t *testing.T,
+	user *usercontext.User,
+	cfgs []env.CatalogConfig,
+) (*Catalog, context.Context, *MockCatalogRepository) {
+	t.Helper()
+
+	ctx, reader, _ := usercontext.NewTestUserContext(user)
+	repo := new(MockCatalogRepository)
+
+	if len(cfgs) == 0 {
+		cfgs = []env.CatalogConfig{
+			{
+				ID: "default-catalog",
+				Restrictions: []env.Restriction{
+					{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+				},
+			},
+		}
+	}
+
+	uc := NewCatalogService(cfgs, repo, reader)
+	return uc, ctx, repo
 }
 
 // ---------- Tests ----------
 
-// ✅ Test public catalogs (no restrictions)
+// ✅ Public catalogs should only include unrestricted ones.
 func TestListPublicCatalogs(t *testing.T) {
-	repo := new(MockCatalogRepository)
-	repo.On("ListPackages", mock.Anything, mock.AnythingOfType("env.CatalogConfig")).
-		Return([]domain.Package{{Name: "chart"}}, nil)
-
+	user := usercontext.DefaultTestUser()
 	cfgs := []env.CatalogConfig{
-		{ID: "public", Restrictions: nil},
+		{ID: "public"},
 		{
 			ID: "restricted",
 			Restrictions: []env.Restriction{
@@ -69,23 +86,29 @@ func TestListPublicCatalogs(t *testing.T) {
 		},
 	}
 
-	usecase := setupCatalogUsecase(cfgs, repo)
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, cfgs[0]).
+		Return([]domain.Package{{Name: "chart"}}, nil)
 
-	catalogs, err := usecase.ListPublicCatalogs(context.Background())
+	catalogs, err := uc.ListPublicCatalogs(ctx)
+
 	assert.NoError(t, err)
 	assert.Len(t, catalogs, 1)
 	assert.Equal(t, "public", catalogs[0].ID)
-
 	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0])
 	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1])
 }
 
-// ✅ Test restricted catalog accessible by user
+// ✅ User has access to matching restricted catalog.
 func TestListUserCatalog_Match(t *testing.T) {
-	repo := new(MockCatalogRepository)
-	repo.On("ListPackages", mock.Anything, mock.AnythingOfType("env.CatalogConfig")).
-		Return([]domain.Package{{Name: "chart"}}, nil)
-
+	user := &usercontext.User{
+		Username: "test-user",
+		Groups:   []string{"sspcloud-dev", "users"},
+		Roles:    []string{"role1"},
+		Attributes: map[string]any{
+			"groups": []string{"sspcloud-dev", "users"},
+		},
+	}
 	cfgs := []env.CatalogConfig{
 		{
 			ID: "restricted-dev",
@@ -101,32 +124,28 @@ func TestListUserCatalog_Match(t *testing.T) {
 		},
 	}
 
-	// ✅ use built-in test context
-	testUser := &usercontext.User{
-		Username: "test-user",
-		Groups:   []string{"sspcloud-dev", "users"},
-		Roles:    []string{"role1"},
-		Attributes: map[string]any{
-			"groups": []string{"sspcloud-dev", "users"},
-		},
-	}
-	ctx, reader, _ := usercontext.NewTestUserContext(testUser)
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, cfgs[0]).
+		Return([]domain.Package{{Name: "chart"}}, nil)
 
-	usecase := setupCatalogUsecase(cfgs, repo)
-	result, err := usecase.ListUserCatalog(ctx, reader)
+	result, err := uc.ListUserCatalog(ctx)
 
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.Equal(t, "restricted-dev", result[0].ID)
 	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0])
+	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1])
 }
 
-// ❌ Test restricted catalog with no matching user attributes
+// ❌ User doesn’t match any restriction — no catalogs returned.
 func TestListUserCatalog_NoMatch(t *testing.T) {
-	repo := new(MockCatalogRepository)
-	repo.On("ListPackages", mock.Anything, mock.AnythingOfType("env.CatalogConfig")).
-		Return([]domain.Package{{Name: "chart"}}, nil)
-
+	user := &usercontext.User{
+		Username: "guest",
+		Groups:   []string{"sspcloud-guest"},
+		Attributes: map[string]any{
+			"groups": []string{"sspcloud-guest"},
+		},
+	}
 	cfgs := []env.CatalogConfig{
 		{
 			ID: "restricted-admin",
@@ -136,30 +155,26 @@ func TestListUserCatalog_NoMatch(t *testing.T) {
 		},
 	}
 
-	testUser := &usercontext.User{
-		Username: "test-user",
-		Groups:   []string{"sspcloud-guest"},
-		Roles:    []string{"role1"},
-		Attributes: map[string]any{
-			"groups": []string{"sspcloud-guest"},
-		},
-	}
-	ctx, reader, _ := usercontext.NewTestUserContext(testUser)
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, mock.Anything).
+		Return([]domain.Package{{Name: "chart"}}, nil)
 
-	usecase := setupCatalogUsecase(cfgs, repo)
-	result, err := usecase.ListUserCatalog(ctx, reader)
+	result, err := uc.ListUserCatalog(ctx)
 
 	assert.NoError(t, err)
-	assert.Len(t, result, 0)
+	assert.Empty(t, result)
 	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[0])
 }
 
-// ❌ Test repo returns an error
+// ❌ Repository returns an error — should propagate up.
 func TestListUserCatalog_RepoError(t *testing.T) {
-	repo := new(MockCatalogRepository)
-	repo.On("ListPackages", mock.Anything, mock.AnythingOfType("env.CatalogConfig")).
-		Return(nil, errors.New("failed to fetch"))
-
+	user := &usercontext.User{
+		Username: "dev",
+		Groups:   []string{"sspcloud-dev"},
+		Attributes: map[string]any{
+			"groups": []string{"sspcloud-dev"},
+		},
+	}
 	cfgs := []env.CatalogConfig{
 		{
 			ID: "restricted-dev",
@@ -169,17 +184,11 @@ func TestListUserCatalog_RepoError(t *testing.T) {
 		},
 	}
 
-	testUser := &usercontext.User{
-		Username: "test-user",
-		Groups:   []string{"sspcloud-dev"},
-		Attributes: map[string]any{
-			"groups": []string{"sspcloud-dev"},
-		},
-	}
-	ctx, reader, _ := usercontext.NewTestUserContext(testUser)
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, cfgs[0]).
+		Return(nil, errors.New("failed to fetch"))
 
-	usecase := setupCatalogUsecase(cfgs, repo)
-	result, err := usecase.ListUserCatalog(ctx, reader)
+	result, err := uc.ListUserCatalog(ctx)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)

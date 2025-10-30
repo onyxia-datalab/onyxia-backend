@@ -16,6 +16,7 @@ import (
 type Catalog struct {
 	envCatalogConfig []env.CatalogConfig
 	repo             ports.CatalogRepository
+	userReader       usercontext.Reader
 }
 
 var _ domain.CatalogService = (*Catalog)(nil)
@@ -24,10 +25,12 @@ var _ domain.CatalogService = (*Catalog)(nil)
 func NewCatalogService(
 	envCatalogConfig []env.CatalogConfig,
 	repo ports.CatalogRepository,
+	userReader usercontext.Reader,
 ) *Catalog {
 	return &Catalog{
 		envCatalogConfig: envCatalogConfig,
 		repo:             repo,
+		userReader:       userReader,
 	}
 }
 
@@ -39,14 +42,13 @@ func (uc *Catalog) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, er
 
 func (uc *Catalog) ListUserCatalog(
 	ctx context.Context,
-	user usercontext.Reader,
 ) ([]domain.Catalog, error) {
 	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
 		if len(c.Restrictions) == 0 {
 			return true
 		}
 
-		attrs, ok := user.GetAttributes(ctx)
+		attrs, ok := uc.userReader.GetAttributes(ctx)
 		if !ok {
 			return false
 		}
