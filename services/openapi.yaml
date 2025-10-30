@@ -18,7 +18,7 @@ tags:
     description: Service catalogs
 
 paths:
-  /catalogs/{catalogId}/packages/{packageName}:
+  /api/services/catalogs/{catalogId}/packages/{packageName}:
     get:
       security:
         - oidc: []
@@ -50,7 +50,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /schemas/{catalogId}/packageName/{packageName}/versions/{version}:
+  /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}:
     get:
       security:
         - oidc: []
@@ -87,7 +87,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /catalogs:
+  /api/services/catalogs:
     get:
       security:
         - {}
@@ -110,7 +110,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /{releaseId}/install:
+  /api/services/{releaseId}/install:
     put:
       tags: [services]
       operationId: installService
@@ -168,7 +168,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /events/{releaseId}/watch-release:
+  /api/services/events/{releaseId}/watch-release:
     get:
       tags: [events]
       operationId: watchRelease
@@ -198,7 +198,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /events/{releaseId}/watch-resources:
+  /api/services/events/{releaseId}/watch-resources:
     get:
       tags: [events]
       operationId: watchResources

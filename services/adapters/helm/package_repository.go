@@ -21,17 +21,32 @@ import (
 	"helm.sh/helm/v3/pkg/repo"
 )
 
-var _ ports.CatalogRepository = (*HelmCatalogRepository)(nil)
+var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
 
-type HelmCatalogRepository struct {
+type HelmPackageRepository struct {
 	repos   map[string]*repo.ChartRepository
 	getters getter.Providers
 }
 
-func NewCatalogRepo(
-	settings *cli.EnvSettings,
-	cfgs []env.CatalogConfig,
-) (*HelmCatalogRepository, error) {
+type Option func(*cli.EnvSettings)
+
+// WithHelmSettings allows tests or external callers to override Helm CLI settings.
+func WithHelmSettings(custom *cli.EnvSettings) Option {
+	return func(s *cli.EnvSettings) {
+		if custom != nil {
+			*s = *custom // copy values to avoid pointer aliasing
+		}
+	}
+}
+
+func NewPackageRepository(
+	cfgs []env.CatalogConfig, opts ...Option,
+) (*HelmPackageRepository, error) {
+	settings := cli.New()
+
+	for _, opt := range opts {
+		opt(settings)
+	}
 
 	repos := make(map[string]*repo.ChartRepository)
 	getters := getter.All(settings)
@@ -57,13 +72,13 @@ func NewCatalogRepo(
 		repos[cfg.ID] = cr
 	}
 
-	return &HelmCatalogRepository{
+	return &HelmPackageRepository{
 		repos:   repos,
 		getters: getters,
 	}, nil
 }
 
-func (h *HelmCatalogRepository) ListPackages(
+func (h *HelmPackageRepository) ListPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
@@ -77,7 +92,7 @@ func (h *HelmCatalogRepository) ListPackages(
 	}
 }
 
-func (h *HelmCatalogRepository) GetPackage(
+func (h *HelmPackageRepository) GetPackage(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 	name string,
@@ -92,7 +107,54 @@ func (h *HelmCatalogRepository) GetPackage(
 	}
 }
 
-func (h *HelmCatalogRepository) listHelmPackages(
+func (h *HelmPackageRepository) ResolvePackage(
+	ctx context.Context,
+	catalogID, pkgName, version string,
+) (domain.PackageVersion, error) {
+	cr, ok := h.repos[catalogID]
+	if !ok {
+		return domain.PackageVersion{}, fmt.Errorf("catalog %q not found", catalogID)
+	}
+
+	if _, err := cr.DownloadIndexFile(); err != nil {
+		return domain.PackageVersion{}, fmt.Errorf("fetching Helm index: %w", err)
+	}
+
+	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(catalogID))
+	idx, err := repo.LoadIndexFile(indexPath)
+	if err != nil {
+		return domain.PackageVersion{}, fmt.Errorf("parsing Helm index: %w", err)
+	}
+
+	versions, ok := idx.Entries[pkgName]
+	if !ok {
+		return domain.PackageVersion{}, fmt.Errorf(
+			"chart %q not found in catalog %q",
+			pkgName,
+			catalogID,
+		)
+	}
+
+	for _, v := range versions {
+		if v.Version == version {
+			return domain.PackageVersion{
+				Package: domain.Package{
+					Name:      pkgName,
+					CatalogID: catalogID,
+				},
+				Version: version,
+				RepoURL: cr.Config.URL,
+			}, nil
+		}
+	}
+
+	return domain.PackageVersion{}, fmt.Errorf(
+		"version %q not found for chart %q in catalog %q",
+		version, pkgName, catalogID,
+	)
+}
+
+func (h *HelmPackageRepository) listHelmPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
@@ -135,7 +197,7 @@ func (h *HelmCatalogRepository) listHelmPackages(
 	return pkgs, nil
 }
 
-func (h *HelmCatalogRepository) getHelmPackage(
+func (h *HelmPackageRepository) getHelmPackage(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 	name string,
@@ -192,7 +254,7 @@ func (h *HelmCatalogRepository) getHelmPackage(
 	return &pkg, nil
 }
 
-func (h *HelmCatalogRepository) pullHelmChart(
+func (h *HelmPackageRepository) pullHelmChart(
 	chartRepo *repo.ChartRepository,
 	version *repo.ChartVersion,
 	cfg env.CatalogConfig,
@@ -225,7 +287,7 @@ func (h *HelmCatalogRepository) pullHelmChart(
 	return loader.LoadArchive(bytes.NewReader(buf.Bytes()))
 }
 
-func (h *HelmCatalogRepository) listOCIPackages(
+func (h *HelmPackageRepository) listOCIPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
@@ -243,7 +305,7 @@ func (h *HelmCatalogRepository) listOCIPackages(
 	return pkgs, nil
 }
 
-func (h *HelmCatalogRepository) getOCIPackage(
+func (h *HelmPackageRepository) getOCIPackage(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 	name string,
@@ -336,4 +398,9 @@ func mustParseURL(s string) (u url.URL) {
 		return *p
 	}
 	return url.URL{}
+}
+
+// only compiled in tests
+func (h *HelmPackageRepository) getRepos() map[string]*repo.ChartRepository {
+	return h.repos
 }

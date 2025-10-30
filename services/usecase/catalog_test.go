@@ -17,7 +17,7 @@ import (
 
 type MockCatalogRepository struct{ mock.Mock }
 
-var _ ports.CatalogRepository = (*MockCatalogRepository)(nil)
+var _ ports.PackageRepository = (*MockCatalogRepository)(nil)
 
 func (m *MockCatalogRepository) ListPackages(
 	ctx context.Context,
@@ -41,6 +41,19 @@ func (m *MockCatalogRepository) GetPackage(
 		return res.(*domain.PackageRef), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+func (m *MockCatalogRepository) ResolvePackage(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+	version string,
+) (domain.PackageVersion, error) {
+	args := m.Called(ctx, catalogID, packageName, version)
+	if res := args.Get(0); res != nil {
+		return res.(domain.PackageVersion), args.Error(1)
+	}
+	return domain.PackageVersion{}, args.Error(1)
 }
 
 // ---------- Setup Helper ----------

@@ -15,7 +15,7 @@ import (
 // Catalog implements domain.CatalogService
 type Catalog struct {
 	envCatalogConfig []env.CatalogConfig
-	repo             ports.CatalogRepository
+	pkgRepo          ports.PackageRepository
 	userReader       usercontext.Reader
 }
 
@@ -24,12 +24,12 @@ var _ domain.CatalogService = (*Catalog)(nil)
 // Constructor
 func NewCatalogService(
 	envCatalogConfig []env.CatalogConfig,
-	repo ports.CatalogRepository,
+	pkgRepo ports.PackageRepository,
 	userReader usercontext.Reader,
 ) *Catalog {
 	return &Catalog{
 		envCatalogConfig: envCatalogConfig,
-		repo:             repo,
+		pkgRepo:          pkgRepo,
 		userReader:       userReader,
 	}
 }
@@ -103,7 +103,7 @@ func (uc *Catalog) buildCatalogs(
 			continue
 		}
 
-		pkgs, err := uc.repo.ListPackages(ctx, cfg)
+		pkgs, err := uc.pkgRepo.ListPackages(ctx, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err)
 		}

@@ -10,6 +10,30 @@ import (
 	"github.com/go-faster/jx"
 )
 
+type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest Problem
+
+func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
+type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError Problem
+
+func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
+type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK map[string]jx.Raw
+
+func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) init() APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
+}
+
 // Ref: #/components/schemas/Catalog
 type Catalog struct {
 	// Catalog id.
@@ -907,30 +931,6 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 		*s = m
 	}
 	return m
-}
-
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest Problem
-
-func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
-}
-
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError Problem
-
-func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
-}
-
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK map[string]jx.Raw
-
-func (s *SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) init() SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-func (*SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
 }
 
 // Ref: #/components/schemas/ServiceInstallRequest

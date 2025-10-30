@@ -28,38 +28,38 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
+	//
+	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+	// and roles.
+	//
+	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error)
 	// GetMyCatalogs invokes getMyCatalogs operation.
 	//
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
 	// by user permissions if the user is authenticated. Otherwise returns the public catalog.
 	//
-	// GET /catalogs
+	// GET /api/services/catalogs
 	GetMyCatalogs(ctx context.Context) (GetMyCatalogsRes, error)
 	// GetMyPackage invokes getMyPackage operation.
 	//
 	// Returns detailed information about a package in a catalog, including available versions.
 	//
-	// GET /catalogs/{catalogId}/packages/{packageName}
+	// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 	GetMyPackage(ctx context.Context, params GetMyPackageParams) (GetMyPackageRes, error)
 	// InstallService invokes installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 	// the release already exists (returns 202 with the same event URLs).
 	//
-	// PUT /{releaseId}/install
+	// PUT /api/services/{releaseId}/install
 	InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
-	// SchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-	//
-	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-	// and roles.
-	//
-	// GET /schemas/{catalogId}/packageName/{packageName}/versions/{version}
-	SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error)
 	// WatchRelease invokes watchRelease operation.
 	//
 	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 	//
-	// GET /events/{releaseId}/watch-release
+	// GET /api/services/events/{releaseId}/watch-release
 	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
 	// WatchResources invokes watchResources operation.
 	//
@@ -67,7 +67,7 @@ type Invoker interface {
 	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
 	// "done".
 	//
-	// GET /events/{releaseId}/watch-resources
+	// GET /api/services/events/{releaseId}/watch-resources
 	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
 }
 
@@ -116,12 +116,174 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 	return u
 }
 
+// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
+//
+// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+// and roles.
+//
+// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+func (c *Client) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
+	res, err := c.sendAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (res APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [6]string
+	pathParts[0] = "/api/services/schemas/"
+	{
+		// Encode "catalogId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "catalogId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.CatalogId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/packageName/"
+	{
+		// Encode "packageName" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "packageName",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.PackageName))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[3] = encoded
+	}
+	pathParts[4] = "/versions/"
+	{
+		// Encode "version" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "version",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Version))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[5] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	defer resp.Body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetMyCatalogs invokes getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
 // by user permissions if the user is authenticated. Otherwise returns the public catalog.
 //
-// GET /catalogs
+// GET /api/services/catalogs
 func (c *Client) GetMyCatalogs(ctx context.Context) (GetMyCatalogsRes, error) {
 	res, err := c.sendGetMyCatalogs(ctx)
 	return res, err
@@ -131,7 +293,7 @@ func (c *Client) sendGetMyCatalogs(ctx context.Context) (res GetMyCatalogsRes, e
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyCatalogs"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/catalogs"),
+		semconv.URLTemplateKey.String("/api/services/catalogs"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -165,7 +327,7 @@ func (c *Client) sendGetMyCatalogs(ctx context.Context) (res GetMyCatalogsRes, e
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/catalogs"
+	pathParts[0] = "/api/services/catalogs"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -228,7 +390,7 @@ func (c *Client) sendGetMyCatalogs(ctx context.Context) (res GetMyCatalogsRes, e
 //
 // Returns detailed information about a package in a catalog, including available versions.
 //
-// GET /catalogs/{catalogId}/packages/{packageName}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 func (c *Client) GetMyPackage(ctx context.Context, params GetMyPackageParams) (GetMyPackageRes, error) {
 	res, err := c.sendGetMyPackage(ctx, params)
 	return res, err
@@ -238,7 +400,7 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getMyPackage"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/catalogs/{catalogId}/packages/{packageName}"),
+		semconv.URLTemplateKey.String("/api/services/catalogs/{catalogId}/packages/{packageName}"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -272,7 +434,7 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [4]string
-	pathParts[0] = "/catalogs/"
+	pathParts[0] = "/api/services/catalogs/"
 	{
 		// Encode "catalogId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -372,7 +534,7 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 // the release already exists (returns 202 with the same event URLs).
 //
-// PUT /{releaseId}/install
+// PUT /api/services/{releaseId}/install
 func (c *Client) InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error) {
 	res, err := c.sendInstallService(ctx, request, params)
 	return res, err
@@ -382,7 +544,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("installService"),
 		semconv.HTTPRequestMethodKey.String("PUT"),
-		semconv.URLTemplateKey.String("/{releaseId}/install"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}/install"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -416,7 +578,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [3]string
-	pathParts[0] = "/"
+	pathParts[0] = "/api/services/"
 	{
 		// Encode "releaseId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -513,173 +675,11 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 	return result, nil
 }
 
-// SchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-//
-// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-// and roles.
-//
-// GET /schemas/{catalogId}/packageName/{packageName}/versions/{version}
-func (c *Client) SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
-	res, err := c.sendSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (res SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [6]string
-	pathParts[0] = "/schemas/"
-	{
-		// Encode "catalogId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "catalogId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.CatalogId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/packageName/"
-	{
-		// Encode "packageName" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "packageName",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.PackageName))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[3] = encoded
-	}
-	pathParts[4] = "/versions/"
-	{
-		// Encode "version" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "version",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.Version))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[5] = encoded
-	}
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"Oidc\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	defer resp.Body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeSchemasCatalogIdPackageNamePackageNameVersionsVersionGetResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
 // WatchRelease invokes watchRelease operation.
 //
 // Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 //
-// GET /events/{releaseId}/watch-release
+// GET /api/services/events/{releaseId}/watch-release
 func (c *Client) WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error) {
 	res, err := c.sendWatchRelease(ctx, params)
 	return res, err
@@ -689,7 +689,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("watchRelease"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/events/{releaseId}/watch-release"),
+		semconv.URLTemplateKey.String("/api/services/events/{releaseId}/watch-release"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -723,7 +723,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [3]string
-	pathParts[0] = "/events/"
+	pathParts[0] = "/api/services/events/"
 	{
 		// Encode "releaseId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -823,7 +823,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 // io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
 // "done".
 //
-// GET /events/{releaseId}/watch-resources
+// GET /api/services/events/{releaseId}/watch-resources
 func (c *Client) WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error) {
 	res, err := c.sendWatchResources(ctx, params)
 	return res, err
@@ -833,7 +833,7 @@ func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesPa
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("watchResources"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/events/{releaseId}/watch-resources"),
+		semconv.URLTemplateKey.String("/api/services/events/{releaseId}/watch-resources"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -867,7 +867,7 @@ func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesPa
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [3]string
-	pathParts[0] = "/events/"
+	pathParts[0] = "/api/services/events/"
 	{
 		// Encode "releaseId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
