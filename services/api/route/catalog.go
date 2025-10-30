@@ -16,14 +16,11 @@ func SetupCatalogController(app *bootstrap.Application) (*controller.CatalogCont
 		return nil, err
 	}
 
-	catalogUc, err := usecase.NewCatalogService(
+	catalogUc := usecase.NewCatalogService(
 		app.Env.CatalogsConfig,
 		catalogRepo,
 		app.UserContextReader,
 	)
-	if err != nil {
-		return nil, err
-	}
 
 	return controller.NewCatalogController(catalogUc, app.UserContextReader), nil
 }
