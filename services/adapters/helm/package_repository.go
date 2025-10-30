@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -188,8 +187,8 @@ func (h *HelmPackageRepository) listHelmPackages(
 			CatalogID:   cfg.ID,
 			Name:        name,
 			Description: latest.Description,
-			HomeUrl:     mustParseURL(latest.Home),
-			IconUrl:     mustParseURL(latest.Icon),
+			HomeUrl:     tools.MustParseURL(latest.Home),
+			IconUrl:     tools.MustParseURL(latest.Icon),
 		})
 	}
 
@@ -246,8 +245,8 @@ func (h *HelmPackageRepository) getHelmPackage(
 		_ = ch
 		if ch.Metadata != nil && ch.Metadata.Description != "" {
 			pkg.Description = ch.Metadata.Description
-			pkg.HomeUrl = mustParseURL(ch.Metadata.Home)
-			pkg.IconUrl = mustParseURL(ch.Metadata.Icon)
+			pkg.HomeUrl = tools.MustParseURL(ch.Metadata.Home)
+			pkg.IconUrl = tools.MustParseURL(ch.Metadata.Icon)
 		}
 	}
 
@@ -356,8 +355,8 @@ func (h *HelmPackageRepository) getOCIPackage(
 		}
 		if ch.Metadata != nil && ch.Metadata.Description != "" {
 			result.Description = ch.Metadata.Description
-			result.HomeUrl = mustParseURL(ch.Metadata.Home)
-			result.IconUrl = mustParseURL(ch.Metadata.Icon)
+			result.HomeUrl = tools.MustParseURL(ch.Metadata.Home)
+			result.IconUrl = tools.MustParseURL(ch.Metadata.Icon)
 		}
 	}
 
@@ -374,15 +373,6 @@ func extractVersions(list []*repo.ChartVersion) []string {
 	return out
 }
 
-func findChartFile(ch *chart.Chart, name string) []byte {
-	for _, f := range ch.Files {
-		if f.Name == name {
-			return f.Data
-		}
-	}
-	return nil
-}
-
 func isExcluded(list []string, name string) bool {
 	for _, x := range list {
 		if x == name {
@@ -390,17 +380,4 @@ func isExcluded(list []string, name string) bool {
 		}
 	}
 	return false
-}
-
-func mustParseURL(s string) (u url.URL) {
-	p, _ := url.Parse(strings.TrimSpace(s))
-	if p != nil {
-		return *p
-	}
-	return url.URL{}
-}
-
-// only compiled in tests
-func (h *HelmPackageRepository) getRepos() map[string]*repo.ChartRepository {
-	return h.repos
 }
