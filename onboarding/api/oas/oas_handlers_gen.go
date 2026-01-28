@@ -29,6 +29,10 @@ func (c *codeRecorder) WriteHeader(status int) {
 	c.ResponseWriter.WriteHeader(status)
 }
 
+func (c *codeRecorder) Unwrap() http.ResponseWriter {
+	return c.ResponseWriter
+}
+
 // handleOnboardRequest handles onboard operation.
 //
 // This endpoint manages all tasks performed when a user logs into the region. It handles the
@@ -113,14 +117,14 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOidc(ctx, OnboardOperation, r)
+			sctx, ok, err := s.securityBearerSchema(ctx, OnboardOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "Oidc",
+					Security:         "BearerSchema",
 					Err:              err,
 				}
-				defer recordError("Security:Oidc", err)
+				defer recordError("Security:BearerSchema", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -129,11 +133,46 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityDpopProof(ctx, OnboardOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "DpopProof",
+					Err:              err,
+				}
+				defer recordError("Security:DpopProof", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securityDpopSchema(ctx, OnboardOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "DpopSchema",
+					Err:              err,
+				}
+				defer recordError("Security:DpopSchema", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 2
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000110},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

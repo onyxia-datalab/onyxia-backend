@@ -29,7 +29,11 @@ paths:
         "403":
           description: Forbidden
       security:
-        - oidc: []
+        # Option 1: Bearer
+        - bearerSchema: []
+        # Option 2: DPoP (Authorization scheme DPoP + proof header)
+        - dpopSchema: []
+          dpopProof: []
 components:
   schemas:
     OnboardingRequest:
@@ -39,10 +43,18 @@ components:
           type: string
       description: Specification on which namespace to create
   securitySchemes:
-    oidc:
-      type: oauth2
-      flows:
-        authorizationCode:
-          authorizationUrl: "https://auth.lab.sspcloud.fr/auth/realms/sspcloud/protocol/openid-connect/auth"
-          tokenUrl: https://auth.lab.sspcloud.fr/auth/realms/sspcloud/protocol/openid-connect/token
-          scopes: {}
+    bearerSchema:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token in Authorization header. "Bearer <token>".
+    dpopSchema:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Access token in Authorization header. "DPoP <token>".
+    dpopProof:
+      type: apiKey
+      in: header
+      name: Dpop
+      description: DPoP proof JWT (required when using dpopSchema)

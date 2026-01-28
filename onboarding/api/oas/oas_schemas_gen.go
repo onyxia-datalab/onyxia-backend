@@ -2,29 +2,79 @@
 
 package api
 
-type Oidc struct {
-	Token  string
-	Scopes []string
+type BearerSchema struct {
+	Token string
+	Roles []string
 }
 
 // GetToken returns the value of Token.
-func (s *Oidc) GetToken() string {
+func (s *BearerSchema) GetToken() string {
 	return s.Token
 }
 
-// GetScopes returns the value of Scopes.
-func (s *Oidc) GetScopes() []string {
-	return s.Scopes
+// GetRoles returns the value of Roles.
+func (s *BearerSchema) GetRoles() []string {
+	return s.Roles
 }
 
 // SetToken sets the value of Token.
-func (s *Oidc) SetToken(val string) {
+func (s *BearerSchema) SetToken(val string) {
 	s.Token = val
 }
 
-// SetScopes sets the value of Scopes.
-func (s *Oidc) SetScopes(val []string) {
-	s.Scopes = val
+// SetRoles sets the value of Roles.
+func (s *BearerSchema) SetRoles(val []string) {
+	s.Roles = val
+}
+
+type DpopProof struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *DpopProof) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *DpopProof) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *DpopProof) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *DpopProof) SetRoles(val []string) {
+	s.Roles = val
+}
+
+type DpopSchema struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *DpopSchema) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *DpopSchema) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *DpopSchema) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *DpopSchema) SetRoles(val []string) {
+	s.Roles = val
 }
 
 // OnboardForbidden is response for Onboard operation.

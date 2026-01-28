@@ -13,8 +13,15 @@ import (
 
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
-	// HandleOidc handles oidc security.
-	HandleOidc(ctx context.Context, operationName OperationName, t Oidc) (context.Context, error)
+	// HandleBearerSchema handles bearerSchema security.
+	// Access token in Authorization header. "Bearer <token>".
+	HandleBearerSchema(ctx context.Context, operationName OperationName, t BearerSchema) (context.Context, error)
+	// HandleDpopProof handles dpopProof security.
+	// DPoP proof JWT (required when using dpopSchema).
+	HandleDpopProof(ctx context.Context, operationName OperationName, t DpopProof) (context.Context, error)
+	// HandleDpopSchema handles dpopSchema security.
+	// Access token in Authorization header. "DPoP <token>".
+	HandleDpopSchema(ctx context.Context, operationName OperationName, t DpopSchema) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -32,19 +39,63 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 	return "", false
 }
 
-var oauth2ScopesOidc = map[string][]string{
+var operationRolesBearerSchema = map[string][]string{
 	OnboardOperation: {},
 }
 
-func (s *Server) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t Oidc
+func (s *Server) securityBearerSchema(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t BearerSchema
 	token, ok := findAuthorization(req.Header, "Bearer")
 	if !ok {
 		return ctx, false, nil
 	}
 	t.Token = token
-	t.Scopes = oauth2ScopesOidc[operationName]
-	rctx, err := s.sec.HandleOidc(ctx, operationName, t)
+	t.Roles = operationRolesBearerSchema[operationName]
+	rctx, err := s.sec.HandleBearerSchema(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
+var operationRolesDpopProof = map[string][]string{
+	OnboardOperation: {},
+}
+
+func (s *Server) securityDpopProof(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t DpopProof
+	const parameterName = "Dpop"
+	value := req.Header.Get(parameterName)
+	if value == "" {
+		return ctx, false, nil
+	}
+	t.APIKey = value
+	t.Roles = operationRolesDpopProof[operationName]
+	rctx, err := s.sec.HandleDpopProof(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
+var operationRolesDpopSchema = map[string][]string{
+	OnboardOperation: {},
+}
+
+func (s *Server) securityDpopSchema(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t DpopSchema
+	const parameterName = "Authorization"
+	value := req.Header.Get(parameterName)
+	if value == "" {
+		return ctx, false, nil
+	}
+	t.APIKey = value
+	t.Roles = operationRolesDpopSchema[operationName]
+	rctx, err := s.sec.HandleDpopSchema(ctx, operationName, t)
 	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
 		return nil, false, nil
 	} else if err != nil {
@@ -55,15 +106,38 @@ func (s *Server) securityOidc(ctx context.Context, operationName OperationName, 
 
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
-	// Oidc provides oidc security value.
-	Oidc(ctx context.Context, operationName OperationName) (Oidc, error)
+	// BearerSchema provides bearerSchema security value.
+	// Access token in Authorization header. "Bearer <token>".
+	BearerSchema(ctx context.Context, operationName OperationName) (BearerSchema, error)
+	// DpopProof provides dpopProof security value.
+	// DPoP proof JWT (required when using dpopSchema).
+	DpopProof(ctx context.Context, operationName OperationName) (DpopProof, error)
+	// DpopSchema provides dpopSchema security value.
+	// Access token in Authorization header. "DPoP <token>".
+	DpopSchema(ctx context.Context, operationName OperationName) (DpopSchema, error)
 }
 
-func (s *Client) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) error {
-	t, err := s.sec.Oidc(ctx, operationName)
+func (s *Client) securityBearerSchema(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.BearerSchema(ctx, operationName)
 	if err != nil {
-		return errors.Wrap(err, "security source \"Oidc\"")
+		return errors.Wrap(err, "security source \"BearerSchema\"")
 	}
 	req.Header.Set("Authorization", "Bearer "+t.Token)
+	return nil
+}
+func (s *Client) securityDpopProof(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.DpopProof(ctx, operationName)
+	if err != nil {
+		return errors.Wrap(err, "security source \"DpopProof\"")
+	}
+	req.Header.Set("Dpop", t.APIKey)
+	return nil
+}
+func (s *Client) securityDpopSchema(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.DpopSchema(ctx, operationName)
+	if err != nil {
+		return errors.Wrap(err, "security source \"DpopSchema\"")
+	}
+	req.Header.Set("Authorization", t.APIKey)
 	return nil
 }

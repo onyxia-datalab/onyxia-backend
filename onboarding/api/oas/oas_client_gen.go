@@ -155,14 +155,36 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, OnboardOperation, r); {
+			stage = "Security:BearerSchema"
+			switch err := c.securityBearerSchema(ctx, OnboardOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"Oidc\"")
+				return res, errors.Wrap(err, "security \"BearerSchema\"")
+			}
+		}
+		{
+			stage = "Security:DpopProof"
+			switch err := c.securityDpopProof(ctx, OnboardOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"DpopProof\"")
+			}
+		}
+		{
+			stage = "Security:DpopSchema"
+			switch err := c.securityDpopSchema(ctx, OnboardOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 2
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"DpopSchema\"")
 			}
 		}
 
@@ -170,6 +192,7 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000110},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
