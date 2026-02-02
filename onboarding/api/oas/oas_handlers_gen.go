@@ -117,14 +117,14 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityBearerSchema(ctx, OnboardOperation, r)
+			sctx, ok, err := s.securityBearer(ctx, OnboardOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "BearerSchema",
+					Security:         "Bearer",
 					Err:              err,
 				}
-				defer recordError("Security:BearerSchema", err)
+				defer recordError("Security:Bearer", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -134,14 +134,14 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 			}
 		}
 		{
-			sctx, ok, err := s.securityDpopProof(ctx, OnboardOperation, r)
+			sctx, ok, err := s.securityDpop(ctx, OnboardOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "DpopProof",
+					Security:         "Dpop",
 					Err:              err,
 				}
-				defer recordError("Security:DpopProof", err)
+				defer recordError("Security:Dpop", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -150,29 +150,12 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 				ctx = sctx
 			}
 		}
-		{
-			sctx, ok, err := s.securityDpopSchema(ctx, OnboardOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "DpopSchema",
-					Err:              err,
-				}
-				defer recordError("Security:DpopSchema", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 2
-				ctx = sctx
-			}
-		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
-				{0b00000110},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

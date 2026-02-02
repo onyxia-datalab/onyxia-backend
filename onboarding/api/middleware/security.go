@@ -2,11 +2,8 @@ package middleware
 
 import (
 	"context"
-	"errors"
 	"log/slog"
-	"strings"
 
-	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/onyxia-datalab/onyxia-backend/internal/auth"
 	"github.com/onyxia-datalab/onyxia-backend/internal/auth/noauth"
 	"github.com/onyxia-datalab/onyxia-backend/internal/auth/oidc"
@@ -20,36 +17,21 @@ func newSecurityAdapter(h auth.Handler) *securityAdapter { return &securityAdapt
 
 var _ oas.SecurityHandler = (*securityAdapter)(nil)
 
-func (a *securityAdapter) HandleBearerSchema(
+func (a *securityAdapter) HandleBearer(
 	ctx context.Context,
 	operation oas.OperationName,
-	req oas.BearerSchema,
+	req oas.Bearer,
 ) (context.Context, error) {
 	return a.h.Authenticate(ctx, operation, req.Token)
 }
 
-func (a *securityAdapter) HandleDpopSchema(
+func (a *securityAdapter) HandleDpop(
 	ctx context.Context,
 	operation oas.OperationName,
-	req oas.DpopSchema,
+	t oas.Dpop,
 ) (context.Context, error) {
-	scheme, token, ok := strings.Cut(req.APIKey, " ")
-	if !ok || !strings.EqualFold(scheme, "DPoP") {
-		//If Authorization scheme is not DPoP, skip this security handler
-		return ctx, ogenerrors.ErrSkipServerSecurity
-	}
-	if token == "" {
-		return ctx, errors.New("invalid DPoP authorization scheme")
-	}
-	return a.h.Authenticate(ctx, operation, token)
-}
 
-func (a *securityAdapter) HandleDpopProof(
-	ctx context.Context,
-	operation oas.OperationName,
-	_ oas.DpopProof,
-) (context.Context, error) {
-	// DPoP proof is optional; validation may be added later.
+	//TODO: validate DPoP
 	return ctx, nil
 }
 

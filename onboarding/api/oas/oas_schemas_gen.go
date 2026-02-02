@@ -2,78 +2,57 @@
 
 package api
 
-type BearerSchema struct {
+import (
+	"net/http"
+)
+
+type Bearer struct {
 	Token string
 	Roles []string
 }
 
 // GetToken returns the value of Token.
-func (s *BearerSchema) GetToken() string {
+func (s *Bearer) GetToken() string {
 	return s.Token
 }
 
 // GetRoles returns the value of Roles.
-func (s *BearerSchema) GetRoles() []string {
+func (s *Bearer) GetRoles() []string {
 	return s.Roles
 }
 
 // SetToken sets the value of Token.
-func (s *BearerSchema) SetToken(val string) {
+func (s *Bearer) SetToken(val string) {
 	s.Token = val
 }
 
 // SetRoles sets the value of Roles.
-func (s *BearerSchema) SetRoles(val []string) {
+func (s *Bearer) SetRoles(val []string) {
 	s.Roles = val
 }
 
-type DpopProof struct {
-	APIKey string
-	Roles  []string
+type Dpop struct {
+	Request *http.Request
+	Roles   []string
 }
 
-// GetAPIKey returns the value of APIKey.
-func (s *DpopProof) GetAPIKey() string {
-	return s.APIKey
-}
-
-// GetRoles returns the value of Roles.
-func (s *DpopProof) GetRoles() []string {
-	return s.Roles
-}
-
-// SetAPIKey sets the value of APIKey.
-func (s *DpopProof) SetAPIKey(val string) {
-	s.APIKey = val
-}
-
-// SetRoles sets the value of Roles.
-func (s *DpopProof) SetRoles(val []string) {
-	s.Roles = val
-}
-
-type DpopSchema struct {
-	APIKey string
-	Roles  []string
-}
-
-// GetAPIKey returns the value of APIKey.
-func (s *DpopSchema) GetAPIKey() string {
-	return s.APIKey
+// GetRequest returns the value of Request.
+func (s *Dpop) GetRequest() *http.Request {
+	return s.Request
 }
 
 // GetRoles returns the value of Roles.
-func (s *DpopSchema) GetRoles() []string {
+func (s *Dpop) GetRoles() []string {
 	return s.Roles
 }
 
-// SetAPIKey sets the value of APIKey.
-func (s *DpopSchema) SetAPIKey(val string) {
-	s.APIKey = val
+// SetRequest sets the value of Request.
+func (s *Dpop) SetRequest(val *http.Request) {
+	s.Request = val
 }
 
 // SetRoles sets the value of Roles.
-func (s *DpopSchema) SetRoles(val []string) {
+func (s *Dpop) SetRoles(val []string) {
 	s.Roles = val
 }
 

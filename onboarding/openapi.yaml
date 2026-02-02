@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Onyxia Onboarding API for a region
-  description: Onboarding API is designed to remain minimal, giving each Onyxia instance the flexibility to use this service or provide its own. It also allows adding features such as quota management. By separating this API from the core functionalities, onyxia-web must handle extra logic—unlike the previous setup, where namespace creation was silently performed by the older API. At a minimum, we need to define an endpoint in the core-features API to verify the existence of a namespace because onboarding is optionnal.
+  description: Onboarding API is designed to remain minimal, giving each Onyxia instance the flexibility to use this service or provide its own. It also allows adding features such as quota management. By separating this API from the core functionalities, onyxia-web must handle extra logic—unlike the previous setup, where namespace creation was silently performed by the older API. At a minimum, we need to define an endpoint in the core-features API to verify the existence of a namespace because onboarding is optional.
   version: 1.0.0
 tags:
   - name: Onboarding
@@ -14,7 +14,6 @@ paths:
       summary: Init a user or a group
       description: This endpoint manages all tasks performed when a user logs into the region. It handles the creation or update of a namespace, along with metadata information, similar to the current API behavior like quota. We should also consider whether to maintain the behavior of creating a RoleBinding for the OIDC user. While this supports external API server calls, it is not the primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However, we can retain an option to explicitly create this RoleBinding if needed.
       operationId: onboard
-      parameters: []
       requestBody:
         content:
           application/json:
@@ -29,11 +28,8 @@ paths:
         "403":
           description: Forbidden
       security:
-        # Option 1: Bearer
-        - bearerSchema: []
-        # Option 2: DPoP (Authorization scheme DPoP + proof header)
-        - dpopSchema: []
-          dpopProof: []
+        - bearer: []
+        - dpop: []
 components:
   schemas:
     OnboardingRequest:
@@ -43,18 +39,14 @@ components:
           type: string
       description: Specification on which namespace to create
   securitySchemes:
-    bearerSchema:
+    bearer:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Access token in Authorization header. "Bearer <token>".
-    dpopSchema:
-      type: apiKey
-      in: header
-      name: Authorization
-      description: Access token in Authorization header. "DPoP <token>".
-    dpopProof:
-      type: apiKey
-      in: header
-      name: Dpop
-      description: DPoP proof JWT (required when using dpopSchema)
+      description: OAuth2 access token in Authorization header using the Bearer scheme.
+    dpop:
+      type: http
+      scheme: DPoP
+      x-ogen-custom-security: true
+      description: >
+        OAuth2 DPoP-bound access token sent in the Authorization header using the "DPoP" scheme. When using this scheme, clients must also send a per-request "Dpop" proof header (RFC 9449).
