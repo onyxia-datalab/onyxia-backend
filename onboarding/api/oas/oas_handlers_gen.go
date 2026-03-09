@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -52,6 +52,8 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 		semconv.HTTPRequestMethodKey.String("POST"),
 		semconv.HTTPRouteKey.String("/api/onboarding"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), OnboardOperation,
@@ -117,14 +119,14 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityBearer(ctx, OnboardOperation, r)
+			sctx, ok, err := s.securityOidc(ctx, OnboardOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "Bearer",
+					Security:         "Oidc",
 					Err:              err,
 				}
-				defer recordError("Security:Bearer", err)
+				defer recordError("Security:Oidc", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -133,29 +135,11 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 				ctx = sctx
 			}
 		}
-		{
-			sctx, ok, err := s.securityDpop(ctx, OnboardOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "Dpop",
-					Err:              err,
-				}
-				defer recordError("Security:Dpop", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 1
-				ctx = sctx
-			}
-		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
-				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

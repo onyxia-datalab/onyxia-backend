@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -27,10 +28,11 @@ func TestBuildSecurityHandler_NoAuthMode_SetsAnonymousUserInContext(t *testing.T
 	require.NoError(t, err)
 	require.NotNil(t, sec)
 
-	ctx, err := sec.HandleBearer(
+	req := httptest.NewRequest("GET", "http://example.com/api/onboarding", nil)
+	ctx, err := sec.HandleOidc(
 		context.Background(),
 		oas.OperationName("test-operation"),
-		oas.Bearer{Token: "ignored"},
+		oas.Oidc{Request: req},
 	)
 	require.NoError(t, err)
 
@@ -50,7 +52,7 @@ func TestBuildSecurityHandler_OIDCModeWithEmptyConfig_ReturnsError(t *testing.T)
 	sec, err := BuildSecurityHandler(
 		context.Background(),
 		"oidc",
-		OIDCConfigOnboarding{}, // issuer vide etc.
+		OIDCConfigOnboarding{},
 		writer,
 	)
 
@@ -58,88 +60,67 @@ func TestBuildSecurityHandler_OIDCModeWithEmptyConfig_ReturnsError(t *testing.T)
 	assert.Nil(t, sec, "expected nil security handler on error")
 }
 
-type stubAuthHandler struct {
+type stubAuth struct {
 	called    bool
 	gotOp     oas.OperationName
-	gotToken  string
 	returnCtx context.Context
 	returnErr error
 }
 
-func (s *stubAuthHandler) Authenticate(
+func (s *stubAuth) VerifyRequest(
 	ctx context.Context,
 	op oas.OperationName,
-	token string,
+	_ *http.Request,
 ) (context.Context, error) {
 	s.called = true
 	s.gotOp = op
-	s.gotToken = token
 	if s.returnCtx != nil {
 		return s.returnCtx, s.returnErr
 	}
 	return ctx, s.returnErr
 }
 
-var _ auth.Handler = (*stubAuthHandler)(nil)
+var _ auth.Auth = (*stubAuth)(nil)
 
-func TestSecurityAdapter_HandleBearer_DelegatesToAuthHandler(t *testing.T) {
+func TestSecurityAdapter_HandleOidc_DelegatesToAuthHandler(t *testing.T) {
 	t.Parallel()
 
 	base := context.Background()
 	wantCtx := context.WithValue(base, "k", "v")
 
-	stub := &stubAuthHandler{
-		returnCtx: wantCtx,
-	}
+	stub := &stubAuth{returnCtx: wantCtx}
 	sec := newSecurityAdapter(stub)
 
-	gotCtx, err := sec.HandleBearer(
+	req := httptest.NewRequest("POST", "http://example.com/api/onboarding?x=1", nil)
+	req.Header.Set("Authorization", "DPoP tkn")
+	req.Header.Set("DPoP", "proof")
+
+	gotCtx, err := sec.HandleOidc(
 		base,
 		oas.OperationName("op"),
-		oas.Bearer{Token: "tkn"},
+		oas.Oidc{Request: req},
 	)
-	require.NoError(t, err)
 
-	require.True(t, stub.called, "Authenticate should be called")
+	require.NoError(t, err)
+	require.True(t, stub.called, "VerifyRequest should be called")
 	assert.Equal(t, oas.OperationName("op"), stub.gotOp)
-	assert.Equal(t, "tkn", stub.gotToken)
 	assert.Equal(t, wantCtx, gotCtx)
 }
 
-func TestSecurityAdapter_HandleBearer_PropagatesError(t *testing.T) {
+func TestSecurityAdapter_HandleOidc_PropagatesError(t *testing.T) {
 	t.Parallel()
 
 	wantErr := errors.New("boom")
-	stub := &stubAuthHandler{returnErr: wantErr}
+	stub := &stubAuth{returnErr: wantErr}
 	sec := newSecurityAdapter(stub)
 
-	gotCtx, err := sec.HandleBearer(
+	req := httptest.NewRequest("POST", "http://example.com/api/onboarding", nil)
+	gotCtx, err := sec.HandleOidc(
 		context.Background(),
 		oas.OperationName("op"),
-		oas.Bearer{Token: "tkn"},
+		oas.Oidc{Request: req},
 	)
 
 	assert.ErrorIs(t, err, wantErr)
-	// ctx peut être celui d'entrée (stub le renvoie tel quel si returnCtx nil)
 	assert.NotNil(t, gotCtx)
-}
-
-func TestSecurityAdapter_HandleDpop_ReturnsCtxAndNil_ForNow(t *testing.T) {
-	t.Parallel()
-
-	sec := newSecurityAdapter(&stubAuthHandler{})
-
-	req := httptest.NewRequest("POST", "http://example.com/api/onboarding", nil)
-	ctx := context.WithValue(context.Background(), "ctx", "val")
-
-	gotCtx, err := sec.HandleDpop(
-		ctx,
-		oas.OperationName("op"),
-		oas.Dpop{
-			Request: req,
-		},
-	)
-
-	require.NoError(t, err)
-	assert.Equal(t, ctx, gotCtx)
 }

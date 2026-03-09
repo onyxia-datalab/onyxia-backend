@@ -200,13 +200,17 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 			}
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:    1,
-					MinLengthSet: true,
-					MaxLength:    0,
-					MaxLengthSet: false,
-					Email:        false,
-					Hostname:     false,
-					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
 				}).Validate(string(params.ReleaseId)); err != nil {
 					return errors.Wrap(err, "string")
 				}
@@ -507,13 +511,17 @@ func decodeWatchReleaseParams(args [1]string, argsEscaped bool, r *http.Request)
 			}
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:    1,
-					MinLengthSet: true,
-					MaxLength:    0,
-					MaxLengthSet: false,
-					Email:        false,
-					Hostname:     false,
-					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
 				}).Validate(string(params.ReleaseId)); err != nil {
 					return errors.Wrap(err, "string")
 				}
@@ -640,13 +648,17 @@ func decodeWatchResourcesParams(args [1]string, argsEscaped bool, r *http.Reques
 			}
 			if err := func() error {
 				if err := (validate.String{
-					MinLength:    1,
-					MinLengthSet: true,
-					MaxLength:    0,
-					MaxLengthSet: false,
-					Email:        false,
-					Hostname:     false,
-					Regex:        regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
 				}).Validate(string(params.ReleaseId)); err != nil {
 					return errors.Wrap(err, "string")
 				}

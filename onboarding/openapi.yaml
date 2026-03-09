@@ -28,8 +28,7 @@ paths:
         "403":
           description: Forbidden
       security:
-        - bearer: []
-        - dpop: []
+        - oidc: []
 components:
   schemas:
     OnboardingRequest:
@@ -39,14 +38,10 @@ components:
           type: string
       description: Specification on which namespace to create
   securitySchemes:
-    bearer:
+    oidc:
       type: http
       scheme: bearer
-      bearerFormat: JWT
-      description: OAuth2 access token in Authorization header using the Bearer scheme.
-    dpop:
-      type: http
-      scheme: DPoP
       x-ogen-custom-security: true
       description: >
-        OAuth2 DPoP-bound access token sent in the Authorization header using the "DPoP" scheme. When using this scheme, clients must also send a per-request "Dpop" proof header (RFC 9449).
+        OAuth2 access token (Bearer or DPoP-bound). When the token contains a cnf.jkt claim,
+        clients must also send a per-request "DPoP" proof header (RFC 9449).

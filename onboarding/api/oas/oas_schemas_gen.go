@@ -6,53 +6,28 @@ import (
 	"net/http"
 )
 
-type Bearer struct {
-	Token string
-	Roles []string
-}
-
-// GetToken returns the value of Token.
-func (s *Bearer) GetToken() string {
-	return s.Token
-}
-
-// GetRoles returns the value of Roles.
-func (s *Bearer) GetRoles() []string {
-	return s.Roles
-}
-
-// SetToken sets the value of Token.
-func (s *Bearer) SetToken(val string) {
-	s.Token = val
-}
-
-// SetRoles sets the value of Roles.
-func (s *Bearer) SetRoles(val []string) {
-	s.Roles = val
-}
-
-type Dpop struct {
+type Oidc struct {
 	Request *http.Request
 	Roles   []string
 }
 
 // GetRequest returns the value of Request.
-func (s *Dpop) GetRequest() *http.Request {
+func (s *Oidc) GetRequest() *http.Request {
 	return s.Request
 }
 
 // GetRoles returns the value of Roles.
-func (s *Dpop) GetRoles() []string {
+func (s *Oidc) GetRoles() []string {
 	return s.Roles
 }
 
 // SetRequest sets the value of Request.
-func (s *Dpop) SetRequest(val *http.Request) {
+func (s *Oidc) SetRequest(val *http.Request) {
 	s.Request = val
 }
 
 // SetRoles sets the value of Roles.
-func (s *Dpop) SetRoles(val []string) {
+func (s *Oidc) SetRoles(val []string) {
 	s.Roles = val
 }
 

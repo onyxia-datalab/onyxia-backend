@@ -10,6 +10,27 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
+var (
+	rn1AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
+	rn5AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
+	rn17AllowedHeaders = map[string]string{
+		"GET": "Authorization,Last-Event-Id",
+	}
+	rn19AllowedHeaders = map[string]string{
+		"GET": "Authorization,Last-Event-Id",
+	}
+	rn14AllowedHeaders = map[string]string{
+		"GET": "Authorization",
+	}
+	rn8AllowedHeaders = map[string]string{
+		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
+	}
+)
+
 func (s *Server) cutPrefix(path string) (string, bool) {
 	prefix := s.cfg.Prefix
 	if prefix == "" {
@@ -74,7 +95,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					case "GET":
 						s.handleGetMyCatalogsRequest([0]string{}, elemIsEscaped, w, r)
 					default:
-						s.notAllowed(w, r, "GET")
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "GET",
+							allowedHeaders: rn1AllowedHeaders,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
 					}
 
 					return
@@ -127,7 +153,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									args[1],
 								}, elemIsEscaped, w, r)
 							default:
-								s.notAllowed(w, r, "GET")
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn5AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
 							}
 
 							return
@@ -187,7 +218,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									args[0],
 								}, elemIsEscaped, w, r)
 							default:
-								s.notAllowed(w, r, "GET")
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn17AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
 							}
 
 							return
@@ -209,7 +245,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									args[0],
 								}, elemIsEscaped, w, r)
 							default:
-								s.notAllowed(w, r, "GET")
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn19AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
 							}
 
 							return
@@ -289,7 +330,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									args[2],
 								}, elemIsEscaped, w, r)
 							default:
-								s.notAllowed(w, r, "GET")
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "GET",
+									allowedHeaders: rn14AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
 							}
 
 							return
@@ -330,7 +376,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							args[0],
 						}, elemIsEscaped, w, r)
 					default:
-						s.notAllowed(w, r, "PUT")
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "PUT",
+							allowedHeaders: rn8AllowedHeaders,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
 					}
 
 					return
@@ -345,12 +396,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Route is route object.
 type Route struct {
-	name        string
-	summary     string
-	operationID string
-	pathPattern string
-	count       int
-	args        [3]string
+	name           string
+	summary        string
+	operationID    string
+	operationGroup string
+	pathPattern    string
+	count          int
+	args           [3]string
 }
 
 // Name returns ogen operation name.
@@ -368,6 +420,11 @@ func (r Route) Summary() string {
 // OperationID returns OpenAPI operationId.
 func (r Route) OperationID() string {
 	return r.operationID
+}
+
+// OperationGroup returns the x-ogen-operation-group value.
+func (r Route) OperationGroup() string {
+	return r.operationGroup
 }
 
 // PathPattern returns OpenAPI path.
@@ -444,6 +501,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.name = GetMyCatalogsOperation
 						r.summary = "List available catalogs and packages for installing for the user"
 						r.operationID = "getMyCatalogs"
+						r.operationGroup = ""
 						r.pathPattern = "/catalogs"
 						r.args = args
 						r.count = 0
@@ -498,6 +556,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = GetMyPackageOperation
 								r.summary = "Get detailed information about a package in a catalog"
 								r.operationID = "getMyPackage"
+								r.operationGroup = ""
 								r.pathPattern = "/catalogs/{catalogId}/packages/{packageName}"
 								r.args = args
 								r.count = 2
@@ -560,6 +619,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = WatchReleaseOperation
 								r.summary = "Release-level status stream (SSE)"
 								r.operationID = "watchRelease"
+								r.operationGroup = ""
 								r.pathPattern = "/events/{releaseId}/watch-release"
 								r.args = args
 								r.count = 1
@@ -584,6 +644,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = WatchResourcesOperation
 								r.summary = "Kubernetes resources status stream (SSE)"
 								r.operationID = "watchResources"
+								r.operationGroup = ""
 								r.pathPattern = "/events/{releaseId}/watch-resources"
 								r.args = args
 								r.count = 1
@@ -664,6 +725,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.name = SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation
 								r.summary = "Get the values.schema.json of a versioned package"
 								r.operationID = ""
+								r.operationGroup = ""
 								r.pathPattern = "/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
 								r.args = args
 								r.count = 3
@@ -707,6 +769,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.name = InstallServiceOperation
 						r.summary = "Trigger service installation (async)"
 						r.operationID = "installService"
+						r.operationGroup = ""
 						r.pathPattern = "/{releaseId}/install"
 						r.args = args
 						r.count = 1

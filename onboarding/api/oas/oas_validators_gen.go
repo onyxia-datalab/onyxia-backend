@@ -7,7 +7,7 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-func (s *Dpop) Validate() error {
+func (s *Oidc) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}

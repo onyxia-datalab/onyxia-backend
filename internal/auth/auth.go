@@ -1,7 +1,10 @@
 package auth
 
-import "context"
+import (
+	"context"
+	"net/http"
+)
 
-type Handler interface {
-	Authenticate(ctx context.Context, operation, token string) (context.Context, error)
+type Auth interface {
+	VerifyRequest(ctx context.Context, operation string, r *http.Request) (context.Context, error)
 }

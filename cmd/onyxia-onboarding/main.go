@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/httplog/v3"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/onyxia-datalab/onyxia-backend/internal/httputil"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/route"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
 )
@@ -46,6 +47,7 @@ func main() {
 	)
 
 	r.Use(middleware.Recoverer)
+	r.Use(httputil.ProxyHeaders)
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: env.Security.CORSAllowedOrigins,

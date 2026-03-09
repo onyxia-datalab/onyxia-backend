@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -46,10 +46,6 @@ type Client struct {
 	sec       SecuritySource
 	baseClient
 }
-
-var _ Handler = struct {
-	*Client
-}{}
 
 // NewClient initializes new Client defined by OAS.
 func NewClient(serverURL string, sec SecuritySource, opts ...ClientOption) (*Client, error) {
@@ -155,25 +151,14 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:Bearer"
-			switch err := c.securityBearer(ctx, OnboardOperation, r); {
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, OnboardOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"Bearer\"")
-			}
-		}
-		{
-			stage = "Security:Dpop"
-			switch err := c.securityDpop(ctx, OnboardOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"Dpop\"")
+				return res, errors.Wrap(err, "security \"Oidc\"")
 			}
 		}
 
@@ -181,7 +166,6 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
-				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -201,7 +185,8 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeOnboardResponse(resp)

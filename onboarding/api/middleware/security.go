@@ -11,28 +11,18 @@ import (
 	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 )
 
-type securityAdapter struct{ h auth.Handler }
+type securityAdapter struct{ h auth.Auth }
 
-func newSecurityAdapter(h auth.Handler) *securityAdapter { return &securityAdapter{h: h} }
+func newSecurityAdapter(h auth.Auth) *securityAdapter { return &securityAdapter{h: h} }
 
 var _ oas.SecurityHandler = (*securityAdapter)(nil)
 
-func (a *securityAdapter) HandleBearer(
+func (a *securityAdapter) HandleOidc(
 	ctx context.Context,
 	operation oas.OperationName,
-	req oas.Bearer,
+	t oas.Oidc,
 ) (context.Context, error) {
-	return a.h.Authenticate(ctx, operation, req.Token)
-}
-
-func (a *securityAdapter) HandleDpop(
-	ctx context.Context,
-	operation oas.OperationName,
-	t oas.Dpop,
-) (context.Context, error) {
-
-	//TODO: validate DPoP
-	return ctx, nil
+	return a.h.VerifyRequest(ctx, operation, t.Request)
 }
 
 type OIDCConfigOnboarding struct {

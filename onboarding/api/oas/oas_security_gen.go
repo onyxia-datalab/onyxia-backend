@@ -13,13 +13,10 @@ import (
 
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
-	// HandleBearer handles bearer security.
-	// OAuth2 access token in Authorization header using the Bearer scheme.
-	HandleBearer(ctx context.Context, operationName OperationName, t Bearer) (context.Context, error)
-	// HandleDpop handles dpop security.
-	// OAuth2 DPoP-bound access token sent in the Authorization header using the "DPoP" scheme. When
-	// using this scheme, clients must also send a per-request "Dpop" proof header (RFC 9449).
-	HandleDpop(ctx context.Context, operationName OperationName, t Dpop) (context.Context, error)
+	// HandleOidc handles oidc security.
+	// OAuth2 access token (Bearer or DPoP-bound). When the token contains a cnf.jkt claim, clients must
+	// also send a per-request "DPoP" proof header (RFC 9449).
+	HandleOidc(ctx context.Context, operationName OperationName, t Oidc) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -37,36 +34,37 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 	return "", false
 }
 
-var operationRolesBearer = map[string][]string{
+// operationRolesOidc is a private map storing roles per operation.
+var operationRolesOidc = map[string][]string{
 	OnboardOperation: {},
 }
 
-func (s *Server) securityBearer(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t Bearer
-	token, ok := findAuthorization(req.Header, "Bearer")
+// GetRolesForOidc returns the required roles for the given operation.
+//
+// This is useful for authorization scenarios where you need to know which roles
+// are required for an operation.
+//
+// Example:
+//
+//	requiredRoles := GetRolesForOidc(AddPetOperation)
+//
+// Returns nil if the operation has no role requirements or if the operation is unknown.
+func GetRolesForOidc(operation string) []string {
+	roles, ok := operationRolesOidc[operation]
 	if !ok {
-		return ctx, false, nil
+		return nil
 	}
-	t.Token = token
-	t.Roles = operationRolesBearer[operationName]
-	rctx, err := s.sec.HandleBearer(ctx, operationName, t)
-	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
-		return nil, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-	return rctx, true, err
+	// Return a copy to prevent external modification
+	result := make([]string, len(roles))
+	copy(result, roles)
+	return result
 }
 
-var operationRolesDpop = map[string][]string{
-	OnboardOperation: {},
-}
-
-func (s *Server) securityDpop(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t Dpop
+func (s *Server) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t Oidc
 	t.Request = req
-	t.Roles = operationRolesDpop[operationName]
-	rctx, err := s.sec.HandleDpop(ctx, operationName, t)
+	t.Roles = operationRolesOidc[operationName]
+	rctx, err := s.sec.HandleOidc(ctx, operationName, t)
 	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
 		return nil, false, nil
 	} else if err != nil {
@@ -77,26 +75,15 @@ func (s *Server) securityDpop(ctx context.Context, operationName OperationName, 
 
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
-	// Bearer provides bearer security value.
-	// OAuth2 access token in Authorization header using the Bearer scheme.
-	Bearer(ctx context.Context, operationName OperationName) (Bearer, error)
-	// Dpop provides dpop security value.
-	// OAuth2 DPoP-bound access token sent in the Authorization header using the "DPoP" scheme. When
-	// using this scheme, clients must also send a per-request "Dpop" proof header (RFC 9449).
-	Dpop(ctx context.Context, operationName OperationName, req *http.Request) error
+	// Oidc provides oidc security value.
+	// OAuth2 access token (Bearer or DPoP-bound). When the token contains a cnf.jkt claim, clients must
+	// also send a per-request "DPoP" proof header (RFC 9449).
+	Oidc(ctx context.Context, operationName OperationName, req *http.Request) error
 }
 
-func (s *Client) securityBearer(ctx context.Context, operationName OperationName, req *http.Request) error {
-	t, err := s.sec.Bearer(ctx, operationName)
-	if err != nil {
-		return errors.Wrap(err, "security source \"Bearer\"")
-	}
-	req.Header.Set("Authorization", "Bearer "+t.Token)
-	return nil
-}
-func (s *Client) securityDpop(ctx context.Context, operationName OperationName, req *http.Request) error {
-	if err := s.sec.Dpop(ctx, operationName, req); err != nil {
-		return errors.Wrap(err, "security source \"Dpop\"")
+func (s *Client) securityOidc(ctx context.Context, operationName OperationName, req *http.Request) error {
+	if err := s.sec.Oidc(ctx, operationName, req); err != nil {
+		return errors.Wrap(err, "security source \"Oidc\"")
 	}
 	return nil
 }

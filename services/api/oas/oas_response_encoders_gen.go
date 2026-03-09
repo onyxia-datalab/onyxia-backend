@@ -97,6 +97,7 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 	switch response := response.(type) {
 	case *InstallAcceptedHeaders:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Access-Control-Expose-Headers", "Location")
 		// Encoding response headers.
 		{
 			h := uri.NewHeaderEncoder(w.Header())
@@ -247,6 +248,7 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 	switch response := response.(type) {
 	case *WatchReleaseOKHeaders:
 		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Access-Control-Expose-Headers", "Connection")
 		// Encoding response headers.
 		{
 			h := uri.NewHeaderEncoder(w.Header())
@@ -342,6 +344,7 @@ func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWri
 	switch response := response.(type) {
 	case *WatchResourcesOKHeaders:
 		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Access-Control-Expose-Headers", "Connection")
 		// Encoding response headers.
 		{
 			h := uri.NewHeaderEncoder(w.Header())

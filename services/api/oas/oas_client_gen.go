@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -77,10 +77,6 @@ type Client struct {
 	sec       SecuritySource
 	baseClient
 }
-
-var _ Handler = struct {
-	*Client
-}{}
 
 // NewClient initializes new Client defined by OAS.
 func NewClient(serverURL string, sec SecuritySource, opts ...ClientOption) (*Client, error) {
@@ -213,7 +209,8 @@ func (c *Client) sendGetMyCatalogs(ctx context.Context) (res GetMyCatalogsRes, e
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyCatalogsResponse(resp)
@@ -356,7 +353,8 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyPackageResponse(resp)
@@ -502,7 +500,8 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeInstallServiceResponse(resp)
@@ -664,7 +663,8 @@ func (c *Client) sendSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ct
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeSchemasCatalogIdPackageNamePackageNameVersionsVersionGetResponse(resp)
@@ -806,7 +806,8 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeWatchReleaseResponse(resp)
@@ -950,7 +951,8 @@ func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesPa
 	if err != nil {
 		return res, errors.Wrap(err, "do request")
 	}
-	defer resp.Body.Close()
+	body := resp.Body
+	defer body.Close()
 
 	stage = "DecodeResponse"
 	result, err := decodeWatchResourcesResponse(resp)
