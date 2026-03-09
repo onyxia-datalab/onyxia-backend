@@ -86,7 +86,8 @@ func TestSecurityAdapter_HandleOidc_DelegatesToAuthHandler(t *testing.T) {
 	t.Parallel()
 
 	base := context.Background()
-	wantCtx := context.WithValue(base, "k", "v")
+	type ctxKey struct{}
+	wantCtx := context.WithValue(base, ctxKey{}, "v")
 
 	stub := &stubAuth{returnCtx: wantCtx}
 	sec := newSecurityAdapter(stub)
