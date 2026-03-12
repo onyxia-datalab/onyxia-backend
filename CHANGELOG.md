@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.18...v0.1.19) (2026-03-12)
+
+
+### Features
+
+* implement DPoP authentication and update header handling ([#40](https://github.com/onyxia-datalab/onyxia-backend/issues/40)) ([348b299](https://github.com/onyxia-datalab/onyxia-backend/commit/348b299ec84d873266627ba0ca57d8432470fc8b))
+
 ## [0.1.18](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.17...v0.1.18) (2025-10-28)
 
 
