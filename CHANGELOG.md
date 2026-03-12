@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.20](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.19...v0.1.20) (2026-03-12)
+
+
+### Bug Fixes
+
+* **logging:** enforce structured context-aware slog usage ([ad2361b](https://github.com/onyxia-datalab/onyxia-backend/commit/ad2361bfe0da8753f9c6359f7d8773517e19ad9d))
+
 ## [0.1.19](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.18...v0.1.19) (2026-03-12)
 
 
