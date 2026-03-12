@@ -38,7 +38,7 @@ type Auth struct {
 	JTICache      *dpop.JTICache
 }
 
-var _ auth.Auth = (*Auth)(nil)
+var _ auth.RequestVerifier = (*Auth)(nil)
 
 func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth, error) {
 	provider, err := oidc.NewProvider(ctx, cfg.IssuerURI)

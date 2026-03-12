@@ -12,7 +12,7 @@ type Handler struct {
 	Writer usercontext.Writer
 }
 
-var _ auth.Auth = (*Handler)(nil)
+var _ auth.RequestVerifier = (*Handler)(nil)
 
 func (h *Handler) VerifyRequest(ctx context.Context, _ string, _ *http.Request) (context.Context, error) {
 	return h.withAnonymous(ctx), nil

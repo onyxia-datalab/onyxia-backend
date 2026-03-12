@@ -80,7 +80,7 @@ func (s *stubAuth) VerifyRequest(
 	return ctx, s.returnErr
 }
 
-var _ auth.Auth = (*stubAuth)(nil)
+var _ auth.RequestVerifier = (*stubAuth)(nil)
 
 func TestSecurityAdapter_HandleOidc_DelegatesToAuthHandler(t *testing.T) {
 	t.Parallel()

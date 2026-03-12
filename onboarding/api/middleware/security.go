@@ -11,9 +11,9 @@ import (
 	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 )
 
-type securityAdapter struct{ h auth.Auth }
+type securityAdapter struct{ h auth.RequestVerifier }
 
-func newSecurityAdapter(h auth.Auth) *securityAdapter { return &securityAdapter{h: h} }
+func newSecurityAdapter(h auth.RequestVerifier) *securityAdapter { return &securityAdapter{h: h} }
 
 var _ oas.SecurityHandler = (*securityAdapter)(nil)
 
