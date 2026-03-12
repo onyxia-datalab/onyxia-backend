@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -21,7 +22,8 @@ func TestBuildSecurityHandlerNoAuthMode(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sec)
 
-	ctx, err := sec.HandleOidc(context.Background(), "test-operation", oas.Oidc{Token: "ignored"})
+	req := httptest.NewRequest("GET", "http://example.com/api", nil)
+	ctx, err := sec.HandleOidc(context.Background(), "test-operation", oas.Oidc{Request: req})
 	assert.NoError(t, err)
 
 	user, ok := reader.GetUser(ctx)

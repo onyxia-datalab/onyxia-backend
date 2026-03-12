@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"slices"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/onyxia-datalab/onyxia-backend/internal/auth"
+	"github.com/onyxia-datalab/onyxia-backend/internal/auth/oidc/dpop"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 )
 
@@ -31,13 +35,10 @@ type Auth struct {
 	Verifier      TokenVerifier
 	Audience      string
 	Writer        usercontext.Writer
+	JTICache      *dpop.JTICache
 }
 
-var _ Handler = (*Auth)(nil)
-
-type Handler interface {
-	Authenticate(ctx context.Context, operation string, token string) (context.Context, error)
-}
+var _ auth.RequestVerifier = (*Auth)(nil)
 
 func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth, error) {
 	provider, err := oidc.NewProvider(ctx, cfg.IssuerURI)
@@ -68,14 +69,58 @@ func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth,
 		Verifier:      verifier,
 		Audience:      cfg.Audience,
 		Writer:        writer,
+		JTICache:      dpop.NewJTICache(),
 	}, nil
 }
 
-func (a *Auth) Authenticate(
+func (a *Auth) VerifyRequest(
+	ctx context.Context,
+	operation string,
+	r *http.Request,
+) (context.Context, error) {
+	tokenStr, isDPoP := dpop.FindAuthorization(r.Header, "DPoP")
+	if !isDPoP {
+		var ok bool
+		tokenStr, ok = dpop.FindAuthorization(r.Header, "Bearer")
+		if !ok {
+			return ctx, fmt.Errorf("missing authorization header")
+		}
+	}
+
+	info, err := a.verifyToken(ctx, operation, tokenStr)
+	if err != nil {
+		return ctx, err
+	}
+
+	if info.cnfJKT != "" {
+		if !isDPoP {
+			return ctx, fmt.Errorf("token requires DPoP binding")
+		}
+		proof := r.Header.Get("DPoP")
+		if proof == "" {
+			return ctx, fmt.Errorf("missing dpop proof")
+		}
+		if err := a.verifyProof(proof, r.Method, dpop.AbsoluteRequestURL(r), tokenStr, info.cnfJKT); err != nil {
+			return ctx, err
+		}
+	}
+
+	return a.applyUserContext(ctx, info), nil
+}
+
+type tokenInfo struct {
+	username string
+	groups   []string
+	roles    []string
+	attrs    map[string]any
+	cnfJKT   string
+}
+
+func (a *Auth) verifyToken(
 	ctx context.Context,
 	operation string,
 	tokenStr string,
-) (context.Context, error) {
+) (*tokenInfo, error) {
 	slog.Info("Verifying OIDC Token", slog.String("operation", operation))
 
 	token, err := a.Verifier.Verify(ctx, tokenStr)
@@ -85,22 +130,22 @@ func (a *Auth) Authenticate(
 			slog.String("operation", operation),
 			slog.Any("error", err),
 		)
-		return ctx, err
+		return nil, err
 	}
 
 	var claims map[string]any
 	if err := token.Claims(&claims); err != nil {
 		slog.Error("Failed to extract claims from token", slog.Any("error", err))
-		return ctx, err
+		return nil, err
 	}
 
 	if err := a.validateAudience(claims); err != nil {
-		return ctx, err
+		return nil, err
 	}
 
 	username, err := a.extractClaim(claims, a.UsernameClaim)
 	if err != nil {
-		return ctx, err
+		return nil, err
 	}
 
 	groups := a.extractStringArray(claims, a.GroupsClaim)
@@ -120,13 +165,46 @@ func (a *Auth) Authenticate(
 		}
 	}
 
-	ctx = a.Writer.WithUser(ctx, &usercontext.User{
-		Username:   username,
-		Groups:     groups,
-		Roles:      roles,
-		Attributes: filtered,
+	jkt, _ := extractCnfJKT(claims)
+	return &tokenInfo{
+		username: username,
+		groups:   groups,
+		roles:    roles,
+		attrs:    filtered,
+		cnfJKT:   jkt,
+	}, nil
+}
+
+func (a *Auth) applyUserContext(ctx context.Context, info *tokenInfo) context.Context {
+	if info.cnfJKT != "" {
+		ctx = WithCnfJKT(ctx, info.cnfJKT)
+	}
+	return a.Writer.WithUser(ctx, &usercontext.User{
+		Username:   info.username,
+		Groups:     info.groups,
+		Roles:      info.roles,
+		Attributes: info.attrs,
 	})
-	return ctx, nil
+}
+
+func (a *Auth) verifyProof(
+	proof string,
+	method string,
+	url string,
+	accessToken string,
+	expectedJKT string,
+) error {
+	if expectedJKT == "" {
+		return fmt.Errorf("missing cnf.jkt claim")
+	}
+	jkt, err := dpop.VerifyProof(proof, method, url, accessToken, time.Now(), a.JTICache.Seen)
+	if err != nil {
+		return err
+	}
+	if jkt != expectedJKT {
+		return fmt.Errorf("dpop jkt mismatch")
+	}
+	return nil
 }
 
 func (a *Auth) validateAudience(claims map[string]any) error {
@@ -212,4 +290,16 @@ func (a *Auth) extractStringArray(claims map[string]any, name string) []string {
 		out[i] = s
 	}
 	return out
+}
+
+func extractCnfJKT(claims map[string]any) (string, bool) {
+	cnf, ok := claims["cnf"].(map[string]any)
+	if !ok {
+		return "", false
+	}
+	jkt, ok := cnf["jkt"].(string)
+	if !ok || jkt == "" {
+		return "", false
+	}
+	return jkt, true
 }

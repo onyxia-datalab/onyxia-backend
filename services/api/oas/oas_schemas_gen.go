@@ -4,6 +4,7 @@ package api
 
 import (
 	"io"
+	"net/http"
 	"net/url"
 
 	"github.com/go-faster/errors"
@@ -428,28 +429,28 @@ func (s *LocalizedString1) init() LocalizedString1 {
 }
 
 type Oidc struct {
-	Token  string
-	Scopes []string
+	Request *http.Request
+	Roles   []string
 }
 
-// GetToken returns the value of Token.
-func (s *Oidc) GetToken() string {
-	return s.Token
+// GetRequest returns the value of Request.
+func (s *Oidc) GetRequest() *http.Request {
+	return s.Request
 }
 
-// GetScopes returns the value of Scopes.
-func (s *Oidc) GetScopes() []string {
-	return s.Scopes
+// GetRoles returns the value of Roles.
+func (s *Oidc) GetRoles() []string {
+	return s.Roles
 }
 
-// SetToken sets the value of Token.
-func (s *Oidc) SetToken(val string) {
-	s.Token = val
+// SetRequest sets the value of Request.
+func (s *Oidc) SetRequest(val *http.Request) {
+	s.Request = val
 }
 
-// SetScopes sets the value of Scopes.
-func (s *Oidc) SetScopes(val []string) {
-	s.Scopes = val
+// SetRoles sets the value of Roles.
+func (s *Oidc) SetRoles(val []string) {
+	s.Roles = val
 }
 
 // NewOptBool returns new OptBool with value set to v.
