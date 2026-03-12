@@ -15,7 +15,7 @@ func (s *onboardingUsecase) applyQuotas(
 	req domain.OnboardingRequest,
 ) error {
 	if !s.quotas.Enabled {
-		slog.WarnContext(ctx, "⚠️ Quotas are disabled, skipping quota application",
+		slog.WarnContext(ctx, "Quotas are disabled, skipping quota application",
 			slog.String("namespace", namespace),
 		)
 		return nil
@@ -23,13 +23,12 @@ func (s *onboardingUsecase) applyQuotas(
 
 	quotaToApply := s.getQuota(ctx, req, namespace)
 
-	slog.InfoContext(ctx,
-		"🔹 Applying quota",
+	slog.InfoContext(ctx, "Applying quota",
 		slog.Any("quota", quotaToApply),
 	)
 	result, err := s.namespaceService.ApplyResourceQuotas(ctx, namespace, quotaToApply)
 	if err != nil {
-		slog.ErrorContext(ctx, "❌ Failed to apply quotas",
+		slog.ErrorContext(ctx, "Failed to apply quotas",
 			slog.String("namespace", namespace),
 			slog.Any("error", err),
 		)
@@ -38,19 +37,19 @@ func (s *onboardingUsecase) applyQuotas(
 
 	switch result {
 	case port.QuotaCreated:
-		slog.InfoContext(ctx, "✅ Created new resource quota",
+		slog.InfoContext(ctx, "Resource quota created",
 			slog.String("namespace", namespace),
 		)
 	case port.QuotaUpdated:
-		slog.InfoContext(ctx, "✅ Updated resource quota",
+		slog.InfoContext(ctx, "Resource quota updated",
 			slog.String("namespace", namespace),
 		)
 	case port.QuotaUnchanged:
-		slog.WarnContext(ctx, "⚠️ Resource quota is already up-to-date",
+		slog.InfoContext(ctx, "Resource quota already up-to-date",
 			slog.String("namespace", namespace),
 		)
 	case port.QuotaIgnored:
-		slog.WarnContext(ctx, "⚠️ Quota ignored due to annotation",
+		slog.WarnContext(ctx, "Quota ignored due to annotation",
 			slog.String("namespace", namespace),
 		)
 	}
@@ -63,12 +62,9 @@ func (s *onboardingUsecase) getQuota(
 	req domain.OnboardingRequest,
 	namespace string,
 ) *domain.Quota {
-	// ✅ If a group is set, check if group quotas are enabled
 	if req.Group != nil {
 		return s.getGroupQuota(ctx, req, namespace)
 	}
-
-	// ✅ Otherwise, apply user quota (roles first)
 	return s.getUserQuota(ctx, req, namespace)
 }
 
@@ -78,7 +74,7 @@ func (s *onboardingUsecase) getGroupQuota(
 	namespace string,
 ) *domain.Quota {
 	if s.quotas.GroupEnabled {
-		slog.InfoContext(ctx, "🔹 Applying group quota",
+		slog.InfoContext(ctx, "Applying group quota",
 			slog.String("namespace", namespace),
 			slog.String("group", *req.Group),
 		)
@@ -94,7 +90,7 @@ func (s *onboardingUsecase) getUserQuota(
 ) *domain.Quota {
 	for _, role := range req.UserRoles {
 		if quota, exists := s.quotas.Roles[role]; exists {
-			slog.InfoContext(ctx, "🔹 Applying role-based user quota",
+			slog.InfoContext(ctx, "Applying role-based user quota",
 				slog.String("namespace", namespace),
 				slog.String("role", role),
 			)
@@ -102,16 +98,14 @@ func (s *onboardingUsecase) getUserQuota(
 		}
 	}
 
-	// ✅ Fallback to user quota (if enabled)
 	if s.quotas.UserEnabled {
-		slog.InfoContext(ctx, "🔹 Applying user quota",
+		slog.InfoContext(ctx, "Applying user quota",
 			slog.String("namespace", namespace),
 		)
 		return &s.quotas.User
 	}
 
-	// ✅ Fallback to default quota
-	slog.InfoContext(ctx, "🔹 Applying default quota",
+	slog.InfoContext(ctx, "Applying default quota",
 		slog.String("namespace", namespace),
 	)
 	return &s.quotas.Default

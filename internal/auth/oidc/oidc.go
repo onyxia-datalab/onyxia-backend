@@ -43,7 +43,7 @@ var _ auth.RequestVerifier = (*Auth)(nil)
 func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth, error) {
 	provider, err := oidc.NewProvider(ctx, cfg.IssuerURI)
 	if err != nil {
-		slog.Error(
+		slog.ErrorContext(ctx,
 			"Failed to init OIDC provider",
 			slog.String("issuer", cfg.IssuerURI),
 			slog.Any("error", err),
@@ -55,9 +55,9 @@ func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth,
 		InsecureSkipSignatureCheck: cfg.SkipTLSVerify,
 	})
 	if cfg.Audience == "" {
-		slog.Warn("Skipping audience validation because 'audience' is empty")
+		slog.WarnContext(ctx, "Skipping audience validation because 'audience' is empty")
 	}
-	slog.Info("OIDC Initialized",
+	slog.InfoContext(ctx, "OIDC Initialized",
 		slog.String("issuer", cfg.IssuerURI),
 		slog.String("client_id", cfg.ClientID),
 		slog.String("aud", cfg.Audience),
@@ -83,6 +83,7 @@ func (a *Auth) VerifyRequest(
 		var ok bool
 		tokenStr, ok = dpop.FindAuthorization(r.Header, "Bearer")
 		if !ok {
+			slog.WarnContext(ctx, "Missing authorization header", slog.String("operation", operation))
 			return ctx, fmt.Errorf("missing authorization header")
 		}
 	}
@@ -94,13 +95,23 @@ func (a *Auth) VerifyRequest(
 
 	if info.cnfJKT != "" {
 		if !isDPoP {
+			slog.WarnContext(ctx, "Token has cnf.jkt but request uses Bearer instead of DPoP",
+				slog.String("operation", operation),
+			)
 			return ctx, fmt.Errorf("token requires DPoP binding")
 		}
 		proof := r.Header.Get("DPoP")
 		if proof == "" {
+			slog.WarnContext(ctx, "DPoP token received but DPoP proof header is missing",
+				slog.String("operation", operation),
+			)
 			return ctx, fmt.Errorf("missing dpop proof")
 		}
 		if err := a.verifyProof(proof, r.Method, dpop.AbsoluteRequestURL(r), tokenStr, info.cnfJKT); err != nil {
+			slog.ErrorContext(ctx, "DPoP proof verification failed",
+				slog.String("operation", operation),
+				slog.Any("error", err),
+			)
 			return ctx, err
 		}
 	}
@@ -121,11 +132,11 @@ func (a *Auth) verifyToken(
 	operation string,
 	tokenStr string,
 ) (*tokenInfo, error) {
-	slog.Info("Verifying OIDC Token", slog.String("operation", operation))
+	slog.InfoContext(ctx, "Verifying OIDC Token", slog.String("operation", operation))
 
 	token, err := a.Verifier.Verify(ctx, tokenStr)
 	if err != nil {
-		slog.Error(
+		slog.ErrorContext(ctx,
 			"OIDC Token Verification Failed",
 			slog.String("operation", operation),
 			slog.Any("error", err),
@@ -135,7 +146,7 @@ func (a *Auth) verifyToken(
 
 	var claims map[string]any
 	if err := token.Claims(&claims); err != nil {
-		slog.Error("Failed to extract claims from token", slog.Any("error", err))
+		slog.ErrorContext(ctx, "Failed to extract claims from token", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -151,7 +162,7 @@ func (a *Auth) verifyToken(
 	groups := a.extractStringArray(claims, a.GroupsClaim)
 	roles := a.extractStringArray(claims, a.RolesClaim)
 
-	slog.Info("OIDC Authentication Successful",
+	slog.InfoContext(ctx, "OIDC Authentication Successful",
 		slog.String("user", username),
 		slog.String("operation", operation),
 		slog.Any("groups", groups),
@@ -199,9 +210,18 @@ func (a *Auth) verifyProof(
 	}
 	jkt, err := dpop.VerifyProof(proof, method, url, accessToken, time.Now(), a.JTICache.Seen)
 	if err != nil {
+		slog.Error("DPoP proof cryptographic verification failed",
+			slog.String("method", method),
+			slog.String("url", url),
+			slog.Any("error", err),
+		)
 		return err
 	}
 	if jkt != expectedJKT {
+		slog.Error("DPoP JKT mismatch",
+			slog.String("expected", expectedJKT),
+			slog.String("got", jkt),
+		)
 		return fmt.Errorf("dpop jkt mismatch")
 	}
 	return nil

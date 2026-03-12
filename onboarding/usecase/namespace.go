@@ -17,10 +17,8 @@ func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) er
 		s.namespace.NamespaceLabels,
 	)
 
-	slog.Info("result create Namespace", slog.String("result", string(result)))
-
 	if err != nil {
-		slog.ErrorContext(ctx, "❌ Failed to create namespace",
+		slog.ErrorContext(ctx, "Failed to create namespace",
 			slog.String("namespace", name),
 			slog.Any("error", err),
 		)
@@ -29,11 +27,11 @@ func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) er
 
 	switch result {
 	case port.NamespaceCreated:
-		slog.InfoContext(ctx, "✅ Successfully created namespace",
+		slog.InfoContext(ctx, "Namespace created",
 			slog.String("namespace", name),
 		)
 	case port.NamespaceAlreadyExists:
-		slog.WarnContext(ctx, "⚠️ Namespace already exists",
+		slog.InfoContext(ctx, "Namespace already exists",
 			slog.String("namespace", name),
 		)
 	}

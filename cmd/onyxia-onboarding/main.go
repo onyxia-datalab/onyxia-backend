@@ -27,7 +27,7 @@ func main() {
 	app, err := bootstrap.NewApplication(ctx)
 
 	if err != nil {
-		slog.Error("failed to initialize application",
+		slog.ErrorContext(ctx, "failed to initialize application",
 			slog.Any("error", err),
 		)
 		os.Exit(1)
@@ -68,7 +68,7 @@ func main() {
 
 	apiHandler, err := route.Setup(ctx, app)
 	if err != nil {
-		slog.Error("failed to set up routes", slog.Any("error", err))
+		slog.ErrorContext(ctx, "failed to set up routes", slog.Any("error", err))
 		os.Exit(1)
 	}
 
@@ -76,10 +76,10 @@ func main() {
 
 	address := fmt.Sprintf(":%d", env.Server.Port)
 
-	slog.Info("Server starting...", slog.String("address", address))
+	slog.InfoContext(ctx, "Server starting...", slog.String("address", address))
 
 	if err := http.ListenAndServe(address, r); err != nil {
-		slog.Error("failed to listen and serve",
+		slog.ErrorContext(ctx, "failed to listen and serve",
 			slog.Any("error", err),
 		)
 		os.Exit(1)

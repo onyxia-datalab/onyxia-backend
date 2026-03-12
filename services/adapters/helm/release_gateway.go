@@ -90,33 +90,33 @@ func (i *Helm) StartInstall(
 	//background operation
 	go func() {
 
+		slog.InfoContext(ctx, "helm install started",
+			slog.String("release", releaseName),
+			slog.String("chart", chartRef),
+			slog.String("chartPath", chartPath),
+			slog.String("namespace", i.settings.Namespace()),
+			slog.Bool("disableHooks", act.DisableHooks),
+			slog.Duration("timeout", act.Timeout),
+		)
 		i.global.OnStart(releaseName, chartRef)
 		opts.Callbacks.OnStart(releaseName, chartRef)
-		slog.InfoContext(ctx, "helm install started",
-			"release", releaseName,
-			"chart", chartRef,
-			"chartPath", chartPath,
-			"namespace", i.settings.Namespace(),
-			"disableHooks", act.DisableHooks,
-			"timeout", act.Timeout,
-		)
 		_, runErr := act.RunWithContext(ctx, chart, valMap)
 		if runErr != nil {
+			slog.ErrorContext(ctx, "helm install failed",
+				slog.String("release", releaseName),
+				slog.String("chart", chartRef),
+				slog.Any("error", runErr),
+			)
 			i.global.OnError(releaseName, chartRef, runErr)
 			opts.Callbacks.OnError(releaseName, chartRef, runErr)
-			slog.ErrorContext(ctx, "helm install failed",
-				"release", releaseName,
-				"chart", chartRef,
-				"err", runErr,
-			)
 			return
 		}
+		slog.InfoContext(ctx, "helm install completed",
+			slog.String("release", releaseName),
+			slog.String("chart", chartRef),
+		)
 		i.global.OnSuccess(releaseName, chartRef)
 		opts.Callbacks.OnSuccess(releaseName, chartRef)
-		slog.InfoContext(ctx, "helm install completed",
-			"release", releaseName,
-			"chart", chartRef,
-		)
 	}()
 
 	return nil

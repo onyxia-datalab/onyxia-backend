@@ -50,7 +50,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("kube: API unreachable: %w", err)
 	}
-	slog.Info("kube: API reachable", slog.String("server_version", ver.GitVersion))
+	slog.InfoContext(ctx, "kube: API reachable", slog.String("server_version", ver.GitVersion))
 	return nil
 }
 

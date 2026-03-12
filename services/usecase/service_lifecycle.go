@@ -57,15 +57,25 @@ func (uc *ServiceLifecycle) Start(
 		Callbacks: ports.HelmStartCallbacks{
 			OnStart: func(release, chart string) {
 				slog.InfoContext(ctx, "helm install started",
-					"release", release, "chart", chart, "namespace", req.Namespace)
+					slog.String("release", release),
+					slog.String("chart", chart),
+					slog.String("namespace", req.Namespace),
+				)
 			},
 			OnSuccess: func(release, chart string) {
 				slog.InfoContext(ctx, "helm install succeeded",
-					"release", release, "chart", chart, "namespace", req.Namespace)
+					slog.String("release", release),
+					slog.String("chart", chart),
+					slog.String("namespace", req.Namespace),
+				)
 			},
 			OnError: func(release, chart string, err error) {
 				slog.ErrorContext(ctx, "helm install failed",
-					"release", release, "chart", chart, "namespace", req.Namespace, "err", err)
+					slog.String("release", release),
+					slog.String("chart", chart),
+					slog.String("namespace", req.Namespace),
+					slog.Any("error", err),
+				)
 			},
 		},
 	}

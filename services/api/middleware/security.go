@@ -43,7 +43,7 @@ func BuildSecurityHandler(
 ) (oas.SecurityHandler, error) {
 
 	if authenticationMode == "none" {
-		slog.Warn("🚀 Running in No-Auth Mode")
+		slog.WarnContext(ctx, "Running in no-auth mode")
 		return newSecurityAdapter(&noauth.Handler{Writer: writer}), nil
 	}
 

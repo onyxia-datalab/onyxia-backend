@@ -1,0 +1,9 @@
+version: "2"
+
+linters:
+  enable:
+    - sloglint
+  settings:
+    sloglint:
+      # Enforce slog.*Context when a context.Context is available in scope
+      context: "scope"

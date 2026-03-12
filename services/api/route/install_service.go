@@ -20,21 +20,21 @@ func SetupInstallController(
 	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), ports.HelmStartCallbacks{
 		OnStart: func(release, chart string) {
 			slog.Info("Helm install started",
-				"release", release,
-				"chart", chart,
+				slog.String("release", release),
+				slog.String("chart", chart),
 			)
 		},
 		OnSuccess: func(release, chart string) {
 			slog.Info("Helm install succeeded",
-				"release", release,
-				"chart", chart,
+				slog.String("release", release),
+				slog.String("chart", chart),
 			)
 		},
 		OnError: func(release, chart string, err error) {
 			slog.Error("Helm install failed",
-				"release", release,
-				"chart", chart,
-				"err", err,
+				slog.String("release", release),
+				slog.String("chart", chart),
+				slog.Any("error", err),
 			)
 		},
 	})

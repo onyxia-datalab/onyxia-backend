@@ -35,7 +35,7 @@ func NewApplication(ctx context.Context) (*Application, error) {
 	}
 
 	if err := k8sClient.Ping(ctx); err != nil {
-		slog.ErrorContext(ctx, "failed to reach Kubernetes API", "error", err)
+		slog.ErrorContext(ctx, "failed to reach Kubernetes API", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to reach Kubernetes API: %w", err)
 	}
 
@@ -46,7 +46,7 @@ func NewApplication(ctx context.Context) (*Application, error) {
 		UserContextWriter: userWriter,
 	}
 
-	slog.Info("Application initialized successfully")
+	slog.InfoContext(ctx, "Application initialized successfully")
 
 	return app, nil
 }
