@@ -19,7 +19,7 @@ import (
 
 // ✅ Test: Create Namespace Successfully
 func TestCreateNamespaceSuccess(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	result, err := service.CreateNamespace(context.Background(), "test-namespace", nil, nil)
@@ -35,7 +35,7 @@ func TestCreateNamespaceSuccess(t *testing.T) {
 
 // ✅ Test: Namespace Already Exists (No Annotation Change)
 func TestCreateNamespaceAlreadyExists(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.Namespace{
+	clientset := fake.NewClientset(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 	})
 	service := NewKubernetesNamespaceService(clientset)
@@ -48,7 +48,7 @@ func TestCreateNamespaceAlreadyExists(t *testing.T) {
 
 // ✅ Test: Namespace Already Exists (No Annotations Given)
 func TestCreateNamespaceAlreadyExistsNoAnnotations(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.Namespace{
+	clientset := fake.NewClientset(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 	})
 	service := NewKubernetesNamespaceService(clientset)
@@ -69,7 +69,7 @@ func TestCreateNamespaceUpdateAnnotations(t *testing.T) {
 	existingAnnotations := map[string]string{"old-key": "old-value"}
 	newAnnotations := map[string]string{"new-key": "new-value"}
 
-	clientset := fake.NewSimpleClientset(&v1.Namespace{
+	clientset := fake.NewClientset(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-namespace",
 			Annotations: existingAnnotations,
@@ -111,7 +111,7 @@ func TestCreateNamespaceUpdateAnnotations(t *testing.T) {
 
 // ❌ Test: Simulated API Failure (Create)
 func TestCreateNamespaceFailure(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	clientset.PrependReactor("create", "namespaces",
@@ -128,7 +128,7 @@ func TestCreateNamespaceFailure(t *testing.T) {
 
 // ❌ Test: Simulated API Failure (Patch)
 func TestCreateNamespaceFailurePatch(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.Namespace{
+	clientset := fake.NewClientset(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 	})
 	service := NewKubernetesNamespaceService(clientset)
@@ -151,7 +151,7 @@ func TestCreateNamespaceFailurePatch(t *testing.T) {
 
 // ✅ Test: Apply Resource Quotas Successfully
 func TestApplyResourceQuotasSuccess(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	quota := &domain.Quota{MemoryRequest: "10Gi", CPURequest: "10"}
@@ -164,7 +164,7 @@ func TestApplyResourceQuotasSuccess(t *testing.T) {
 
 // ✅ Test: Quota Already Exists with Unchanged Values
 func TestApplyResourceQuotasUnchangedQuota(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.ResourceQuota{
+	clientset := fake.NewClientset(&v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: QuotaName, Namespace: "test-namespace"},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: map[v1.ResourceName]resource.Quantity{
@@ -184,7 +184,7 @@ func TestApplyResourceQuotasUnchangedQuota(t *testing.T) {
 
 // ✅ Test: Quota is Ignored Due to Annotation
 func TestApplyResourceQuotasIgnoredQuota(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.ResourceQuota{
+	clientset := fake.NewClientset(&v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      QuotaName,
 			Namespace: "test-namespace",
@@ -205,7 +205,7 @@ func TestApplyResourceQuotasIgnoredQuota(t *testing.T) {
 
 // ❌ Test: Failure When Checking for an Existing Quota
 func TestApplyResourceQuotasFailureCheck(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	clientset.PrependReactor(
@@ -227,7 +227,7 @@ func TestApplyResourceQuotasFailureCheck(t *testing.T) {
 
 // ❌ Test: Failure When Creating a Quota
 func TestApplyResourceQuotasFailureCreate(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	clientset.PrependReactor(
@@ -248,7 +248,7 @@ func TestApplyResourceQuotasFailureCreate(t *testing.T) {
 }
 
 func TestApplyResourceQuotasQuotaUpdated(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.ResourceQuota{
+	clientset := fake.NewClientset(&v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: QuotaName, Namespace: "test-namespace"},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: map[v1.ResourceName]resource.Quantity{
@@ -284,7 +284,7 @@ func TestApplyResourceQuotasQuotaUpdated(t *testing.T) {
 }
 
 func TestApplyResourceQuotasUnexpectedGetError(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	clientset.PrependReactor(
@@ -304,7 +304,7 @@ func TestApplyResourceQuotasUnexpectedGetError(t *testing.T) {
 	assert.Contains(t, err.Error(), "unexpected error checking for existing quota")
 }
 func TestApplyResourceQuotasFailureUpdate(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.ResourceQuota{
+	clientset := fake.NewClientset(&v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: QuotaName, Namespace: "test-namespace"},
 		Spec: v1.ResourceQuotaSpec{
 			Hard: map[v1.ResourceName]resource.Quantity{
@@ -335,7 +335,7 @@ func TestApplyResourceQuotasFailureUpdate(t *testing.T) {
 }
 
 func TestApplyResourceQuotasEmptyQuota(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	quota := &domain.Quota{} // 👈 Empty quota should return "QuotaUnchanged"
@@ -347,7 +347,7 @@ func TestApplyResourceQuotasEmptyQuota(t *testing.T) {
 }
 
 func TestApplyResourceQuotasFailureConvertQuota(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	// Simulate a quota that causes conversion failure
@@ -363,7 +363,7 @@ func TestApplyResourceQuotasFailureConvertQuota(t *testing.T) {
 }
 
 func TestApplyResourceQuotasLabelOnCreate(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	service := NewKubernetesNamespaceService(clientset)
 
 	quota := &domain.Quota{MemoryRequest: "10Gi"}
@@ -385,7 +385,7 @@ func TestApplyResourceQuotasLabelOnCreate(t *testing.T) {
 }
 
 func TestApplyResourceQuotasLabelOnUpdate(t *testing.T) {
-	clientset := fake.NewSimpleClientset(&v1.ResourceQuota{
+	clientset := fake.NewClientset(&v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      QuotaName,
 			Namespace: "test-namespace",
