@@ -2,7 +2,6 @@ package env
 
 import (
 	_ "embed"
-
 	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
 )
 
@@ -10,7 +9,7 @@ import (
 var defaultConfig []byte
 
 func New() (Env, error) {
-	cfg, err := configloader.Load[Env](defaultConfig, "env.yaml")
+	cfg, err := configloader.Load[Env](defaultConfig, "env.services.yaml")
 	if err != nil {
 		return Env{}, err
 	}
