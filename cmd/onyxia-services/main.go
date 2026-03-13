@@ -36,14 +36,13 @@ func main() {
 
 	r := chi.NewRouter()
 
-	r.Use(middleware.Heartbeat("/healthz"))
-
 	logger := slog.Default()
 
 	r.Use(
 		httplog.RequestLogger(logger, &httplog.Options{Level: slog.LevelInfo, RecoverPanics: true}),
 	)
 
+	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(middleware.Recoverer)
 	r.Use(httputil.ProxyHeaders)
 

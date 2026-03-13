@@ -37,15 +37,13 @@ func main() {
 
 	r := chi.NewRouter()
 
-	//We set up heartbeat before logging to avoid logging the heartbeat requests
-	r.Use(middleware.Heartbeat("/healthz"))
-
 	logger := slog.Default()
 
 	r.Use(
 		httplog.RequestLogger(logger, &httplog.Options{Level: slog.LevelInfo, RecoverPanics: true}),
 	)
 
+	r.Use(middleware.Heartbeat("/healthz"))
 	r.Use(middleware.Recoverer)
 	r.Use(httputil.ProxyHeaders)
 
