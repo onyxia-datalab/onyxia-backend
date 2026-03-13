@@ -1,7 +1,7 @@
 # Onyxia Backend
 
 <p align="center">
-    <a href="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yml">
+    <a href="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yaml">
       <img src="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yml/badge.svg?branch=main">
     </a>
     <a href="https://join.slack.com/t/3innovation/shared_invite/zt-2skhjkavr-xO~uTRLgoNOCm6ubLpKG7Q">
