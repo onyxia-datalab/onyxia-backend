@@ -1,140 +1,57 @@
 # Onyxia Onboarding
 
-<p align="center">
-    <a href="https://github.com/onyxia-datalab/onyxia-onboarding/actions/workflows/release.yml">
-      <img src="https://github.com/onyxia-datalab/onyxia-onboarding/actions/workflows/release.yml/badge.svg?branch=main">
-    </a>
-    <a href="https://join.slack.com/t/3innovation/shared_invite/zt-2skhjkavr-xO~uTRLgoNOCm6ubLpKG7Q">
-      <img src="https://img.shields.io/badge/slack-550_Members-brightgreen.svg?logo=slack">
-    </a>
-</p>
 
-Onyxia Onboarding is a **Go-based REST API** responsible for managing user onboarding in **Onyxia** by provisioning **Kubernetes namespaces** with associated **quotas, and annotations**.
+REST API responsible for managing user onboarding in Onyxia by provisioning **Kubernetes namespaces** with associated **quotas and annotations**.
 
-This project is a **refactor** of the [Java-based Onyxia API](https://github.com/inseeFrlab/onyxia-api) and is designed to provide a lightweight and efficient onboarding mechanism for **data science and cloud workspaces**. The original Java API will be split into three Go REST API modules: Onboarding, Bootstrap, and Feature API.
-
-## 🌍 Project Website
-
-Visit [onyxia.sh](https://onyxia.sh) to learn more about the Onyxia ecosystem.
-
-## 🚀 Features
+## Features
 
 - **Automated namespace creation**: Ensures users have their own dedicated Kubernetes namespace.
 - **Resource quotas**: Enforces limits on CPU, GPU, memory, and storage usage.
 - **Namespace annotations**: Allows additional metadata if enabled via environment variables.
 - **REST API**: Simple and efficient API for managing onboarding operations.
 
-## 🏗️ Installation & Setup
+## Local development
 
-This module is designed to be used within the Onyxia ecosystem. Detailed installation guides are coming soon. In the meantime, you can explore the local development setup below.
-
-### Local Development
-
-Prerequisites
-
-- [Go](https://golang.org/doc/install)
-- [Docker](https://docs.docker.com/get-docker/) (optional, for containerized deployment)
-- Kubernetes cluster with appropriate RBAC setup
-
-1. **Clone the repository**:
-
-   ```sh
-   git clone https://github.com/onyxia-datalab/onyxia-onboarding.git
-   cd onyxia-onboarding
-   make install
-   ```
-
-2. **Setup environment variables**:
-
-   Developers can create a local environment configuration by copying the default template:
-
-   ```sh
-   cp internal/bootstrap/env.default.yaml env.yaml
-   ```
-
-   Modify `env.yaml` as needed to configure the service. Feel free, env.yaml is git ignored.
-
-3. **Run locally**:
-
-   ```sh
-   make run
-   ```
-
-4. **Run tests**:
-   ```sh
-   make test
-   ```
-
-## 🐳 Docker Deployment
-
-You can build and run the service using **Docker** with the following commands:
+From the repository root:
 
 ```sh
-make docker-build
-make docker-run
+cp onboarding/bootstrap/env.default.yaml env.onboarding.yaml
 ```
 
-This will:
-
-- **Build the Docker image** using the appropriate platform for your system.
-- **Run the container** and expose it on port **8080**.
-
-### 🖀 Multi-Architecture Build
-
-By default, the Docker image is built for **the local system architecture** that is running the command. If you need to support **both AMD64 and ARM64** (e.g., Apple M1/M2 chips), enable multi-architecture builds by setting the `MULTIARCH` flag:
+Modify `env.onboarding.yaml` as needed (git-ignored).
 
 ```sh
-MULTIARCH=1 make docker-build
+make run-onboarding  # start the API
+make test            # run tests
 ```
 
-### 🚀 Pushing to Docker Hub
+## Environment variables
 
-First, set credentials in your environment.
+The configuration is loaded via [Viper](https://github.com/spf13/viper) from:
 
-Make sure there is a repository called: `$(DOCKER_REGISTRY)/$(PROJECTNAME)`.
+1. Embedded `bootstrap/env.default.yaml`
+2. An `env.yaml` file at the repository root (overrides defaults)
+3. Direct environment variables
 
-```sh
-DOCKER_REGISTRY=<Your registry> make docker-push
-```
-
-This will:
-
-- **Build the image**.
-- **Push** it to your Docker registry.
-
-## 🛠️ Environnement Values
-
-The service is configurable via **environment variables**.
-
-### Configuration Structure
-
-The configuration is loaded using **Viper** and can be provided via:
-
-- Embedded `env.default.yaml`
-- An external `env.yaml` file in the root directory (overrides defaults)
-- Direct environment variables
-
-### Available Configuration Options
-
-#### **General**
+### General
 
 | Variable             | Description                      | Default |
 | -------------------- | -------------------------------- | ------- |
 | `authenticationMode` | Authentication mode (none, oidc) | `none`  |
 
-#### **Server**
+### Server
 
 | Variable | Description | Default |
 | -------- | ----------- | ------- |
 | `port`   | Server port | `8080`  |
 
-#### **Security**
+### Security
 
 | Variable             | Description                  | Default |
 | -------------------- | ---------------------------- | ------- |
 | `corsAllowedOrigins` | List of allowed CORS origins | `[]`    |
 
-#### **OIDC Authentication**
+### OIDC Authentication
 
 | Variable        | Description           | Default              |
 | --------------- | --------------------- | -------------------- |
@@ -146,7 +63,7 @@ The configuration is loaded using **Viper** and can be provided via:
 | `groupsClaim`   | Claim for groups      | `groups`             |
 | `rolesClaim`    | Claim for roles       | `roles`              |
 
-#### **Onboarding Configuration**
+### Onboarding
 
 | Variable               | Description                                                                    | Default                      |
 | ---------------------- | ------------------------------------------------------------------------------ | ---------------------------- |
@@ -156,7 +73,7 @@ The configuration is loaded using **Viper** and can be provided via:
 | `annotations`          | See [Annotations](#annotations)                                                |                              |
 | `quotas`               | See [Quotas](#quotas)                                                          |                              |
 
-##### **Annotations**
+#### Annotations
 
 | Variable                     | Description                                                                                     | Default |
 | ---------------------------- | ----------------------------------------------------------------------------------------------- | ------- |
@@ -165,19 +82,19 @@ The configuration is loaded using **Viper** and can be provided via:
 | `dynamic.lastLoginTimestamp` | Track last login timestamp by adding `onyxia_last_login_timestamp: <unix time in milliseconds>` | `false` |
 | `dynamic.userAttributes`     | List of user attributes                                                                         | `[]`    |
 
-##### **Quotas**
+#### Quotas
 
 | Variable       | Description                                                                                                                                                                                      | Default |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
 | `enabled`      | Enable quotas                                                                                                                                                                                    | `false` |
-| `default`      | Default quotas values [See](#quotas-values)                                                                                                                                                      |         |
+| `default`      | Default quotas values — see [Quota values](#quota-values)                                                                                                                                        |         |
 | `userEnabled`  | Enable user-specific quotas                                                                                                                                                                      | `false` |
-| `user`         | User quotas values [See](#quotas-values)                                                                                                                                                         |         |
+| `user`         | User quotas values — see [Quota values](#quota-values)                                                                                                                                           |         |
 | `groupEnabled` | Enable group-specific quotas                                                                                                                                                                     | `false` |
-| `group`        | Group quotas values [See](#quotas-values)                                                                                                                                                        |         |
+| `group`        | Group quotas values — see [Quota values](#quota-values)                                                                                                                                          |         |
 | `roles`        | Map of quotas corresponding to user roles. In case the user has multiple of those roles, only the first one will be applied. If user has no role from this list then user quota will be applied. | `{}`    |
 
-##### **Quotas Values**
+#### Quota values
 
 | Variable                     | Description                       | Default |
 | ---------------------------- | --------------------------------- | ------- |
@@ -192,14 +109,4 @@ The configuration is loaded using **Viper** and can be provided via:
 | `requests.nvidia.com/gpu`    | Default GPU requests              | `0`     |
 | `limits.nvidia.com/gpu`      | Default GPU limits                | `0`     |
 
-This is a subset of the configuration options available. The full configuration structure can be found in `env.default.yaml`.
-
-## 📖 Contributing
-
-We welcome contributions! To get started:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature-name`)
-3. Commit changes (`git commit -m "Add new feature"`)
-4. Push the branch (`git push origin feature-name`)
-5. Open a pull request 🚀
+The full configuration structure can be found in [`bootstrap/env.default.yaml`](bootstrap/env.default.yaml).

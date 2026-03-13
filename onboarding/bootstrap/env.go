@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	_ "embed"
-
 	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
 )
 
@@ -75,5 +74,5 @@ type Env struct {
 }
 
 func NewEnv() (Env, error) {
-	return configloader.Load[Env](defaultConfig, "env.yaml")
+	return configloader.Load[Env](defaultConfig, "env.onboarding.yaml")
 }
