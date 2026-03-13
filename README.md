@@ -2,7 +2,7 @@
 
 <p align="center">
     <a href="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yaml">
-      <img src="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yml/badge.svg?branch=main">
+      <img src="https://github.com/onyxia-datalab/onyxia-backend/actions/workflows/release.yaml/badge.svg">
     </a>
     <a href="https://join.slack.com/t/3innovation/shared_invite/zt-2skhjkavr-xO~uTRLgoNOCm6ubLpKG7Q">
       <img src="https://img.shields.io/badge/slack-550_Members-brightgreen.svg?logo=slack">
