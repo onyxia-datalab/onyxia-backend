@@ -18,7 +18,7 @@ From the repository root:
 cp onboarding/bootstrap/env.default.yaml env.onboarding.yaml
 ```
 
-Modify `env.yaml` as needed (`env.yaml` is git-ignored).
+Modify `env.onboarding.yaml` as needed (git-ignored).
 
 ```sh
 make run-onboarding  # start the API

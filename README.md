@@ -11,6 +11,10 @@
 
 Go-based backend for the [Onyxia](https://onyxia.sh) platform. This monorepo is a progressive refactor of the original [Java Onyxia API](https://github.com/inseeFrlab/onyxia-api), split into focused REST API modules.
 
+## Project Website
+
+Visit [onyxia.sh](https://onyxia.sh) to learn more about the Onyxia ecosystem.
+
 ## APIs
 
 | Module              | Description                                                   | Docs                                         |
