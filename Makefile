@@ -39,10 +39,12 @@ help:
 # --- DEP MANAGEMENT ----------------------------------------------------------
 
 .PHONY: install
-## install: Install dependencies using Go modules
+## install: Install dependencies and set up git hooks
 install:
 	@echo "📦 Installing dependencies..."
 	go mod tidy
+	@echo "🪝 Installing git hooks..."
+	git config core.hooksPath .githooks
 
 .PHONY: verify
 ## verify: Verify module dependencies

@@ -1,0 +1,12 @@
+#!/bin/sh
+make fmt
+if ! git diff --quiet; then
+  echo "❌ go fmt made changes, please review and re-stage"
+  exit 1
+fi
+
+go mod tidy
+if ! git diff --quiet; then
+  echo "❌ go mod tidy made changes, please review and re-stage"
+  exit 1
+fi
