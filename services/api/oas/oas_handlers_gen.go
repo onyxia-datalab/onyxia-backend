@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -27,6 +27,10 @@ type codeRecorder struct {
 func (c *codeRecorder) WriteHeader(status int) {
 	c.status = status
 	c.ResponseWriter.WriteHeader(status)
+}
+
+func (c *codeRecorder) Unwrap() http.ResponseWriter {
+	return c.ResponseWriter
 }
 
 // handleAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRequest handles GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
@@ -42,6 +46,8 @@ func (s *Server) handleAPIServicesSchemasCatalogIdPackageNamePackageNameVersions
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation,
@@ -236,6 +242,8 @@ func (s *Server) handleGetMyCatalogsRequest(args [0]string, argsEscaped bool, w 
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/api/services/catalogs"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), GetMyCatalogsOperation,
@@ -407,6 +415,8 @@ func (s *Server) handleGetMyPackageRequest(args [2]string, argsEscaped bool, w h
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/api/services/catalogs/{catalogId}/packages/{packageName}"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), GetMyPackageOperation,
@@ -597,6 +607,8 @@ func (s *Server) handleInstallServiceRequest(args [1]string, argsEscaped bool, w
 		semconv.HTTPRequestMethodKey.String("PUT"),
 		semconv.HTTPRouteKey.String("/api/services/{releaseId}/install"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), InstallServiceOperation,
@@ -801,6 +813,8 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/api/services/events/{releaseId}/watch-release"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchReleaseOperation,
@@ -992,6 +1006,8 @@ func (s *Server) handleWatchResourcesRequest(args [1]string, argsEscaped bool, w
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/api/services/events/{releaseId}/watch-resources"),
 	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
 	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchResourcesOperation,

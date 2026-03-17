@@ -89,7 +89,7 @@ func (h *HelmPackageRepository) ListPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
-	slog.InfoContext(ctx,"")
+	slog.InfoContext(ctx, "")
 	switch cfg.Type {
 	case env.CatalogTypeHelm:
 		return h.listHelmPackages(ctx, cfg)
