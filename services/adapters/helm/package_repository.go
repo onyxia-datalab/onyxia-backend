@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -69,6 +70,13 @@ func NewPackageRepository(
 		}
 		cr.CachePath = settings.RepositoryCache
 		repos[cfg.ID] = cr
+
+		slog.Info(
+			"Helm repo configured",
+			slog.String("catalog", cfg.ID),
+			slog.String("url", cfg.Location),
+			slog.String("cache", settings.RepositoryCache),
+		)
 	}
 
 	return &HelmPackageRepository{
@@ -81,6 +89,7 @@ func (h *HelmPackageRepository) ListPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
+	slog.InfoContext(ctx,"")
 	switch cfg.Type {
 	case env.CatalogTypeHelm:
 		return h.listHelmPackages(ctx, cfg)
@@ -115,7 +124,17 @@ func (h *HelmPackageRepository) ResolvePackage(
 		return domain.PackageVersion{}, fmt.Errorf("catalog %q not found", catalogID)
 	}
 
+	slog.InfoContext(ctx, "Resolving Helm package version",
+		slog.String("catalog", catalogID),
+		slog.String("package", pkgName),
+		slog.String("version", version),
+	)
+
 	if _, err := cr.DownloadIndexFile(); err != nil {
+		slog.ErrorContext(ctx, "Error downloading Helm index",
+			slog.String("catalog", catalogID),
+			slog.String("error", err.Error()),
+		)
 		return domain.PackageVersion{}, fmt.Errorf("fetching Helm index: %w", err)
 	}
 

@@ -58,5 +58,5 @@ type Restriction struct {
 
 type OCIPackage struct {
 	Name     string   `json:"name"`
-	Versions []string `json:"versions"`
+	Versions []string `json:"versions"` // if empty we refresh with ttl (same as helm index)
 }

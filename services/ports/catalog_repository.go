@@ -10,7 +10,7 @@ import (
 type PackageRepository interface {
 	// Lists all packages for a given catalog.
 	// For Helm: reads index.yaml
-	// For OCI: uses cfg.Packages	ListPackages(ctx context.Context, cfg env.CatalogConfig) ([]domain.PackageRef, error)
+	// For OCI: uses cfg.Packages	ListPackages(ctx context.Context, cfg env.CatalogConfig) ([]domain.Package, error)
 	ListPackages(ctx context.Context, cfg env.CatalogConfig) ([]domain.Package, error)
 
 	// 2. Heavyweight: fetch full details for a specific package
