@@ -14,12 +14,13 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/helmpath"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/chart"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/helmpath"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
@@ -74,7 +75,7 @@ func NewPackageRepository(
 			URL:                   cfg.Location,
 			Username:              tools.Deref(cfg.Username),
 			Password:              tools.Deref(cfg.Password),
-			InsecureSkipTLSverify: cfg.SkipTLSVerify,
+			InsecureSkipTLSVerify: cfg.SkipTLSVerify,
 			CAFile:                tools.Deref(cfg.CAFile),
 		}
 
@@ -354,14 +355,14 @@ func (h *HelmPackageRepository) getOCIPackageSchema(
 	return extractSchema(ch), nil
 }
 
-func extractSchema(ch *chart.Chart) []byte {
+func extractSchema(ch *chartv2.Chart) []byte {
 	if len(ch.Schema) == 0 {
 		return []byte("{}")
 	}
 	return ch.Schema
 }
 
-func (h *HelmPackageRepository) pullChart(chartURL string, opts ...getter.Option) (*chart.Chart, error) {
+func (h *HelmPackageRepository) pullChart(chartURL string, opts ...getter.Option) (*chartv2.Chart, error) {
 	u, err := url.Parse(chartURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid chart URL: %w", err)
@@ -374,8 +375,19 @@ func (h *HelmPackageRepository) pullChart(chartURL string, opts ...getter.Option
 	if err != nil {
 		return nil, fmt.Errorf("downloading chart: %w", err)
 	}
-	return loader.LoadArchive(bytes.NewReader(buf.Bytes()))
+	raw, err := loader.LoadArchive(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		return nil, err
+	}
+	ch, ok := raw.(*chartv2.Chart)
+	if !ok {
+		return nil, fmt.Errorf("unexpected chart type %T", raw)
+	}
+	return ch, nil
 }
+
+// ensure chart package is referenced (used via chart.Charter interface from loader)
+var _ chart.Charter = (*chartv2.Chart)(nil)
 
 func (h *HelmPackageRepository) listOCIPackages(
 	ctx context.Context,

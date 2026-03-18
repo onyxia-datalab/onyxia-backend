@@ -12,9 +12,9 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/repo"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 type localHelmRepo struct {
@@ -24,7 +24,7 @@ type localHelmRepo struct {
 	cfg      env.CatalogConfig
 }
 
-func newLocalHelmRepo(t *testing.T, charts ...*chart.Metadata) *localHelmRepo {
+func newLocalHelmRepo(t *testing.T, charts ...*chartv2.Metadata) *localHelmRepo {
 	t.Helper()
 
 	tmp := t.TempDir()
@@ -76,7 +76,7 @@ func TestListHelmPackages_WithLocalHTTPRepo(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	lr := newLocalHelmRepo(t, &chart.Metadata{
+	lr := newLocalHelmRepo(t, &chartv2.Metadata{
 		Name:        "mychart",
 		Version:     "1.0.0",
 		Description: "Fake chart for testing",
@@ -106,9 +106,9 @@ func TestGetHelmPackage_Found(t *testing.T) {
 	}
 
 	lr := newLocalHelmRepo(t,
-		&chart.Metadata{Name: "mychart", Version: "2.0.0", Description: "v2"},
-		&chart.Metadata{Name: "mychart", Version: "1.0.0", Description: "v1"},
-		&chart.Metadata{Name: "other", Version: "1.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "2.0.0", Description: "v2"},
+		&chartv2.Metadata{Name: "mychart", Version: "1.0.0", Description: "v1"},
+		&chartv2.Metadata{Name: "other", Version: "1.0.0"},
 	)
 	repoAdapter := lr.newAdapter(t)
 
@@ -124,7 +124,7 @@ func TestGetHelmPackage_NotFound(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	lr := newLocalHelmRepo(t, &chart.Metadata{Name: "mychart", Version: "1.0.0"})
+	lr := newLocalHelmRepo(t, &chartv2.Metadata{Name: "mychart", Version: "1.0.0"})
 	repoAdapter := lr.newAdapter(t)
 
 	_, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "unknown")
@@ -138,8 +138,8 @@ func TestGetHelmPackage_VersionFilter_Latest(t *testing.T) {
 	}
 
 	lr := newLocalHelmRepo(t,
-		&chart.Metadata{Name: "mychart", Version: "2.0.0"},
-		&chart.Metadata{Name: "mychart", Version: "1.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "2.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
 	)
 	lr.cfg.MultipleServicesMode = env.MultipleServicesLatest
 	repoAdapter := lr.newAdapter(t)
@@ -156,9 +156,9 @@ func TestGetHelmPackage_VersionFilter_MaxNumber(t *testing.T) {
 
 	n := 2
 	lr := newLocalHelmRepo(t,
-		&chart.Metadata{Name: "mychart", Version: "3.0.0"},
-		&chart.Metadata{Name: "mychart", Version: "2.0.0"},
-		&chart.Metadata{Name: "mychart", Version: "1.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "3.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "2.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
 	)
 	lr.cfg.MultipleServicesMode = env.MultipleServicesMaxNumber
 	lr.cfg.MaxNumberOfVersions = &n
@@ -175,10 +175,10 @@ func TestGetHelmPackage_VersionFilter_SkipPatches(t *testing.T) {
 	}
 
 	lr := newLocalHelmRepo(t,
-		&chart.Metadata{Name: "mychart", Version: "2.1.1"},
-		&chart.Metadata{Name: "mychart", Version: "2.1.0"},
-		&chart.Metadata{Name: "mychart", Version: "1.0.5"},
-		&chart.Metadata{Name: "mychart", Version: "1.0.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "2.1.1"},
+		&chartv2.Metadata{Name: "mychart", Version: "2.1.0"},
+		&chartv2.Metadata{Name: "mychart", Version: "1.0.5"},
+		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
 	)
 	lr.cfg.MultipleServicesMode = env.MultipleServicesSkipPatches
 	repoAdapter := lr.newAdapter(t)
@@ -206,7 +206,7 @@ func TestResolvePackage_HelmRepository(t *testing.T) {
 		t.Skip("skipping integration test")
 	}
 
-	lr := newLocalHelmRepo(t, &chart.Metadata{
+	lr := newLocalHelmRepo(t, &chartv2.Metadata{
 		Name:        "mychart",
 		Version:     "1.0.0",
 		Description: "fake chart",

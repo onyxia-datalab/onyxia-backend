@@ -7,11 +7,11 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/getter"
 	"k8s.io/client-go/rest"
 )
 
@@ -35,7 +35,6 @@ func NewReleaseGtw(
 		&StaticRESTClientGetter{config: k8sConfig},
 		settings.Namespace(),
 		"secret",
-		slog.Debug,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init Helm config: %w", err)
