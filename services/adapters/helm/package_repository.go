@@ -143,26 +143,15 @@ func (h *HelmPackageRepository) ResolvePackage(
 		return resolveOCIPackage(cfg, pkgName, version)
 	}
 
-	cr := h.repos[catalogID]
-
 	slog.InfoContext(ctx, "Resolving Helm package version",
 		slog.String("catalog", catalogID),
 		slog.String("package", pkgName),
 		slog.String("version", version),
 	)
 
-	if _, err := cr.DownloadIndexFile(); err != nil {
-		slog.ErrorContext(ctx, "Error downloading Helm index",
-			slog.String("catalog", catalogID),
-			slog.String("error", err.Error()),
-		)
-		return domain.PackageVersion{}, fmt.Errorf("fetching Helm index: %w", err)
-	}
-
-	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(catalogID))
-	idx, err := repo.LoadIndexFile(indexPath)
+	cr, idx, err := h.loadHelmIndex(catalogID)
 	if err != nil {
-		return domain.PackageVersion{}, fmt.Errorf("parsing Helm index: %w", err)
+		return domain.PackageVersion{}, err
 	}
 
 	versions, ok := idx.Entries[pkgName]
@@ -193,24 +182,30 @@ func (h *HelmPackageRepository) ResolvePackage(
 	)
 }
 
+func (h *HelmPackageRepository) loadHelmIndex(catalogID string) (*repo.ChartRepository, *repo.IndexFile, error) {
+	cr, ok := h.repos[catalogID]
+	if !ok {
+		return nil, nil, fmt.Errorf("unknown Helm catalog: %s", catalogID)
+	}
+	if _, err := cr.DownloadIndexFile(); err != nil {
+		return nil, nil, fmt.Errorf("fetching Helm index: %w", err)
+	}
+	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(catalogID))
+	idx, err := repo.LoadIndexFile(indexPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing Helm index: %w", err)
+	}
+	return cr, idx, nil
+}
+
 func (h *HelmPackageRepository) listHelmPackages(
 	ctx context.Context,
 	cfg env.CatalogConfig,
 ) ([]domain.Package, error) {
 
-	cr, ok := h.repos[cfg.ID]
-	if !ok {
-		return nil, fmt.Errorf("unknown Helm catalog: %s", cfg.ID)
-	}
-
-	if _, err := cr.DownloadIndexFile(); err != nil {
-		return nil, fmt.Errorf("fetching Helm index: %w", err)
-	}
-
-	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(cfg.ID))
-	idx, err := repo.LoadIndexFile(indexPath)
+	_, idx, err := h.loadHelmIndex(cfg.ID)
 	if err != nil {
-		return nil, fmt.Errorf("parsing Helm index: %w", err)
+		return nil, err
 	}
 
 	pkgs := make([]domain.Package, 0, len(idx.Entries))
@@ -242,19 +237,9 @@ func (h *HelmPackageRepository) getHelmPackage(
 	name string,
 ) (*domain.PackageRef, error) {
 
-	cr, ok := h.repos[cfg.ID]
-	if !ok {
-		return nil, fmt.Errorf("unknown Helm catalog: %s", cfg.ID)
-	}
-
-	if _, err := cr.DownloadIndexFile(); err != nil {
-		return nil, fmt.Errorf("fetching Helm index: %w", err)
-	}
-
-	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(cfg.ID))
-	idx, err := repo.LoadIndexFile(indexPath)
+	_, idx, err := h.loadHelmIndex(cfg.ID)
 	if err != nil {
-		return nil, fmt.Errorf("parsing Helm index: %w", err)
+		return nil, err
 	}
 
 	versions, ok := idx.Entries[name]
@@ -297,19 +282,9 @@ func (h *HelmPackageRepository) getHelmPackageSchema(
 	packageName string,
 	version string,
 ) ([]byte, error) {
-	cr, ok := h.repos[cfg.ID]
-	if !ok {
-		return nil, fmt.Errorf("unknown Helm catalog: %s", cfg.ID)
-	}
-
-	if _, err := cr.DownloadIndexFile(); err != nil {
-		return nil, fmt.Errorf("fetching Helm index: %w", err)
-	}
-
-	indexPath := filepath.Join(cr.CachePath, helmpath.CacheIndexFile(cfg.ID))
-	idx, err := repo.LoadIndexFile(indexPath)
+	cr, idx, err := h.loadHelmIndex(cfg.ID)
 	if err != nil {
-		return nil, fmt.Errorf("parsing Helm index: %w", err)
+		return nil, err
 	}
 
 	entries, ok := idx.Entries[packageName]
