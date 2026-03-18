@@ -26,6 +26,7 @@ var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
 
 type HelmPackageRepository struct {
 	repos          map[string]*repo.ChartRepository
+	catalogs       map[string]env.CatalogConfig
 	getters        getter.Providers
 	versionFilters map[string]versionFilter
 }
@@ -51,10 +52,13 @@ func NewPackageRepository(
 	}
 
 	repos := make(map[string]*repo.ChartRepository)
+	catalogs := make(map[string]env.CatalogConfig)
 	filters := make(map[string]versionFilter)
 	getters := getter.All(settings)
 
 	for _, cfg := range cfgs {
+		catalogs[cfg.ID] = cfg
+
 		if cfg.Type != env.CatalogTypeHelm {
 			continue
 		}
@@ -91,6 +95,7 @@ func NewPackageRepository(
 
 	return &HelmPackageRepository{
 		repos:          repos,
+		catalogs:       catalogs,
 		getters:        getters,
 		versionFilters: filters,
 	}, nil
@@ -130,10 +135,15 @@ func (h *HelmPackageRepository) ResolvePackage(
 	ctx context.Context,
 	catalogID, pkgName, version string,
 ) (domain.PackageVersion, error) {
-	cr, ok := h.repos[catalogID]
+	cfg, ok := h.catalogs[catalogID]
 	if !ok {
 		return domain.PackageVersion{}, fmt.Errorf("catalog %q not found", catalogID)
 	}
+	if cfg.Type == env.CatalogTypeOCI {
+		return resolveOCIPackage(cfg, pkgName, version)
+	}
+
+	cr := h.repos[catalogID]
 
 	slog.InfoContext(ctx, "Resolving Helm package version",
 		slog.String("catalog", catalogID),
@@ -456,6 +466,34 @@ func (h *HelmPackageRepository) getOCIPackage(
 	}
 
 	return &result, nil
+}
+
+func resolveOCIPackage(cfg env.CatalogConfig, pkgName, version string) (domain.PackageVersion, error) {
+	for _, p := range cfg.Packages {
+		if p.Name != pkgName {
+			continue
+		}
+		for _, v := range p.Versions {
+			if v == version {
+				return domain.PackageVersion{
+					Package: domain.Package{
+						Name:      pkgName,
+						CatalogID: cfg.ID,
+					},
+					Version: version,
+					RepoURL: cfg.Location,
+				}, nil
+			}
+		}
+		return domain.PackageVersion{}, fmt.Errorf(
+			"%w: version %q not found for package %q in OCI catalog %q",
+			domain.ErrNotFound, version, pkgName, cfg.ID,
+		)
+	}
+	return domain.PackageVersion{}, fmt.Errorf(
+		"%w: package %q not found in OCI catalog %q",
+		domain.ErrNotFound, pkgName, cfg.ID,
+	)
 }
 
 func extractVersions(list []*repo.ChartVersion) []string {

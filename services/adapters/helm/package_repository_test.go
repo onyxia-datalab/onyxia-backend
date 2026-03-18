@@ -233,3 +233,35 @@ func TestResolvePackage_HelmRepository(t *testing.T) {
 		require.Contains(t, err.Error(), `version "9.9.9" not found`)
 	})
 }
+
+func TestResolvePackage_OCICatalog(t *testing.T) {
+	ociCfg := env.CatalogConfig{
+		ID:       "oci-catalog",
+		Type:     env.CatalogTypeOCI,
+		Location: "oci://registry.example.com/charts",
+		Packages: []env.OCIPackage{
+			{Name: "my-app", Versions: []string{"2.0.0", "1.5.0", "1.0.0"}},
+		},
+	}
+	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{ociCfg})
+	require.NoError(t, err)
+
+	t.Run("existing package and version", func(t *testing.T) {
+		pkg, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "my-app", "1.5.0")
+		require.NoError(t, err)
+		assert.Equal(t, "my-app", pkg.Name)
+		assert.Equal(t, "1.5.0", pkg.Version)
+		assert.Equal(t, "oci://registry.example.com/charts", pkg.RepoURL)
+		assert.Equal(t, "oci-catalog", pkg.CatalogID)
+	})
+
+	t.Run("package not found", func(t *testing.T) {
+		_, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "unknown", "1.0.0")
+		require.ErrorIs(t, err, domain.ErrNotFound)
+	})
+
+	t.Run("version not found", func(t *testing.T) {
+		_, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "my-app", "9.9.9")
+		require.ErrorIs(t, err, domain.ErrNotFound)
+	})
+}
