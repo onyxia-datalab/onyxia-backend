@@ -13,16 +13,6 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
-// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-//
-// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-// and roles.
-//
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
-func (UnimplementedHandler) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (r APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // GetMyCatalogs implements getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -39,6 +29,16 @@ func (UnimplementedHandler) GetMyCatalogs(ctx context.Context) (r GetMyCatalogsR
 //
 // GET /api/services/catalogs/{catalogId}/packages/{packageName}
 func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackageParams) (r GetMyPackageRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetPackageSchema implements getPackageSchema operation.
+//
+// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+// and roles.
+//
+// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (r GetPackageSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

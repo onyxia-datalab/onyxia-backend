@@ -28,13 +28,6 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
-	// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-	//
-	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-	// and roles.
-	//
-	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
-	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error)
 	// GetMyCatalogs invokes getMyCatalogs operation.
 	//
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -48,6 +41,13 @@ type Invoker interface {
 	//
 	// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 	GetMyPackage(ctx context.Context, params GetMyPackageParams) (GetMyPackageRes, error)
+	// GetPackageSchema invokes getPackageSchema operation.
+	//
+	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+	// and roles.
+	//
+	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService invokes installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
@@ -110,169 +110,6 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
-}
-
-// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet invokes GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-//
-// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-// and roles.
-//
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
-func (c *Client) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
-	res, err := c.sendAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (res APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [6]string
-	pathParts[0] = "/api/services/schemas/"
-	{
-		// Encode "catalogId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "catalogId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.CatalogId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/packageName/"
-	{
-		// Encode "packageName" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "packageName",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.PackageName))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[3] = encoded
-	}
-	pathParts[4] = "/versions/"
-	{
-		// Encode "version" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "version",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.Version))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[5] = encoded
-	}
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"Oidc\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
 }
 
 // GetMyCatalogs invokes getMyCatalogs operation.
@@ -521,6 +358,170 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyPackageResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetPackageSchema invokes getPackageSchema operation.
+//
+// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+// and roles.
+//
+// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+func (c *Client) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error) {
+	res, err := c.sendGetPackageSchema(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (res GetPackageSchemaRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getPackageSchema"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetPackageSchemaOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [6]string
+	pathParts[0] = "/api/services/schemas/"
+	{
+		// Encode "catalogId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "catalogId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.CatalogId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/packageName/"
+	{
+		// Encode "packageName" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "packageName",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.PackageName))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[3] = encoded
+	}
+	pathParts[4] = "/versions/"
+	{
+		// Encode "version" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "version",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Version))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[5] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, GetPackageSchemaOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetPackageSchemaResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

@@ -92,6 +92,40 @@ func (uc *Catalog) ListUserCatalog(
 	})
 }
 
+func (uc *Catalog) GetPackageSchema(ctx context.Context, catalogID string, packageName string, version string) ([]byte, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return nil, err
+	}
+	return uc.pkgRepo.GetPackageSchema(ctx, *cfg, packageName, version)
+}
+
+func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
+	for i := range uc.envCatalogConfig {
+		if uc.envCatalogConfig[i].ID == catalogID {
+			return &uc.envCatalogConfig[i], nil
+		}
+	}
+	return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
+}
+
+func (uc *Catalog) GetPackage(ctx context.Context, catalogID string, packageName string) (*domain.PackageRef, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg, err := uc.pkgRepo.GetPackage(ctx, *cfg, packageName)
+	if err != nil {
+		return nil, fmt.Errorf("catalog %q package %q: %w", catalogID, packageName, err)
+	}
+	if pkg == nil {
+		return nil, fmt.Errorf("package %q in catalog %q: %w", packageName, catalogID, domain.ErrNotFound)
+	}
+
+	return pkg, nil
+}
+
 func (uc *Catalog) buildCatalogs(
 	ctx context.Context,
 	include func(env.CatalogConfig) bool,

@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	rn8AllowedHeaders = map[string]string{
+	rn1AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn12AllowedHeaders = map[string]string{
+	rn5AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn17AllowedHeaders = map[string]string{
@@ -23,7 +23,7 @@ var (
 	rn19AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
 	}
-	rn6AllowedHeaders = map[string]string{
+	rn12AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn14AllowedHeaders = map[string]string{
@@ -97,7 +97,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "GET",
-							allowedHeaders: rn8AllowedHeaders,
+							allowedHeaders: rn1AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -155,7 +155,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn12AllowedHeaders,
+									allowedHeaders: rn5AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -324,7 +324,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							// Leaf node.
 							switch r.Method {
 							case "GET":
-								s.handleAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRequest([3]string{
+								s.handleGetPackageSchemaRequest([3]string{
 									args[0],
 									args[1],
 									args[2],
@@ -332,7 +332,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn6AllowedHeaders,
+									allowedHeaders: rn12AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -722,9 +722,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							// Leaf node.
 							switch method {
 							case "GET":
-								r.name = APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation
+								r.name = GetPackageSchemaOperation
 								r.summary = "Get the values.schema.json of a versioned package"
-								r.operationID = ""
+								r.operationID = "getPackageSchema"
 								r.operationGroup = ""
 								r.pathPattern = "/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
 								r.args = args

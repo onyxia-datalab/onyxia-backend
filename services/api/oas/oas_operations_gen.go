@@ -6,10 +6,10 @@ package api
 type OperationName = string
 
 const (
-	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation OperationName = "APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet"
-	GetMyCatalogsOperation                                                       OperationName = "GetMyCatalogs"
-	GetMyPackageOperation                                                        OperationName = "GetMyPackage"
-	InstallServiceOperation                                                      OperationName = "InstallService"
-	WatchReleaseOperation                                                        OperationName = "WatchRelease"
-	WatchResourcesOperation                                                      OperationName = "WatchResources"
+	GetMyCatalogsOperation    OperationName = "GetMyCatalogs"
+	GetMyPackageOperation     OperationName = "GetMyPackage"
+	GetPackageSchemaOperation OperationName = "GetPackageSchema"
+	InstallServiceOperation   OperationName = "InstallService"
+	WatchReleaseOperation     OperationName = "WatchRelease"
+	WatchResourcesOperation   OperationName = "WatchResources"
 )

@@ -20,6 +20,13 @@ type PackageRepository interface {
 		name string,
 	) (*domain.PackageRef, error)
 
+	GetPackageSchema(
+		ctx context.Context,
+		cfg env.CatalogConfig,
+		packageName string,
+		version string,
+	) ([]byte, error)
+
 	ResolvePackage(
 		ctx context.Context,
 		catalogID string,

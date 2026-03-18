@@ -53,11 +53,11 @@ func (h *Handler) GetMyPackage(
 	ctx context.Context,
 	p api.GetMyPackageParams,
 ) (api.GetMyPackageRes, error) {
-	return nil, ht.ErrNotImplemented
+	return h.catalogs.GetMyPackage(ctx, p.CatalogId, p.PackageName)
 }
-func (h *Handler) APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(
+func (h *Handler) GetPackageSchema(
 	ctx context.Context,
-	p api.APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams,
-) (api.APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error) {
-	return nil, ht.ErrNotImplemented
+	p api.GetPackageSchemaParams,
+) (api.GetPackageSchemaRes, error) {
+	return h.catalogs.GetPackageSchema(ctx, p.CatalogId, p.PackageName, p.Version)
 }

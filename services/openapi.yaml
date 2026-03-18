@@ -54,6 +54,7 @@ paths:
     get:
       security:
         - oidc: []
+      operationId: getPackageSchema
       summary: Get the values.schema.json of a versioned package
       description: >
         Returns the values.schema.json of a versioned package. The schema is
@@ -335,13 +336,8 @@ components:
               type: array
               description: List of versions available for the package
               items:
-                type: object
-                required: [version]
-                properties:
-                  version:
-                    type: string
-                    format: semver
-                    description: Version string of the Helm chart
+                type: string
+                format: semver
 
     ServiceInstallRequest:
       type: object

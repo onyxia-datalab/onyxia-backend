@@ -11,30 +11,6 @@ import (
 	"github.com/go-faster/jx"
 )
 
-type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest Problem
-
-func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
-}
-
-type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError Problem
-
-func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
-}
-
-type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK map[string]jx.Raw
-
-func (s *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) init() APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-func (*APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK) aPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes() {
-}
-
 // Ref: #/components/schemas/Catalog
 type Catalog struct {
 	// Catalog id.
@@ -205,7 +181,7 @@ type DetailedPackage struct {
 	// URL to the home page.
 	Home OptURI `json:"home"`
 	// List of versions available for the package.
-	Versions []DetailedPackageVersionsItem `json:"versions"`
+	Versions []string `json:"versions"`
 }
 
 // GetName returns the value of Name.
@@ -229,7 +205,7 @@ func (s *DetailedPackage) GetHome() OptURI {
 }
 
 // GetVersions returns the value of Versions.
-func (s *DetailedPackage) GetVersions() []DetailedPackageVersionsItem {
+func (s *DetailedPackage) GetVersions() []string {
 	return s.Versions
 }
 
@@ -254,26 +230,11 @@ func (s *DetailedPackage) SetHome(val OptURI) {
 }
 
 // SetVersions sets the value of Versions.
-func (s *DetailedPackage) SetVersions(val []DetailedPackageVersionsItem) {
+func (s *DetailedPackage) SetVersions(val []string) {
 	s.Versions = val
 }
 
 func (*DetailedPackage) getMyPackageRes() {}
-
-type DetailedPackageVersionsItem struct {
-	// Version string of the Helm chart.
-	Version string `json:"version"`
-}
-
-// GetVersion returns the value of Version.
-func (s *DetailedPackageVersionsItem) GetVersion() string {
-	return s.Version
-}
-
-// SetVersion sets the value of Version.
-func (s *DetailedPackageVersionsItem) SetVersion(val string) {
-	s.Version = val
-}
 
 type GetMyCatalogsOKApplicationJSON []Catalog
 
@@ -286,6 +247,27 @@ func (*GetMyPackageInternalServerError) getMyPackageRes() {}
 type GetMyPackageNotFound Problem
 
 func (*GetMyPackageNotFound) getMyPackageRes() {}
+
+type GetPackageSchemaBadRequest Problem
+
+func (*GetPackageSchemaBadRequest) getPackageSchemaRes() {}
+
+type GetPackageSchemaInternalServerError Problem
+
+func (*GetPackageSchemaInternalServerError) getPackageSchemaRes() {}
+
+type GetPackageSchemaOK map[string]jx.Raw
+
+func (s *GetPackageSchemaOK) init() GetPackageSchemaOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*GetPackageSchemaOK) getPackageSchemaRes() {}
 
 // Ref: #/components/schemas/InstallAccepted
 type InstallAccepted struct {

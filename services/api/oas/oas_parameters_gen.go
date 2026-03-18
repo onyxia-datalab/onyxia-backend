@@ -14,8 +14,128 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams is parameters of GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams struct {
+// GetMyPackageParams is parameters of getMyPackage operation.
+type GetMyPackageParams struct {
+	// Catalog identifier.
+	CatalogId string
+	// Package name.
+	PackageName string
+}
+
+func unpackGetMyPackageParams(packed middleware.Parameters) (params GetMyPackageParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "catalogId",
+			In:   "path",
+		}
+		params.CatalogId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "packageName",
+			In:   "path",
+		}
+		params.PackageName = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetMyPackageParams(args [2]string, argsEscaped bool, r *http.Request) (params GetMyPackageParams, _ error) {
+	// Decode path: catalogId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "catalogId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.CatalogId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "catalogId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode path: packageName.
+	if err := func() error {
+		param := args[1]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[1])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "packageName",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.PackageName = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "packageName",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// GetPackageSchemaParams is parameters of getPackageSchema operation.
+type GetPackageSchemaParams struct {
 	// Catalog identifier.
 	CatalogId string
 	// Package name.
@@ -24,7 +144,7 @@ type APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams s
 	Version string
 }
 
-func unpackAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(packed middleware.Parameters) (params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) {
+func unpackGetPackageSchemaParams(packed middleware.Parameters) (params GetPackageSchemaParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "catalogId",
@@ -49,7 +169,7 @@ func unpackAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetPa
 	return params
 }
 
-func decodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(args [3]string, argsEscaped bool, r *http.Request) (params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams, _ error) {
+func decodeGetPackageSchemaParams(args [3]string, argsEscaped bool, r *http.Request) (params GetPackageSchemaParams, _ error) {
 	// Decode path: catalogId.
 	if err := func() error {
 		param := args[0]
@@ -181,126 +301,6 @@ func decodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetPa
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "version",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// GetMyPackageParams is parameters of getMyPackage operation.
-type GetMyPackageParams struct {
-	// Catalog identifier.
-	CatalogId string
-	// Package name.
-	PackageName string
-}
-
-func unpackGetMyPackageParams(packed middleware.Parameters) (params GetMyPackageParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "catalogId",
-			In:   "path",
-		}
-		params.CatalogId = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "packageName",
-			In:   "path",
-		}
-		params.PackageName = packed[key].(string)
-	}
-	return params
-}
-
-func decodeGetMyPackageParams(args [2]string, argsEscaped bool, r *http.Request) (params GetMyPackageParams, _ error) {
-	// Decode path: catalogId.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "catalogId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.CatalogId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "catalogId",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode path: packageName.
-	if err := func() error {
-		param := args[1]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[1])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "packageName",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.PackageName = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "packageName",
 			In:   "path",
 			Err:  err,
 		}

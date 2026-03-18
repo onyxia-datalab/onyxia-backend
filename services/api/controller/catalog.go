@@ -2,8 +2,12 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 
+	"github.com/go-faster/jx"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -106,4 +110,62 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 	}
 
 	return &response, nil
+}
+
+func (cc *CatalogController) GetMyPackage(ctx context.Context, catalogID string, packageName string) (api.GetMyPackageRes, error) {
+	slog.InfoContext(ctx, "GetMyPackage", slog.String("catalog_id", catalogID), slog.String("package_name", packageName))
+
+	pkg, err := cc.catalogs.GetPackage(ctx, catalogID, packageName)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			problem := &api.GetMyPackageNotFound{}
+			problem.Title.SetTo("Not found")
+			problem.Status.SetTo(404)
+			problem.Detail.SetTo(err.Error())
+			return problem, nil
+		}
+		slog.ErrorContext(ctx, "Failed to get package", slog.String("error", err.Error()))
+		problem := &api.GetMyPackageInternalServerError{}
+		problem.Title.SetTo("Unable to get package")
+		problem.Status.SetTo(500)
+		problem.Detail.SetTo(err.Error())
+		return problem, err
+	}
+
+	return &api.DetailedPackage{
+		Name:        pkg.Name,
+		Description: api.NewOptString(pkg.Description),
+		Icon:        pkg.IconUrl,
+		Home:        api.NewOptURI(pkg.HomeUrl),
+		Versions:    pkg.Versions,
+	}, nil
+}
+
+func (cc *CatalogController) GetPackageSchema(ctx context.Context, catalogID string, packageName string, version string) (api.GetPackageSchemaRes, error) {
+	slog.InfoContext(ctx, "GetPackageSchema",
+		slog.String("catalog_id", catalogID),
+		slog.String("package_name", packageName),
+		slog.String("version", version),
+	)
+
+	raw, err := cc.catalogs.GetPackageSchema(ctx, catalogID, packageName, version)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get package schema", slog.String("error", err.Error()))
+		problem := &api.GetPackageSchemaInternalServerError{}
+		problem.Title.SetTo("Unable to get package schema")
+		problem.Status.SetTo(500)
+		problem.Detail.SetTo(err.Error())
+		return problem, err
+	}
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &rawMap); err != nil {
+		return nil, fmt.Errorf("parsing schema: %w", err)
+	}
+
+	result := make(api.GetPackageSchemaOK, len(rawMap))
+	for k, v := range rawMap {
+		result[k] = jx.Raw(v)
+	}
+	return &result, nil
 }

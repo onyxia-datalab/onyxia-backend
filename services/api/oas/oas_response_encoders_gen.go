@@ -14,52 +14,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func encodeAPIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetResponse(response APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetOK:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetBadRequest:
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetInternalServerError:
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(500)
-		span.SetStatus(codes.Error, http.StatusText(500))
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
 func encodeGetMyCatalogsResponse(response GetMyCatalogsRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *GetMyCatalogsOKApplicationJSON:
@@ -122,6 +76,52 @@ func encodeGetMyPackageResponse(response GetMyPackageRes, w http.ResponseWriter,
 		return nil
 
 	case *GetMyPackageInternalServerError:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(500)
+		span.SetStatus(codes.Error, http.StatusText(500))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	default:
+		return errors.Errorf("unexpected response type: %T", response)
+	}
+}
+
+func encodeGetPackageSchemaResponse(response GetPackageSchemaRes, w http.ResponseWriter, span trace.Span) error {
+	switch response := response.(type) {
+	case *GetPackageSchemaOK:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(200)
+		span.SetStatus(codes.Ok, http.StatusText(200))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetPackageSchemaBadRequest:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(400)
+		span.SetStatus(codes.Error, http.StatusText(400))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetPackageSchemaInternalServerError:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))

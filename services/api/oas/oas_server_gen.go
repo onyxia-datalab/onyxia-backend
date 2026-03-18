@@ -8,13 +8,6 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-	//
-	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-	// and roles.
-	//
-	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
-	APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (APIServicesSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error)
 	// GetMyCatalogs implements getMyCatalogs operation.
 	//
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -28,6 +21,13 @@ type Handler interface {
 	//
 	// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 	GetMyPackage(ctx context.Context, params GetMyPackageParams) (GetMyPackageRes, error)
+	// GetPackageSchema implements getPackageSchema operation.
+	//
+	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+	// and roles.
+	//
+	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService implements installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
