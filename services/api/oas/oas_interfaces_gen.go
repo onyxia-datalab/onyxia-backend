@@ -9,12 +9,12 @@ type GetMyPackageRes interface {
 	getMyPackageRes()
 }
 
-type InstallServiceRes interface {
-	installServiceRes()
+type GetPackageSchemaRes interface {
+	getPackageSchemaRes()
 }
 
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes interface {
-	schemasCatalogIdPackageNamePackageNameVersionsVersionGetRes()
+type InstallServiceRes interface {
+	installServiceRes()
 }
 
 type WatchReleaseRes interface {

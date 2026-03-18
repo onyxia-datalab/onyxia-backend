@@ -134,145 +134,8 @@ func decodeGetMyPackageParams(args [2]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
-// InstallServiceParams is parameters of installService operation.
-type InstallServiceParams struct {
-	// Logical release identifier.
-	ReleaseId string
-	// Project identifier in Onyxia.
-	XOnyxiaProject OptString `json:",omitempty,omitzero"`
-}
-
-func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "releaseId",
-			In:   "path",
-		}
-		params.ReleaseId = packed[key].(string)
-	}
-	{
-		key := middleware.ParameterKey{
-			Name: "X-Onyxia-Project",
-			In:   "header",
-		}
-		if v, ok := packed[key]; ok {
-			params.XOnyxiaProject = v.(OptString)
-		}
-	}
-	return params
-}
-
-func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params InstallServiceParams, _ error) {
-	h := uri.NewHeaderDecoder(r.Header)
-	// Decode path: releaseId.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "releaseId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ReleaseId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.String{
-					MinLength:     1,
-					MinLengthSet:  true,
-					MaxLength:     0,
-					MaxLengthSet:  false,
-					Email:         false,
-					Hostname:      false,
-					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
-					MinNumeric:    0,
-					MinNumericSet: false,
-					MaxNumeric:    0,
-					MaxNumericSet: false,
-				}).Validate(string(params.ReleaseId)); err != nil {
-					return errors.Wrap(err, "string")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "releaseId",
-			In:   "path",
-			Err:  err,
-		}
-	}
-	// Decode header: X-Onyxia-Project.
-	if err := func() error {
-		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "X-Onyxia-Project",
-			Explode: false,
-		}
-		if err := h.HasParam(cfg); err == nil {
-			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotXOnyxiaProjectVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotXOnyxiaProjectVal = c
-					return nil
-				}(); err != nil {
-					return err
-				}
-				params.XOnyxiaProject.SetTo(paramsDotXOnyxiaProjectVal)
-				return nil
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "X-Onyxia-Project",
-			In:   "header",
-			Err:  err,
-		}
-	}
-	return params, nil
-}
-
-// SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams is parameters of GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams struct {
+// GetPackageSchemaParams is parameters of getPackageSchema operation.
+type GetPackageSchemaParams struct {
 	// Catalog identifier.
 	CatalogId string
 	// Package name.
@@ -281,7 +144,7 @@ type SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams struct {
 	Version string
 }
 
-func unpackSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(packed middleware.Parameters) (params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) {
+func unpackGetPackageSchemaParams(packed middleware.Parameters) (params GetPackageSchemaParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "catalogId",
@@ -306,7 +169,7 @@ func unpackSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(packed
 	return params
 }
 
-func decodeSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(args [3]string, argsEscaped bool, r *http.Request) (params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams, _ error) {
+func decodeGetPackageSchemaParams(args [3]string, argsEscaped bool, r *http.Request) (params GetPackageSchemaParams, _ error) {
 	// Decode path: catalogId.
 	if err := func() error {
 		param := args[0]
@@ -439,6 +302,143 @@ func decodeSchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams(args [
 		return params, &ogenerrors.DecodeParamError{
 			Name: "version",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// InstallServiceParams is parameters of installService operation.
+type InstallServiceParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia.
+	XOnyxiaProject OptString `json:",omitempty,omitzero"`
+}
+
+func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		if v, ok := packed[key]; ok {
+			params.XOnyxiaProject = v.(OptString)
+		}
+	}
+	return params
+}
+
+func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params InstallServiceParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotXOnyxiaProjectVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotXOnyxiaProjectVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.XOnyxiaProject.SetTo(paramsDotXOnyxiaProjectVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
 			Err:  err,
 		}
 	}

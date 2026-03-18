@@ -14,7 +14,6 @@ type CatalogConfig struct {
 	SkipTLSVerify bool              `mapstructure:"skipTlsVerify"     json:"skipTlsVerify"`
 	CAFile        *string           `mapstructure:"caFile"            json:"caFile"`
 	AllowSharing  bool              `mapstructure:"allowSharing"      json:"allowSharing"`
-	Visible       Visibility        `mapstructure:"visible"           json:"visible"`
 	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
 	Username      *string           `mapstructure:"username"          json:"username"`
 	Password      *string           `mapstructure:"password"          json:"password"`
@@ -32,8 +31,8 @@ type CatalogConfig struct {
 type CatalogType string
 
 const (
-	CatalogTypeHelm CatalogType = "helm"
-	CatalogTypeOCI  CatalogType = "oci"
+	CatalogTypeHelmRepo CatalogType = "helm"
+	CatalogTypeOCI      CatalogType = "oci"
 )
 
 type CatalogStatus string
@@ -52,11 +51,6 @@ const (
 	MultipleServicesMaxNumber   MultipleServicesMode = "maxNumber"
 )
 
-type Visibility struct {
-	User    bool `mapstructure:"user"    json:"user"`
-	Project bool `mapstructure:"project" json:"project"`
-}
-
 type Restriction struct {
 	UserAttributeKey string `mapstructure:"userAttribute.key"     json:"userAttributeKey"`
 	Match            string `mapstructure:"userAttribute.matches" json:"match"`
@@ -64,5 +58,5 @@ type Restriction struct {
 
 type OCIPackage struct {
 	Name     string   `json:"name"`
-	Versions []string `json:"versions"`
+	Versions []string `json:"versions"` // if empty we refresh with ttl (same as helm index)
 }

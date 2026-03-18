@@ -13,33 +13,33 @@ type Handler interface {
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
 	// by user permissions if the user is authenticated. Otherwise returns the public catalog.
 	//
-	// GET /catalogs
+	// GET /api/services/catalogs
 	GetMyCatalogs(ctx context.Context) (GetMyCatalogsRes, error)
 	// GetMyPackage implements getMyPackage operation.
 	//
 	// Returns detailed information about a package in a catalog, including available versions.
 	//
-	// GET /catalogs/{catalogId}/packages/{packageName}
+	// GET /api/services/catalogs/{catalogId}/packages/{packageName}
 	GetMyPackage(ctx context.Context, params GetMyPackageParams) (GetMyPackageRes, error)
+	// GetPackageSchema implements getPackageSchema operation.
+	//
+	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
+	// and roles.
+	//
+	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService implements installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 	// the release already exists (returns 202 with the same event URLs).
 	//
-	// PUT /{releaseId}/install
+	// PUT /api/services/{releaseId}/install
 	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
-	// SchemasCatalogIdPackageNamePackageNameVersionsVersionGet implements GET /schemas/{catalogId}/packageName/{packageName}/versions/{version} operation.
-	//
-	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
-	// and roles.
-	//
-	// GET /schemas/{catalogId}/packageName/{packageName}/versions/{version}
-	SchemasCatalogIdPackageNamePackageNameVersionsVersionGet(ctx context.Context, params SchemasCatalogIdPackageNamePackageNameVersionsVersionGetParams) (SchemasCatalogIdPackageNamePackageNameVersionsVersionGetRes, error)
 	// WatchRelease implements watchRelease operation.
 	//
 	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
 	//
-	// GET /events/{releaseId}/watch-release
+	// GET /api/services/events/{releaseId}/watch-release
 	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
 	// WatchResources implements watchResources operation.
 	//
@@ -47,7 +47,7 @@ type Handler interface {
 	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
 	// "done".
 	//
-	// GET /events/{releaseId}/watch-resources
+	// GET /api/services/events/{releaseId}/watch-resources
 	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
 }
 

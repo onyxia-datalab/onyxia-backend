@@ -23,10 +23,10 @@ var (
 	rn19AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn12AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn8AllowedHeaders = map[string]string{
+	rn14AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
 	}
 )
@@ -70,9 +70,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/"
+		case '/': // Prefix: "/api/services/"
 
-			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -324,7 +324,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							// Leaf node.
 							switch r.Method {
 							case "GET":
-								s.handleSchemasCatalogIdPackageNamePackageNameVersionsVersionGetRequest([3]string{
+								s.handleGetPackageSchemaRequest([3]string{
 									args[0],
 									args[1],
 									args[2],
@@ -332,7 +332,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn14AllowedHeaders,
+									allowedHeaders: rn12AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -378,7 +378,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "PUT",
-							allowedHeaders: rn8AllowedHeaders,
+							allowedHeaders: rn14AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -475,9 +475,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/"
+		case '/': // Prefix: "/api/services/"
 
-			if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
 				elem = elem[l:]
 			} else {
 				break
@@ -502,7 +502,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "List available catalogs and packages for installing for the user"
 						r.operationID = "getMyCatalogs"
 						r.operationGroup = ""
-						r.pathPattern = "/catalogs"
+						r.pathPattern = "/api/services/catalogs"
 						r.args = args
 						r.count = 0
 						return r, true
@@ -557,7 +557,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.summary = "Get detailed information about a package in a catalog"
 								r.operationID = "getMyPackage"
 								r.operationGroup = ""
-								r.pathPattern = "/catalogs/{catalogId}/packages/{packageName}"
+								r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}"
 								r.args = args
 								r.count = 2
 								return r, true
@@ -620,7 +620,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.summary = "Release-level status stream (SSE)"
 								r.operationID = "watchRelease"
 								r.operationGroup = ""
-								r.pathPattern = "/events/{releaseId}/watch-release"
+								r.pathPattern = "/api/services/events/{releaseId}/watch-release"
 								r.args = args
 								r.count = 1
 								return r, true
@@ -645,7 +645,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.summary = "Kubernetes resources status stream (SSE)"
 								r.operationID = "watchResources"
 								r.operationGroup = ""
-								r.pathPattern = "/events/{releaseId}/watch-resources"
+								r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
 								r.args = args
 								r.count = 1
 								return r, true
@@ -722,11 +722,11 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							// Leaf node.
 							switch method {
 							case "GET":
-								r.name = SchemasCatalogIdPackageNamePackageNameVersionsVersionGetOperation
+								r.name = GetPackageSchemaOperation
 								r.summary = "Get the values.schema.json of a versioned package"
-								r.operationID = ""
+								r.operationID = "getPackageSchema"
 								r.operationGroup = ""
-								r.pathPattern = "/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
+								r.pathPattern = "/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
 								r.args = args
 								r.count = 3
 								return r, true
@@ -770,7 +770,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						r.summary = "Trigger service installation (async)"
 						r.operationID = "installService"
 						r.operationGroup = ""
-						r.pathPattern = "/{releaseId}/install"
+						r.pathPattern = "/api/services/{releaseId}/install"
 						r.args = args
 						r.count = 1
 						return r, true

@@ -3,6 +3,8 @@ package env
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 )
 
 func ValidateCatalogsConfig(catalogs []CatalogConfig) error {
@@ -26,7 +28,7 @@ func ValidateCatalogConfig(c CatalogConfig) error {
 	}
 
 	switch c.Type {
-	case CatalogTypeHelm:
+	case CatalogTypeHelmRepo:
 		if c.Packages != nil {
 			return errors.New("helm catalog should not have packages")
 		}
@@ -39,7 +41,7 @@ func ValidateCatalogConfig(c CatalogConfig) error {
 		return fmt.Errorf(
 			"catalog: invalid type %q (expected %q or %q)",
 			c.Type,
-			CatalogTypeHelm,
+			CatalogTypeHelmRepo,
 			CatalogTypeOCI,
 		)
 	}
@@ -91,6 +93,15 @@ func validateCommon(cc CatalogConfig) error {
 	}
 	if len(cc.Name) == 0 {
 		return fmt.Errorf("catalog %q: name is required", cc.ID)
+	}
+
+	for _, r := range cc.Restrictions {
+		if strings.TrimSpace(r.UserAttributeKey) == "" {
+			return fmt.Errorf("catalog %q: restriction missing userAttribute.key", cc.ID)
+		}
+		if _, err := regexp.Compile(r.Match); err != nil {
+			return fmt.Errorf("catalog %q: invalid restriction regex for key %q: %w", cc.ID, r.UserAttributeKey, err)
+		}
 	}
 
 	return nil
