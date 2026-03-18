@@ -28,7 +28,7 @@ func ValidateCatalogConfig(c CatalogConfig) error {
 	}
 
 	switch c.Type {
-	case CatalogTypeHelm:
+	case CatalogTypeHelmRepo:
 		if c.Packages != nil {
 			return errors.New("helm catalog should not have packages")
 		}
@@ -41,7 +41,7 @@ func ValidateCatalogConfig(c CatalogConfig) error {
 		return fmt.Errorf(
 			"catalog: invalid type %q (expected %q or %q)",
 			c.Type,
-			CatalogTypeHelm,
+			CatalogTypeHelmRepo,
 			CatalogTypeOCI,
 		)
 	}

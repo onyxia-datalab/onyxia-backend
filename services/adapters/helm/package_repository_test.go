@@ -49,7 +49,7 @@ func newLocalHelmRepo(t *testing.T, charts ...*chart.Metadata) *localHelmRepo {
 
 	cfg := env.CatalogConfig{
 		ID:       "test",
-		Type:     env.CatalogTypeHelm,
+		Type:     env.CatalogTypeHelmRepo,
 		Location: server.URL,
 	}
 
@@ -191,7 +191,7 @@ func TestGetHelmPackage_VersionFilter_SkipPatches(t *testing.T) {
 func TestNewPackageRepository_MaxNumber_MissingN_ReturnsError(t *testing.T) {
 	cfgs := []env.CatalogConfig{{
 		ID:                   "bad-catalog",
-		Type:                 env.CatalogTypeHelm,
+		Type:                 env.CatalogTypeHelmRepo,
 		Location:             "http://localhost",
 		MultipleServicesMode: env.MultipleServicesMaxNumber,
 		MaxNumberOfVersions:  nil,

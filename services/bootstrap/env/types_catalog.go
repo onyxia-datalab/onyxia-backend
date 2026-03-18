@@ -31,8 +31,8 @@ type CatalogConfig struct {
 type CatalogType string
 
 const (
-	CatalogTypeHelm CatalogType = "helm"
-	CatalogTypeOCI  CatalogType = "oci"
+	CatalogTypeHelmRepo CatalogType = "helm"
+	CatalogTypeOCI      CatalogType = "oci"
 )
 
 type CatalogStatus string

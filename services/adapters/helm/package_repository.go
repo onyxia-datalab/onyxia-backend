@@ -59,7 +59,7 @@ func NewPackageRepository(
 	for _, cfg := range cfgs {
 		catalogs[cfg.ID] = cfg
 
-		if cfg.Type != env.CatalogTypeHelm {
+		if cfg.Type != env.CatalogTypeHelmRepo {
 			continue
 		}
 
@@ -107,7 +107,7 @@ func (h *HelmPackageRepository) ListPackages(
 ) ([]domain.Package, error) {
 	slog.InfoContext(ctx, "")
 	switch cfg.Type {
-	case env.CatalogTypeHelm:
+	case env.CatalogTypeHelmRepo:
 		return h.listHelmPackages(ctx, cfg)
 	case env.CatalogTypeOCI:
 		return h.listOCIPackages(ctx, cfg)
@@ -122,7 +122,7 @@ func (h *HelmPackageRepository) GetPackage(
 	name string,
 ) (*domain.PackageRef, error) {
 	switch cfg.Type {
-	case env.CatalogTypeHelm:
+	case env.CatalogTypeHelmRepo:
 		return h.getHelmPackage(ctx, cfg, name)
 	case env.CatalogTypeOCI:
 		return h.getOCIPackage(ctx, cfg, name)
@@ -282,7 +282,7 @@ func (h *HelmPackageRepository) GetPackageSchema(
 	version string,
 ) ([]byte, error) {
 	switch cfg.Type {
-	case env.CatalogTypeHelm:
+	case env.CatalogTypeHelmRepo:
 		return h.getHelmPackageSchema(ctx, cfg, packageName, version)
 	case env.CatalogTypeOCI:
 		return h.getOCIPackageSchema(ctx, cfg, packageName, version)
