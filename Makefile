@@ -72,7 +72,10 @@ lint:
 	@echo "🔍 Running golangci-lint..."
 	@mkdir -p $(GOBIN)
 	@LATEST=$$(curl -s https://api.github.com/repos/golangci/golangci-lint/releases/latest | grep tag_name | cut -d '"' -f4 | sed 's/^v//'); \
-	if [ ! -x "$(GOBIN)/golangci-lint" ]; then \
+	if ! echo "$$LATEST" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "⚠️  Could not fetch latest golangci-lint version (GitHub API unavailable?), skipping update check"; \
+		if [ ! -x "$(GOBIN)/golangci-lint" ]; then echo "❌ golangci-lint not installed, run make lint with network access"; exit 1; fi; \
+	elif [ ! -x "$(GOBIN)/golangci-lint" ]; then \
 		echo "📥 Installing golangci-lint $$LATEST..."; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(GOBIN) v$$LATEST; \
 	else \
