@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
@@ -26,49 +25,34 @@ import (
 var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
 
 type HelmPackageRepository struct {
-	repos          map[string]*repo.ChartRepository
-	catalogs       map[string]env.CatalogConfig
-	getters        getter.Providers
-	versionFilters map[string]versionFilter
-}
-
-type Option func(*cli.EnvSettings)
-
-// WithHelmSettings allows tests or external callers to override Helm CLI settings.
-func WithHelmSettings(custom *cli.EnvSettings) Option {
-	return func(s *cli.EnvSettings) {
-		if custom != nil {
-			*s = *custom // copy values to avoid pointer aliasing
-		}
-	}
+	repos    map[string]*repo.ChartRepository
+	catalogs map[string]env.CatalogConfig
+	getters  getter.Providers
 }
 
 func NewPackageRepository(
-	cfgs []env.CatalogConfig, opts ...Option,
+	catalogs []env.CatalogConfig,
+	cacheDir string,
 ) (*HelmPackageRepository, error) {
 	settings := cli.New()
-
-	for _, opt := range opts {
-		opt(settings)
+	if cacheDir != "" {
+		settings.RepositoryCache = cacheDir
 	}
 
 	repos := make(map[string]*repo.ChartRepository)
-	catalogs := make(map[string]env.CatalogConfig)
-	filters := make(map[string]versionFilter)
+	catalogMap := make(map[string]env.CatalogConfig)
 	getters := getter.All(settings)
 
-	for _, cfg := range cfgs {
-		catalogs[cfg.ID] = cfg
+	for _, cfg := range catalogs {
+		catalogMap[cfg.ID] = cfg
 
 		if cfg.Type != env.CatalogTypeHelmRepo {
 			continue
 		}
 
-		f, err := versionFilterFrom(cfg)
-		if err != nil {
+		if _, err := versionFilterFrom(cfg); err != nil {
 			return nil, err
 		}
-		filters[cfg.ID] = f
 
 		entry := &repo.Entry{
 			Name:                  cfg.ID,
@@ -95,18 +79,20 @@ func NewPackageRepository(
 	}
 
 	return &HelmPackageRepository{
-		repos:          repos,
-		catalogs:       catalogs,
-		getters:        getters,
-		versionFilters: filters,
+		repos:    repos,
+		catalogs: catalogMap,
+		getters:  getters,
 	}, nil
 }
 
 func (h *HelmPackageRepository) ListPackages(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 ) ([]domain.Package, error) {
-	slog.InfoContext(ctx, "")
+	cfg, ok := h.catalogs[catalogID]
+	if !ok {
+		return nil, fmt.Errorf("catalog %q not found", catalogID)
+	}
 	switch cfg.Type {
 	case env.CatalogTypeHelmRepo:
 		return h.listHelmPackages(ctx, cfg)
@@ -119,9 +105,13 @@ func (h *HelmPackageRepository) ListPackages(
 
 func (h *HelmPackageRepository) GetPackage(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 	name string,
 ) (*domain.PackageRef, error) {
+	cfg, ok := h.catalogs[catalogID]
+	if !ok {
+		return nil, fmt.Errorf("%w: catalog %q not found", domain.ErrNotFound, catalogID)
+	}
 	switch cfg.Type {
 	case env.CatalogTypeHelmRepo:
 		return h.getHelmPackage(ctx, cfg, name)
@@ -183,7 +173,9 @@ func (h *HelmPackageRepository) ResolvePackage(
 	)
 }
 
-func (h *HelmPackageRepository) loadHelmIndex(catalogID string) (*repo.ChartRepository, *repo.IndexFile, error) {
+func (h *HelmPackageRepository) loadHelmIndex(
+	catalogID string,
+) (*repo.ChartRepository, *repo.IndexFile, error) {
 	cr, ok := h.repos[catalogID]
 	if !ok {
 		return nil, nil, fmt.Errorf("unknown Helm catalog: %s", catalogID)
@@ -228,141 +220,69 @@ func (h *HelmPackageRepository) listHelmPackages(
 		})
 	}
 
-	sort.Slice(pkgs, func(i, j int) bool { return pkgs[i].Name < pkgs[j].Name })
 	return pkgs, nil
 }
 
 func (h *HelmPackageRepository) getHelmPackage(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalog env.CatalogConfig,
 	name string,
 ) (*domain.PackageRef, error) {
 
-	_, idx, err := h.loadHelmIndex(cfg.ID)
+	_, idx, err := h.loadHelmIndex(catalog.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	versions, ok := idx.Entries[name]
 	if !ok || len(versions) == 0 {
-		return nil, fmt.Errorf("%w: chart %q not found in catalog %q", domain.ErrNotFound, name, cfg.ID)
+		return nil, fmt.Errorf(
+			"%w: chart %q not found in catalog %q",
+			domain.ErrNotFound,
+			name,
+			catalog.ID,
+		)
 	}
 
 	latest := versions[0]
 	return &domain.PackageRef{
 		Package: domain.Package{
-			CatalogID:   cfg.ID,
+			CatalogID:   catalog.ID,
 			Name:        name,
 			Description: latest.Description,
 			HomeUrl:     tools.MustParseURL(latest.Home),
 			IconUrl:     tools.MustParseURL(latest.Icon),
 		},
-		Versions: h.versionFilters[cfg.ID].apply(extractVersions(versions)),
+		Versions: mustVersionFilter(catalog).apply(extractVersions(versions)),
 	}, nil
 }
 
 func (h *HelmPackageRepository) GetPackageSchema(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 	packageName string,
 	version string,
 ) ([]byte, error) {
-	switch cfg.Type {
-	case env.CatalogTypeHelmRepo:
-		return h.getHelmPackageSchema(ctx, cfg, packageName, version)
-	case env.CatalogTypeOCI:
-		return h.getOCIPackageSchema(ctx, cfg, packageName, version)
-	default:
-		return nil, fmt.Errorf("unsupported catalog type: %v", cfg.Type)
-	}
+
+	//TODO  Je suis persuadé que peut importe OCI ou HELM on peut faire la même logique
+	// Il suffit de faire un pull du package et d'extraire le schema (que ce soit un Url ou un lien oci// ne doit pas changer l'implem ? )
+
+	// switch catalog.Type {
+	// case env.CatalogTypeHelmRepo:
+	// 	return h.getHelmPackageSchema(ctx, catalog, packageName, version)
+	// case env.CatalogTypeOCI:
+	// 	return h.getOCIPackageSchema(ctx, catalog, packageName, version)
+	// default:
+	// 	return nil, fmt.Errorf("unsupported catalog type: %v", cfg.Type)
+	// }
+
+	return nil, fmt.Errorf("GetPackageSchema not implemented yet")
 }
 
-func (h *HelmPackageRepository) getHelmPackageSchema(
-	ctx context.Context,
-	cfg env.CatalogConfig,
-	packageName string,
-	version string,
-) ([]byte, error) {
-	cr, idx, err := h.loadHelmIndex(cfg.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	entries, ok := idx.Entries[packageName]
-	if !ok || len(entries) == 0 {
-		return nil, fmt.Errorf("%w: chart %q not found in catalog %q", domain.ErrNotFound, packageName, cfg.ID)
-	}
-
-	var target *repo.ChartVersion
-	for _, v := range entries {
-		if v.Version == version {
-			target = v
-			break
-		}
-	}
-	if target == nil {
-		return nil, fmt.Errorf("%w: version %q not found for chart %q", domain.ErrNotFound, version, packageName)
-	}
-
-	chartURL, err := repo.ResolveReferenceURL(cr.Config.URL, target.URLs[0])
-	if err != nil {
-		return nil, fmt.Errorf("resolving chart URL: %w", err)
-	}
-	ch, err := h.pullChart(chartURL,
-		getter.WithURL(cr.Config.URL),
-		getter.WithInsecureSkipVerifyTLS(cfg.SkipTLSVerify),
-		getter.WithTLSClientConfig(cr.Config.CertFile, cr.Config.KeyFile, cr.Config.CAFile),
-		getter.WithBasicAuth(cr.Config.Username, cr.Config.Password),
-		getter.WithPassCredentialsAll(cr.Config.PassCredentialsAll),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("pulling chart: %w", err)
-	}
-
-	return extractSchema(ch), nil
-}
-
-func (h *HelmPackageRepository) getOCIPackageSchema(
-	ctx context.Context,
-	cfg env.CatalogConfig,
-	packageName string,
-	version string,
-) ([]byte, error) {
-	var pkg *env.OCIPackage
-	for _, p := range cfg.Packages {
-		if p.Name == packageName {
-			pkg = &p
-			break
-		}
-	}
-	if pkg == nil {
-		return nil, fmt.Errorf("%w: package %q not found in OCI catalog %q", domain.ErrNotFound, packageName, cfg.ID)
-	}
-
-	base := strings.TrimSuffix(cfg.Location, "/")
-	ref := fmt.Sprintf("%s/%s", base, strings.TrimPrefix(packageName, "/"))
-	ch, err := h.pullChart(ref,
-		getter.WithURL(ref),
-		getter.WithTagName(version),
-		getter.WithInsecureSkipVerifyTLS(cfg.SkipTLSVerify),
-		getter.WithTLSClientConfig("", "", tools.Deref(cfg.CAFile)),
-		getter.WithBasicAuth(tools.Deref(cfg.Username), tools.Deref(cfg.Password)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("pulling OCI chart: %w", err)
-	}
-
-	return extractSchema(ch), nil
-}
-
-func extractSchema(ch *chartv2.Chart) []byte {
-	if len(ch.Schema) == 0 {
-		return []byte("{}")
-	}
-	return ch.Schema
-}
-
-func (h *HelmPackageRepository) pullChart(chartURL string, opts ...getter.Option) (*chartv2.Chart, error) {
+func (h *HelmPackageRepository) pullChart(
+	chartURL string,
+	opts ...getter.Option,
+) (*chartv2.Chart, error) {
 	u, err := url.Parse(chartURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid chart URL: %w", err)
@@ -403,31 +323,30 @@ func (h *HelmPackageRepository) listOCIPackages(
 			Name:      p.Name,
 		})
 	}
-	sort.Slice(pkgs, func(i, j int) bool { return pkgs[i].Name < pkgs[j].Name })
 	return pkgs, nil
 }
 
 func (h *HelmPackageRepository) getOCIPackage(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalog env.CatalogConfig,
 	name string,
 ) (*domain.PackageRef, error) {
 
 	var pkg *env.OCIPackage
-	for _, p := range cfg.Packages {
+	for _, p := range catalog.Packages {
 		if p.Name == name {
 			pkg = &p
 			break
 		}
 	}
 	if pkg == nil {
-		return nil, fmt.Errorf("package %q not found in OCI catalog %q", name, cfg.ID)
+		return nil, fmt.Errorf("package %q not found in OCI catalog %q", name, catalog.ID)
 	}
 
-	base := strings.TrimSuffix(cfg.Location, "/")
+	base := strings.TrimSuffix(catalog.Location, "/")
 	result := domain.PackageRef{
 		Package: domain.Package{
-			CatalogID: cfg.ID,
+			CatalogID: catalog.ID,
 			Name:      name,
 		},
 		Versions: pkg.Versions,
@@ -438,9 +357,9 @@ func (h *HelmPackageRepository) getOCIPackage(
 		ch, err := h.pullChart(ref,
 			getter.WithURL(ref),
 			getter.WithTagName(version),
-			getter.WithInsecureSkipVerifyTLS(cfg.SkipTLSVerify),
-			getter.WithTLSClientConfig("", "", tools.Deref(cfg.CAFile)),
-			getter.WithBasicAuth(tools.Deref(cfg.Username), tools.Deref(cfg.Password)),
+			getter.WithInsecureSkipVerifyTLS(catalog.SkipTLSVerify),
+			getter.WithTLSClientConfig("", "", tools.Deref(catalog.CAFile)),
+			getter.WithBasicAuth(tools.Deref(catalog.Username), tools.Deref(catalog.Password)),
 		)
 		if err != nil {
 			continue
@@ -455,7 +374,10 @@ func (h *HelmPackageRepository) getOCIPackage(
 	return &result, nil
 }
 
-func resolveOCIPackage(cfg env.CatalogConfig, pkgName, version string) (domain.PackageVersion, error) {
+func resolveOCIPackage(
+	cfg env.CatalogConfig,
+	pkgName, version string,
+) (domain.PackageVersion, error) {
 	for _, p := range cfg.Packages {
 		if p.Name != pkgName {
 			continue
@@ -481,6 +403,17 @@ func resolveOCIPackage(cfg env.CatalogConfig, pkgName, version string) (domain.P
 		"%w: package %q not found in OCI catalog %q",
 		domain.ErrNotFound, pkgName, cfg.ID,
 	)
+}
+
+// mustVersionFilter returns the version filter for cfg.
+// It panics if the config is invalid, but that can't happen since
+// NewPackageRepository validates all configs at startup.
+func mustVersionFilter(cfg env.CatalogConfig) versionFilter {
+	f, err := versionFilterFrom(cfg)
+	if err != nil {
+		panic(fmt.Sprintf("invalid version filter for catalog %q: %v", cfg.ID, err))
+	}
+	return f
 }
 
 func extractVersions(list []*repo.ChartVersion) []string {

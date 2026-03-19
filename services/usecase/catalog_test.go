@@ -21,9 +21,9 @@ var _ ports.PackageRepository = (*MockCatalogRepository)(nil)
 
 func (m *MockCatalogRepository) ListPackages(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 ) ([]domain.Package, error) {
-	args := m.Called(ctx, cfg)
+	args := m.Called(ctx, catalogID)
 	val := args.Get(0)
 	if val == nil {
 		return nil, args.Error(1)
@@ -33,10 +33,10 @@ func (m *MockCatalogRepository) ListPackages(
 
 func (m *MockCatalogRepository) GetPackage(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 	name string,
 ) (*domain.PackageRef, error) {
-	args := m.Called(ctx, cfg, name)
+	args := m.Called(ctx, catalogID, name)
 	if res := args.Get(0); res != nil {
 		return res.(*domain.PackageRef), args.Error(1)
 	}
@@ -45,11 +45,11 @@ func (m *MockCatalogRepository) GetPackage(
 
 func (m *MockCatalogRepository) GetPackageSchema(
 	ctx context.Context,
-	cfg env.CatalogConfig,
+	catalogID string,
 	packageName string,
 	version string,
 ) ([]byte, error) {
-	args := m.Called(ctx, cfg, packageName, version)
+	args := m.Called(ctx, catalogID, packageName, version)
 	if res := args.Get(0); res != nil {
 		return res.([]byte), args.Error(1)
 	}
@@ -113,7 +113,7 @@ func TestListPublicCatalogs(t *testing.T) {
 	}
 
 	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
-	repo.On("ListPackages", mock.Anything, cfgs[0]).
+	repo.On("ListPackages", mock.Anything, cfgs[0].ID).
 		Return([]domain.Package{{Name: "chart"}}, nil)
 
 	catalogs, err := uc.ListPublicCatalogs(ctx)
@@ -121,12 +121,12 @@ func TestListPublicCatalogs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, catalogs, 1)
 	assert.Equal(t, "public", catalogs[0].ID)
-	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0])
-	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1])
+	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0].ID)
+	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1].ID)
 }
 
 // ✅ User has access to matching restricted catalog.
-func TestListUserCatalog_Match(t *testing.T) {
+func TestListUserCatalogs_Match(t *testing.T) {
 	user := &usercontext.User{
 		Username: "test-user",
 		Groups:   []string{"sspcloud-dev", "users"},
@@ -151,20 +151,20 @@ func TestListUserCatalog_Match(t *testing.T) {
 	}
 
 	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
-	repo.On("ListPackages", mock.Anything, cfgs[0]).
+	repo.On("ListPackages", mock.Anything, cfgs[0].ID).
 		Return([]domain.Package{{Name: "chart"}}, nil)
 
-	result, err := uc.ListUserCatalog(ctx)
+	result, err := uc.ListUserCatalogs(ctx)
 
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.Equal(t, "restricted-dev", result[0].ID)
-	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0])
-	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1])
+	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0].ID)
+	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1].ID)
 }
 
 // ❌ User doesn’t match any restriction — no catalogs returned.
-func TestListUserCatalog_NoMatch(t *testing.T) {
+func TestListUserCatalogs_NoMatch(t *testing.T) {
 	user := &usercontext.User{
 		Username: "guest",
 		Groups:   []string{"sspcloud-guest"},
@@ -185,15 +185,15 @@ func TestListUserCatalog_NoMatch(t *testing.T) {
 	repo.On("ListPackages", mock.Anything, mock.Anything).
 		Return([]domain.Package{{Name: "chart"}}, nil)
 
-	result, err := uc.ListUserCatalog(ctx)
+	result, err := uc.ListUserCatalogs(ctx)
 
 	assert.NoError(t, err)
 	assert.Empty(t, result)
-	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[0])
+	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[0].ID)
 }
 
 // ❌ Repository returns an error — should propagate up.
-func TestListUserCatalog_RepoError(t *testing.T) {
+func TestListUserCatalogs_RepoError(t *testing.T) {
 	user := &usercontext.User{
 		Username: "dev",
 		Groups:   []string{"sspcloud-dev"},
@@ -211,15 +211,15 @@ func TestListUserCatalog_RepoError(t *testing.T) {
 	}
 
 	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
-	repo.On("ListPackages", mock.Anything, cfgs[0]).
+	repo.On("ListPackages", mock.Anything, cfgs[0].ID).
 		Return(nil, errors.New("failed to fetch"))
 
-	result, err := uc.ListUserCatalog(ctx)
+	result, err := uc.ListUserCatalogs(ctx)
 
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "failed to fetch")
-	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0])
+	repo.AssertCalled(t, "ListPackages", mock.Anything, cfgs[0].ID)
 }
 
 // ✅ GetPackage returns the package when found.
@@ -231,7 +231,7 @@ func TestGetPackage_Found(t *testing.T) {
 		Package:  domain.Package{Name: "my-chart", CatalogID: "my-catalog"},
 		Versions: []string{"1.0.0", "0.9.0"},
 	}
-	repo.On("GetPackage", mock.Anything, cfgs[0], "my-chart").Return(expected, nil)
+	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").Return(expected, nil)
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
 
@@ -255,7 +255,7 @@ func TestGetPackage_RepoError(t *testing.T) {
 	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
-	repo.On("GetPackage", mock.Anything, cfgs[0], "my-chart").
+	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").
 		Return(nil, errors.New("network failure"))
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
@@ -271,7 +271,7 @@ func TestGetPackageSchema_Found(t *testing.T) {
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	schema := []byte(`{"type":"object"}`)
-	repo.On("GetPackageSchema", mock.Anything, cfgs[0], "my-chart", "1.0.0").
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
 		Return(schema, nil)
 
 	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
@@ -296,7 +296,7 @@ func TestGetPackageSchema_RepoError(t *testing.T) {
 	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
-	repo.On("GetPackageSchema", mock.Anything, cfgs[0], "my-chart", "1.0.0").
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
 		Return(nil, errors.New("schema fetch failed"))
 
 	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")

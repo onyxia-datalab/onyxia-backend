@@ -43,7 +43,7 @@ func SetupInstallController(
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig)
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
 	if err != nil {
 		return nil, err
 	}

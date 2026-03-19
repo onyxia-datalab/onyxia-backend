@@ -34,7 +34,7 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 	)
 
 	if _, authenticated := cc.userReader.GetUser(ctx); authenticated {
-		catalogs, err = cc.catalogs.ListUserCatalog(ctx)
+		catalogs, err = cc.catalogs.ListUserCatalogs(ctx)
 	} else {
 		catalogs, err = cc.catalogs.ListPublicCatalogs(ctx)
 	}
@@ -112,8 +112,17 @@ func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalo
 	return &response, nil
 }
 
-func (cc *CatalogController) GetMyPackage(ctx context.Context, catalogID string, packageName string) (api.GetMyPackageRes, error) {
-	slog.InfoContext(ctx, "GetMyPackage", slog.String("catalog_id", catalogID), slog.String("package_name", packageName))
+func (cc *CatalogController) GetMyPackage(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) (api.GetMyPackageRes, error) {
+	slog.InfoContext(
+		ctx,
+		"GetMyPackage",
+		slog.String("catalog_id", catalogID),
+		slog.String("package_name", packageName),
+	)
 
 	pkg, err := cc.catalogs.GetPackage(ctx, catalogID, packageName)
 	if err != nil {
@@ -141,7 +150,12 @@ func (cc *CatalogController) GetMyPackage(ctx context.Context, catalogID string,
 	}, nil
 }
 
-func (cc *CatalogController) GetPackageSchema(ctx context.Context, catalogID string, packageName string, version string) (api.GetPackageSchemaRes, error) {
+func (cc *CatalogController) GetPackageSchema(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+	version string,
+) (api.GetPackageSchemaRes, error) {
 	slog.InfoContext(ctx, "GetPackageSchema",
 		slog.String("catalog_id", catalogID),
 		slog.String("package_name", packageName),

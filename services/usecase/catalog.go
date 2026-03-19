@@ -40,7 +40,7 @@ func (uc *Catalog) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, er
 	})
 }
 
-func (uc *Catalog) ListUserCatalog(
+func (uc *Catalog) ListUserCatalogs(
 	ctx context.Context,
 ) ([]domain.Catalog, error) {
 	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
@@ -92,12 +92,16 @@ func (uc *Catalog) ListUserCatalog(
 	})
 }
 
-func (uc *Catalog) GetPackageSchema(ctx context.Context, catalogID string, packageName string, version string) ([]byte, error) {
-	cfg, err := uc.findCatalog(catalogID)
-	if err != nil {
+func (uc *Catalog) GetPackageSchema(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+	version string,
+) ([]byte, error) {
+	if _, err := uc.findCatalog(catalogID); err != nil {
 		return nil, err
 	}
-	return uc.pkgRepo.GetPackageSchema(ctx, *cfg, packageName, version)
+	return uc.pkgRepo.GetPackageSchema(ctx, catalogID, packageName, version)
 }
 
 func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
@@ -109,18 +113,26 @@ func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
 	return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
 }
 
-func (uc *Catalog) GetPackage(ctx context.Context, catalogID string, packageName string) (*domain.PackageRef, error) {
-	cfg, err := uc.findCatalog(catalogID)
-	if err != nil {
+func (uc *Catalog) GetPackage(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) (*domain.PackageRef, error) {
+	if _, err := uc.findCatalog(catalogID); err != nil {
 		return nil, err
 	}
 
-	pkg, err := uc.pkgRepo.GetPackage(ctx, *cfg, packageName)
+	pkg, err := uc.pkgRepo.GetPackage(ctx, catalogID, packageName)
 	if err != nil {
 		return nil, fmt.Errorf("catalog %q package %q: %w", catalogID, packageName, err)
 	}
 	if pkg == nil {
-		return nil, fmt.Errorf("package %q in catalog %q: %w", packageName, catalogID, domain.ErrNotFound)
+		return nil, fmt.Errorf(
+			"package %q in catalog %q: %w",
+			packageName,
+			catalogID,
+			domain.ErrNotFound,
+		)
 	}
 
 	return pkg, nil
@@ -137,7 +149,7 @@ func (uc *Catalog) buildCatalogs(
 			continue
 		}
 
-		pkgs, err := uc.pkgRepo.ListPackages(ctx, cfg)
+		pkgs, err := uc.pkgRepo.ListPackages(ctx, cfg.ID)
 		if err != nil {
 			return nil, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err)
 		}

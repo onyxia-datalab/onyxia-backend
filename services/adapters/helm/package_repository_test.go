@@ -13,23 +13,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
-	"helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 type localHelmRepo struct {
-	server   *httptest.Server
-	tmpDir   string
-	settings *cli.EnvSettings
-	cfg      env.CatalogConfig
+	server *httptest.Server
+	tmpDir string
+	cfg    env.CatalogConfig
 }
 
 func newLocalHelmRepo(t *testing.T, charts ...*chartv2.Metadata) *localHelmRepo {
 	t.Helper()
 
 	tmp := t.TempDir()
-	settings := cli.New()
-	settings.RepositoryCache = tmp
 
 	// Crée un index.yaml local
 	idx := repo.NewIndexFile()
@@ -54,19 +50,15 @@ func newLocalHelmRepo(t *testing.T, charts ...*chartv2.Metadata) *localHelmRepo 
 	}
 
 	return &localHelmRepo{
-		server:   server,
-		tmpDir:   tmp,
-		settings: settings,
-		cfg:      cfg,
+		server: server,
+		tmpDir: tmp,
+		cfg:    cfg,
 	}
 }
 
 func (l *localHelmRepo) newAdapter(t *testing.T) *HelmPackageRepository {
 	t.Helper()
-	repoAdapter, err := NewPackageRepository(
-		[]env.CatalogConfig{l.cfg},
-		WithHelmSettings(l.settings),
-	)
+	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{l.cfg}, l.tmpDir)
 	require.NoError(t, err)
 	return repoAdapter
 }
@@ -86,7 +78,7 @@ func TestListHelmPackages_WithLocalHTTPRepo(t *testing.T) {
 
 	repoAdapter := lr.newAdapter(t)
 
-	result, err := repoAdapter.ListPackages(context.Background(), lr.cfg)
+	result, err := repoAdapter.ListPackages(context.Background(), lr.cfg.ID)
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -112,7 +104,7 @@ func TestGetHelmPackage_Found(t *testing.T) {
 	)
 	repoAdapter := lr.newAdapter(t)
 
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "mychart")
+	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
 	require.NotNil(t, pkg)
 	assert.Equal(t, "mychart", pkg.Name)
@@ -127,7 +119,7 @@ func TestGetHelmPackage_NotFound(t *testing.T) {
 	lr := newLocalHelmRepo(t, &chartv2.Metadata{Name: "mychart", Version: "1.0.0"})
 	repoAdapter := lr.newAdapter(t)
 
-	_, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "unknown")
+	_, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "unknown")
 	require.Error(t, err)
 	require.ErrorIs(t, err, domain.ErrNotFound)
 }
@@ -144,7 +136,7 @@ func TestGetHelmPackage_VersionFilter_Latest(t *testing.T) {
 	lr.cfg.MultipleServicesMode = env.MultipleServicesLatest
 	repoAdapter := lr.newAdapter(t)
 
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "mychart")
+	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"2.0.0"}, pkg.Versions)
 }
@@ -164,7 +156,7 @@ func TestGetHelmPackage_VersionFilter_MaxNumber(t *testing.T) {
 	lr.cfg.MaxNumberOfVersions = &n
 	repoAdapter := lr.newAdapter(t)
 
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "mychart")
+	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"3.0.0", "2.0.0"}, pkg.Versions)
 }
@@ -183,7 +175,7 @@ func TestGetHelmPackage_VersionFilter_SkipPatches(t *testing.T) {
 	lr.cfg.MultipleServicesMode = env.MultipleServicesSkipPatches
 	repoAdapter := lr.newAdapter(t)
 
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg, "mychart")
+	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"2.1.1", "1.0.5"}, pkg.Versions)
 }
@@ -196,7 +188,7 @@ func TestNewPackageRepository_MaxNumber_MissingN_ReturnsError(t *testing.T) {
 		MultipleServicesMode: env.MultipleServicesMaxNumber,
 		MaxNumberOfVersions:  nil,
 	}}
-	_, err := NewPackageRepository(cfgs)
+	_, err := NewPackageRepository(cfgs, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "maxNumberOfVersions")
 }
@@ -243,7 +235,7 @@ func TestResolvePackage_OCICatalog(t *testing.T) {
 			{Name: "my-app", Versions: []string{"2.0.0", "1.5.0", "1.0.0"}},
 		},
 	}
-	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{ociCfg})
+	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{ociCfg}, "")
 	require.NoError(t, err)
 
 	t.Run("existing package and version", func(t *testing.T) {

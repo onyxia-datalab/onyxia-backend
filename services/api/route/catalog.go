@@ -9,7 +9,7 @@ import (
 
 func SetupCatalogController(app *bootstrap.Application) (*controller.CatalogController, error) {
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig)
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
 	if err != nil {
 		return nil, err
 	}
