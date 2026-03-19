@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.20...v0.1.21) (2026-03-19)
+
+
+### Bug Fixes
+
+* **lint:** replace deprecated NewSimpleClientset with NewClientset ([5e66b64](https://github.com/onyxia-datalab/onyxia-backend/commit/5e66b643c53782964ca80014f1b1a9008d99a65d))
+
 ## [0.1.20](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.19...v0.1.20) (2026-03-12)
 
 
