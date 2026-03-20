@@ -224,7 +224,7 @@ func (h *HelmPackageRepository) GetPackageSchema(
 
 // --- helm repo (index) ---
 
-// loadIndex downloads and parses the repo index.
+// TODO: we could optimize by caching the index in memory and refreshing it with a TTL (same as helm index cache)
 func (h *HelmPackageRepository) loadIndex(catalogName string) (*repo.IndexFile, error) {
 	cr := h.repos[catalogName]
 	indexPath, err := cr.DownloadIndexFile()
