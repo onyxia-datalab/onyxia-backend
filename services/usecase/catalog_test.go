@@ -35,10 +35,19 @@ func (m *MockCatalogRepository) GetPackage(
 	ctx context.Context,
 	catalogID string,
 	name string,
-) (*domain.PackageRef, error) {
+) (domain.Package, error) {
+	args := m.Called(ctx, catalogID, name)
+	return args.Get(0).(domain.Package), args.Error(1)
+}
+
+func (m *MockCatalogRepository) GetAvailableVersions(
+	ctx context.Context,
+	catalogID string,
+	name string,
+) ([]string, error) {
 	args := m.Called(ctx, catalogID, name)
 	if res := args.Get(0); res != nil {
-		return res.(*domain.PackageRef), args.Error(1)
+		return res.([]string), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -54,19 +63,6 @@ func (m *MockCatalogRepository) GetPackageSchema(
 		return res.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
-}
-
-func (m *MockCatalogRepository) ResolvePackage(
-	ctx context.Context,
-	catalogID string,
-	packageName string,
-	version string,
-) (domain.PackageVersion, error) {
-	args := m.Called(ctx, catalogID, packageName, version)
-	if res := args.Get(0); res != nil {
-		return res.(domain.PackageVersion), args.Error(1)
-	}
-	return domain.PackageVersion{}, args.Error(1)
 }
 
 // ---------- Setup Helper ----------
@@ -227,10 +223,7 @@ func TestGetPackage_Found(t *testing.T) {
 	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
-	expected := &domain.PackageRef{
-		Package:  domain.Package{Name: "my-chart", CatalogID: "my-catalog"},
-		Versions: []string{"1.0.0", "0.9.0"},
-	}
+	expected := domain.Package{Name: "my-chart", CatalogID: "my-catalog"}
 	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").Return(expected, nil)
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
@@ -247,7 +240,7 @@ func TestGetPackage_CatalogNotFound(t *testing.T) {
 	result, err := uc.GetPackage(ctx, "unknown-catalog", "my-chart")
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	assert.Nil(t, result)
+	assert.Equal(t, domain.Package{}, result)
 }
 
 // ❌ GetPackage — repo returns an error.
@@ -256,13 +249,13 @@ func TestGetPackage_RepoError(t *testing.T) {
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").
-		Return(nil, errors.New("network failure"))
+		Return(domain.Package{}, errors.New("network failure"))
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "network failure")
-	assert.Nil(t, result)
+	assert.Equal(t, domain.Package{}, result)
 }
 
 // ✅ GetPackageSchema returns the schema bytes when found.
