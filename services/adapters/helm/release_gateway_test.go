@@ -42,29 +42,26 @@ func TestStartInstallEmptyArgs(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"",
-		domain.PackageVersion{},
+		&domain.Package{},
+		"",
 		nil,
 		ports.HelmStartOptions{},
 	)
 	require.Error(t, err)
-
 }
 
 func TestStartInstallLocateChartError(t *testing.T) {
 	i := newAdapter(t, defaultCallbacks())
 
-	// Chart inexistant → act.LocateChart renvoie une erreur (pré-flight)
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "this-chart-does-not-exist",
-			},
-			Version: "0.1.0",
-			RepoURL: "fake-repo",
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      "this-chart-does-not-exist",
+			RepoURL:   "fake-repo",
 		},
+		"0.1.0",
 		nil,
 		ports.HelmStartOptions{},
 	)
@@ -82,14 +79,12 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 	err := i.StartInstall(
 		context.Background(),
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "",
-			},
-			Version: "0.1.0",
-			RepoURL: nonChartDir,
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      "",
+			RepoURL:   nonChartDir,
 		},
+		"0.1.0",
 		map[string]interface{}{},
 		ports.HelmStartOptions{},
 	)
@@ -109,20 +104,24 @@ func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 		OnError:   func(_, _ string, _ error) { errorCalled = true },
 	})
 
-	err := i.StartInstall(context.Background(), "rel", domain.PackageVersion{
-		Package: domain.Package{
+	err := i.StartInstall(
+		context.Background(),
+		"rel",
+		&domain.Package{
 			CatalogID: "fake-cat",
 			Name:      "unknown-chart",
+			RepoURL:   "fake-repo",
 		},
-		Version: "0.1.0",
-		RepoURL: "fake-repo",
-	}, nil, ports.HelmStartOptions{
-		Callbacks: ports.HelmStartCallbacks{
-			OnStart:   func(_, _ string) { startCalled = true },
-			OnSuccess: func(_, _ string) { successCalled = true },
-			OnError:   func(_, _ string, _ error) { errorCalled = true },
+		"0.1.0",
+		nil,
+		ports.HelmStartOptions{
+			Callbacks: ports.HelmStartCallbacks{
+				OnStart:   func(_, _ string) { startCalled = true },
+				OnSuccess: func(_, _ string) { successCalled = true },
+				OnError:   func(_, _ string, _ error) { errorCalled = true },
+			},
 		},
-	})
+	)
 	require.Error(t, err)
 
 	time.Sleep(50 * time.Millisecond)

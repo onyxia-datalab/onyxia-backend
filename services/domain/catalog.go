@@ -25,7 +25,8 @@ const (
 type CatalogService interface {
 	ListPublicCatalogs(ctx context.Context) ([]Catalog, error)
 	ListUserCatalogs(ctx context.Context) ([]Catalog, error)
-	GetPackage(ctx context.Context, catalogID string, packageName string) (*PackageRef, error)
+	GetPackage(ctx context.Context, catalogID string, packageName string) (Package, error)
+	GetAvailableVersions(ctx context.Context, catalogID string, packageName string) ([]string, error)
 	GetPackageSchema(
 		ctx context.Context,
 		catalogID string,

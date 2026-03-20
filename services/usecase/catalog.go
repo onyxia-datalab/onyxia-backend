@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -98,8 +99,12 @@ func (uc *Catalog) GetPackageSchema(
 	packageName string,
 	version string,
 ) ([]byte, error) {
-	if _, err := uc.findCatalog(catalogID); err != nil {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
 		return nil, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return nil, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
 	}
 	return uc.pkgRepo.GetPackageSchema(ctx, catalogID, packageName, version)
 }
@@ -117,25 +122,42 @@ func (uc *Catalog) GetPackage(
 	ctx context.Context,
 	catalogID string,
 	packageName string,
-) (*domain.PackageRef, error) {
-	if _, err := uc.findCatalog(catalogID); err != nil {
-		return nil, err
+) (domain.Package, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return domain.Package{}, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return domain.Package{}, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
 	}
 
 	pkg, err := uc.pkgRepo.GetPackage(ctx, catalogID, packageName)
 	if err != nil {
-		return nil, fmt.Errorf("catalog %q package %q: %w", catalogID, packageName, err)
-	}
-	if pkg == nil {
-		return nil, fmt.Errorf(
-			"package %q in catalog %q: %w",
-			packageName,
-			catalogID,
-			domain.ErrNotFound,
-		)
+		return domain.Package{}, fmt.Errorf("catalog %q package %q: %w", catalogID, packageName, err)
 	}
 
 	return pkg, nil
+}
+
+func (uc *Catalog) GetAvailableVersions(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) ([]string, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return nil, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
+	}
+
+	versions, err := uc.pkgRepo.GetAvailableVersions(ctx, catalogID, packageName)
+	if err != nil {
+		return nil, fmt.Errorf("catalog %q package %q versions: %w", catalogID, packageName, err)
+	}
+
+	return versions, nil
 }
 
 func (uc *Catalog) buildCatalogs(
@@ -149,9 +171,15 @@ func (uc *Catalog) buildCatalogs(
 			continue
 		}
 
-		pkgs, err := uc.pkgRepo.ListPackages(ctx, cfg.ID)
+		allPkgs, err := uc.pkgRepo.ListPackages(ctx, cfg.ID)
 		if err != nil {
 			return nil, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err)
+		}
+		pkgs := make([]domain.Package, 0, len(allPkgs))
+		for _, p := range allPkgs {
+			if !slices.Contains(cfg.Excluded, p.Name) {
+				pkgs = append(pkgs, p)
+			}
 		}
 
 		name, err := tools.NewLocalizedString(cfg.Name)
