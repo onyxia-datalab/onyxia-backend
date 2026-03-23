@@ -223,18 +223,22 @@ func (h *HelmPackageRepository) GetPackageSchema(
 // --- helm repo (index) ---
 
 func (h *HelmPackageRepository) loadIndex(catalogName string) (*repo.IndexFile, error) {
-	return h.indexes.Get(catalogName, h.catalogs[catalogName].IndexTTL, func() (*repo.IndexFile, error) {
-		cr := h.repos[catalogName]
-		indexPath, err := cr.DownloadIndexFile()
-		if err != nil {
-			return nil, fmt.Errorf("downloading helm index for %q: %w", catalogName, err)
-		}
-		idx, err := repo.LoadIndexFile(indexPath)
-		if err != nil {
-			return nil, fmt.Errorf("loading helm index for %q: %w", catalogName, err)
-		}
-		return idx, nil
-	})
+	return h.indexes.Get(
+		catalogName,
+		h.catalogs[catalogName].IndexTTL,
+		func() (*repo.IndexFile, error) {
+			cr := h.repos[catalogName]
+			indexPath, err := cr.DownloadIndexFile()
+			if err != nil {
+				return nil, fmt.Errorf("downloading helm index for %q: %w", catalogName, err)
+			}
+			idx, err := repo.LoadIndexFile(indexPath)
+			if err != nil {
+				return nil, fmt.Errorf("loading helm index for %q: %w", catalogName, err)
+			}
+			return idx, nil
+		},
+	)
 }
 
 // listCharts returns the latest version of each chart (helm search repo <catalog>).
@@ -312,6 +316,7 @@ func (h *HelmPackageRepository) listOCIPackages(cfg env.CatalogConfig) []domain.
 	return pkgs
 }
 
+// Helm pull oci://<registry>/<package>:<version>
 func (h *HelmPackageRepository) getOCIPackage(
 	cfg env.CatalogConfig,
 	name string,
@@ -320,10 +325,37 @@ func (h *HelmPackageRepository) getOCIPackage(
 	if err != nil {
 		return domain.Package{}, err
 	}
-	// TODO: pull chart to get metadata (description, icon, home URL)
+
+	if len(p.Versions) == 0 {
+		return domain.Package{CatalogID: cfg.ID, Name: p.Name, RepoURL: cfg.Location}, nil
+	}
+
+	chartRef := fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), name)
+
+	act := action.NewInstall(new(action.Configuration))
+	act.Version = p.Versions[0]
+
+	chartPath, err := act.LocateChart(chartRef, h.settings)
+	if err != nil {
+		return domain.Package{}, fmt.Errorf("locating OCI chart %q: %w", chartRef, err)
+	}
+
+	raw, err := loader.Load(chartPath)
+	if err != nil {
+		return domain.Package{}, fmt.Errorf("loading OCI chart %q: %w", chartRef, err)
+	}
+	ch, ok := raw.(*chartv2.Chart)
+	if !ok {
+		return domain.Package{}, fmt.Errorf("unexpected chart type %T", raw)
+	}
+
 	return domain.Package{
-		CatalogID: cfg.ID,
-		Name:      p.Name,
+		CatalogID:   cfg.ID,
+		Name:        p.Name,
+		Description: ch.Metadata.Description,
+		HomeUrl:     tools.MustParseURL(ch.Metadata.Home),
+		IconUrl:     tools.MustParseURL(ch.Metadata.Icon),
+		RepoURL:     cfg.Location,
 	}, nil
 }
 
