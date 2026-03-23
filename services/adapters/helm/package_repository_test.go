@@ -58,7 +58,9 @@ func newLocalHelmRepo(t *testing.T, charts ...*chartv2.Metadata) *localHelmRepo 
 
 func (l *localHelmRepo) newAdapter(t *testing.T) *HelmPackageRepository {
 	t.Helper()
-	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{l.cfg}, l.tmpDir)
+	client, err := NewClient(l.tmpDir)
+	require.NoError(t, err)
+	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{l.cfg}, client)
 	require.NoError(t, err)
 	return repoAdapter
 }
