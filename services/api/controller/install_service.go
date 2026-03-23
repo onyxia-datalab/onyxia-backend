@@ -67,15 +67,16 @@ func (ic *InstallController) InstallService(
 	}
 
 	dreq := domain.StartRequest{
-		Username:      u.Username,
-		CatalogID:     req.CatalogId,
-		PackageName:   req.PackageName,
-		Name:          req.Name,
-		Version:       req.Version.Or("latest"),
-		ReleaseID:     params.ReleaseId,
-		OnyxiaProject: params.XOnyxiaProject.Or(""),
-		FriendlyName:  req.FriendlyName.Or(req.PackageName),
-		Values:        values,
+		Username:     u.Username,
+		CatalogID:    req.CatalogId,
+		PackageName:  req.PackageName,
+		Name:         req.Name,
+		Version:      req.Version.Or("latest"),
+		ReleaseID:    params.ReleaseId,
+		Namespace:    params.XOnyxiaProject,
+		FriendlyName: req.FriendlyName.Or(req.PackageName),
+		Share:        req.Share.Or(false),
+		Values:       values,
 	}
 
 	// Execute use case.

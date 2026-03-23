@@ -124,9 +124,9 @@ paths:
         - $ref: "#/components/parameters/releaseId"
         - name: X-Onyxia-Project
           in: header
-          required: false
+          required: true
           schema: { type: string }
-          description: Project identifier in Onyxia
+          description: Project identifier in Onyxia (user or group namespace)
       requestBody:
         required: true
         content:
