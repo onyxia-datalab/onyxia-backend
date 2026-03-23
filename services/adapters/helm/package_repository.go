@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
@@ -26,12 +27,17 @@ var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
 // ensure chart package is referenced (used via chart.Charter interface from loader)
 var _ chart.Charter = (*chartv2.Chart)(nil)
 
+// ociPackageTTL is effectively infinite: OCI versions are immutable so
+// cached metadata never goes stale. Eviction happens on process restart.
+const ociPackageTTL = time.Duration(1<<63 - 1)
+
 type HelmPackageRepository struct {
 	repos          map[string]*repo.ChartRepository
 	catalogs       map[string]env.CatalogConfig
 	getters        getter.Providers
 	settings       *cli.EnvSettings
 	indexes        *tools.TTLCache[string, *repo.IndexFile]
+	ociPkgs        *tools.TTLCache[string, domain.Package]
 	registryClient *registry.Client
 }
 
@@ -81,6 +87,7 @@ func NewPackageRepository(
 		getters:        client.Getters,
 		settings:       client.Settings,
 		indexes:        tools.NewTTLCache[string, *repo.IndexFile](),
+		ociPkgs:        tools.NewTTLCache[string, domain.Package](),
 		registryClient: client.RegistryClient,
 	}, nil
 }
@@ -335,34 +342,36 @@ func (h *HelmPackageRepository) getOCIPackage(
 		return domain.Package{CatalogID: cfg.ID, Name: p.Name, RepoURL: cfg.Location}, nil
 	}
 
-	chartRef := fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), name)
+	return h.ociPkgs.Get(cfg.ID+"/"+name, ociPackageTTL, func() (domain.Package, error) {
+		chartRef := fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), name)
 
-	ociCfg := &action.Configuration{RegistryClient: h.registryClient}
-	act := action.NewInstall(ociCfg)
-	act.Version = p.Versions[0]
+		ociCfg := &action.Configuration{RegistryClient: h.registryClient}
+		act := action.NewInstall(ociCfg)
+		act.Version = p.Versions[0]
 
-	chartPath, err := act.LocateChart(chartRef, h.settings)
-	if err != nil {
-		return domain.Package{}, fmt.Errorf("locating OCI chart %q: %w", chartRef, err)
-	}
+		chartPath, err := act.LocateChart(chartRef, h.settings)
+		if err != nil {
+			return domain.Package{}, fmt.Errorf("locating OCI chart %q: %w", chartRef, err)
+		}
 
-	raw, err := loader.Load(chartPath)
-	if err != nil {
-		return domain.Package{}, fmt.Errorf("loading OCI chart %q: %w", chartRef, err)
-	}
-	ch, ok := raw.(*chartv2.Chart)
-	if !ok {
-		return domain.Package{}, fmt.Errorf("unexpected chart type %T", raw)
-	}
+		raw, err := loader.Load(chartPath)
+		if err != nil {
+			return domain.Package{}, fmt.Errorf("loading OCI chart %q: %w", chartRef, err)
+		}
+		ch, ok := raw.(*chartv2.Chart)
+		if !ok {
+			return domain.Package{}, fmt.Errorf("unexpected chart type %T", raw)
+		}
 
-	return domain.Package{
-		CatalogID:   cfg.ID,
-		Name:        p.Name,
-		Description: ch.Metadata.Description,
-		HomeUrl:     tools.MustParseURL(ch.Metadata.Home),
-		IconUrl:     tools.MustParseURL(ch.Metadata.Icon),
-		RepoURL:     cfg.Location,
-	}, nil
+		return domain.Package{
+			CatalogID:   cfg.ID,
+			Name:        p.Name,
+			Description: ch.Metadata.Description,
+			HomeUrl:     tools.MustParseURL(ch.Metadata.Home),
+			IconUrl:     tools.MustParseURL(ch.Metadata.Icon),
+			RepoURL:     cfg.Location,
+		}, nil
+	})
 }
 
 func findOCIPackage(cfg env.CatalogConfig, name string) (*env.OCIPackage, error) {
