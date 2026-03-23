@@ -1,4 +1,4 @@
-package helm
+package catalog
 
 import (
 	"fmt"
@@ -62,7 +62,7 @@ func versionFilterFrom(cfg env.CatalogConfig) (versionFilter, error) {
 			return nil, fmt.Errorf("catalog %q: multipleServicesMode=maxNumber requires maxNumberOfVersions", cfg.ID)
 		}
 		return maxNumber{n: *cfg.MaxNumberOfVersions}, nil
-	default: // "all" or unset
+	default:
 		return allVersions{}, nil
 	}
 }

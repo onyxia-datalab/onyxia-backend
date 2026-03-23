@@ -30,6 +30,7 @@ type HelmPackageRepository struct {
 	catalogs map[string]env.CatalogConfig
 	getters  getter.Providers
 	settings *cli.EnvSettings
+	indexes  *tools.TTLCache[string, *repo.IndexFile]
 }
 
 // --- Public (port interface) ---
@@ -49,10 +50,6 @@ func NewPackageRepository(
 
 	for _, cfg := range catalogs {
 		catalogMap[cfg.ID] = cfg
-
-		if _, err := versionFilterFrom(cfg); err != nil {
-			return nil, err
-		}
 
 		if cfg.Type != env.CatalogTypeHelmRepo {
 			continue
@@ -87,6 +84,7 @@ func NewPackageRepository(
 		catalogs: catalogMap,
 		getters:  getters,
 		settings: settings,
+		indexes:  tools.NewTTLCache[string, *repo.IndexFile](),
 	}, nil
 }
 
@@ -224,18 +222,19 @@ func (h *HelmPackageRepository) GetPackageSchema(
 
 // --- helm repo (index) ---
 
-// TODO: we could optimize by caching the index in memory and refreshing it with a TTL (same as helm index cache)
 func (h *HelmPackageRepository) loadIndex(catalogName string) (*repo.IndexFile, error) {
-	cr := h.repos[catalogName]
-	indexPath, err := cr.DownloadIndexFile()
-	if err != nil {
-		return nil, fmt.Errorf("downloading helm index for %q: %w", catalogName, err)
-	}
-	idx, err := repo.LoadIndexFile(indexPath)
-	if err != nil {
-		return nil, fmt.Errorf("loading helm index for %q: %w", catalogName, err)
-	}
-	return idx, nil
+	return h.indexes.Get(catalogName, h.catalogs[catalogName].IndexTTL, func() (*repo.IndexFile, error) {
+		cr := h.repos[catalogName]
+		indexPath, err := cr.DownloadIndexFile()
+		if err != nil {
+			return nil, fmt.Errorf("downloading helm index for %q: %w", catalogName, err)
+		}
+		idx, err := repo.LoadIndexFile(indexPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading helm index for %q: %w", catalogName, err)
+		}
+		return idx, nil
+	})
 }
 
 // listCharts returns the latest version of each chart (helm search repo <catalog>).
@@ -269,9 +268,6 @@ func (h *HelmPackageRepository) getChart(
 
 	cv, err := idx.Get(packageName, "")
 	if err != nil {
-		return nil, fmt.Errorf("getting chart %q: %w", packageName, err)
-	}
-	if cv == nil {
 		return nil, fmt.Errorf(
 			"%w: chart %q not found in repo %q",
 			domain.ErrNotFound,

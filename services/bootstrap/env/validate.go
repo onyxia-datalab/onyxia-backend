@@ -32,7 +32,13 @@ func ValidateCatalogConfig(c CatalogConfig) error {
 		if c.Packages != nil {
 			return errors.New("helm catalog should not have packages")
 		}
+		if c.IndexTTL < 0 {
+			return fmt.Errorf("catalog %q: indexTtl must not be negative", c.ID)
+		}
 	case CatalogTypeOCI:
+		if c.IndexTTL != 0 {
+			return fmt.Errorf("catalog %q: indexTtl is not supported for OCI catalogs", c.ID)
+		}
 		if err := validateOCI(c); err != nil {
 			return err
 		}
