@@ -70,7 +70,7 @@ func validateCommon(cc CatalogConfig) error {
 	}
 
 	switch cc.MultipleServicesMode {
-	case MultipleServicesAll, MultipleServicesLatest, MultipleServicesSkipPatches:
+	case MultipleServicesAll, MultipleServicesLatest, MultipleServicesSkipPatches, "":
 		if cc.MaxNumberOfVersions != nil {
 			return fmt.Errorf(
 				"catalog %q: maxNumberOfVersions must not be set when multipleServicesMode=%q",
@@ -106,7 +106,12 @@ func validateCommon(cc CatalogConfig) error {
 			return fmt.Errorf("catalog %q: restriction missing userAttribute.key", cc.ID)
 		}
 		if _, err := regexp.Compile(r.Match); err != nil {
-			return fmt.Errorf("catalog %q: invalid restriction regex for key %q: %w", cc.ID, r.UserAttributeKey, err)
+			return fmt.Errorf(
+				"catalog %q: invalid restriction regex for key %q: %w",
+				cc.ID,
+				r.UserAttributeKey,
+				err,
+			)
 		}
 	}
 
