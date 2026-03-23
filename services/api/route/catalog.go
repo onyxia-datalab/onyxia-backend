@@ -4,7 +4,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
 )
 
 func SetupCatalogController(app *bootstrap.Application) (*controller.CatalogController, error) {
@@ -14,7 +14,7 @@ func SetupCatalogController(app *bootstrap.Application) (*controller.CatalogCont
 		return nil, err
 	}
 
-	catalogUc := usecase.NewCatalogService(
+	catalogUc := catalog.NewCatalogService(
 		app.Env.CatalogsConfig,
 		pkgRepo,
 		app.UserContextReader,
