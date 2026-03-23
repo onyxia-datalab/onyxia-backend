@@ -14,10 +14,11 @@ import (
 
 func SetupInstallController(
 	app *bootstrap.Application,
+	helmClient *helm.Client,
 ) (*controller.InstallController, error) {
 
 	//TODO: pass callbacks properly
-	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), ports.HelmStartCallbacks{
+	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), helmClient, ports.HelmStartCallbacks{
 		OnStart: func(release, chart string) {
 			slog.Info("Helm install started",
 				slog.String("release", release),
@@ -43,7 +44,7 @@ func SetupInstallController(
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, helmClient)
 	if err != nil {
 		return nil, err
 	}

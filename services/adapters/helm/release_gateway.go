@@ -25,24 +25,24 @@ var _ ports.HelmReleasesGateway = (*Helm)(nil)
 
 func NewReleaseGtw(
 	k8sConfig *rest.Config,
+	client *Client,
 	global ports.HelmStartCallbacks,
 ) (*Helm, error) {
-
-	settings := cli.New()
 
 	cfg := new(action.Configuration)
 	err := cfg.Init(
 		&StaticRESTClientGetter{config: k8sConfig},
-		settings.Namespace(),
+		client.Settings.Namespace(),
 		"secret",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init Helm config: %w", err)
 	}
+	cfg.RegistryClient = client.RegistryClient
 
 	return &Helm{
 		cfg:      cfg,
-		settings: settings,
+		settings: client.Settings,
 		global:   global,
 	}, nil
 }
