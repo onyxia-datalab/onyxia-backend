@@ -1,4 +1,4 @@
-package usecase
+package catalog
 
 import (
 	"context"
@@ -159,7 +159,7 @@ func TestListUserCatalogs_Match(t *testing.T) {
 	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1].ID)
 }
 
-// ❌ User doesn’t match any restriction — no catalogs returned.
+// ❌ User doesn't match any restriction — no catalogs returned.
 func TestListUserCatalogs_NoMatch(t *testing.T) {
 	user := &usercontext.User{
 		Username: "guest",
@@ -297,4 +297,57 @@ func TestGetPackageSchema_RepoError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema fetch failed")
 	assert.Nil(t, result)
+}
+
+// ✅ GetAvailableVersions applies MaxNumber filter.
+func TestGetAvailableVersions_MaxNumber(t *testing.T) {
+	n := 2
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesMaxNumber,
+		MaxNumberOfVersions:  &n,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"3.0.0", "2.0.0", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"3.0.0", "2.0.0"}, versions)
+}
+
+// ✅ GetAvailableVersions applies SkipPatches filter.
+func TestGetAvailableVersions_SkipPatches(t *testing.T) {
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesSkipPatches,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"2.1.1", "2.1.0", "1.0.5", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"2.1.1", "1.0.5"}, versions)
+}
+
+// ✅ GetAvailableVersions applies Latest filter.
+func TestGetAvailableVersions_Latest(t *testing.T) {
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesLatest,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"2.0.0", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"2.0.0"}, versions)
 }
