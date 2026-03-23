@@ -22,7 +22,10 @@ func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
 		Host: "https://fake-cluster",
 	}
 
-	adapter, err := NewReleaseGtw(k8sCfg, cb)
+	client, err := NewClient("")
+	require.NoError(t, err)
+
+	adapter, err := NewReleaseGtw(k8sCfg, client, cb)
 	require.NoError(t, err)
 
 	return adapter

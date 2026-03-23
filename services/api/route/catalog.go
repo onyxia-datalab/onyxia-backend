@@ -7,9 +7,9 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
 )
 
-func SetupCatalogController(app *bootstrap.Application) (*controller.CatalogController, error) {
+func SetupCatalogController(app *bootstrap.Application, helmClient *helm.Client) (*controller.CatalogController, error) {
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, helmClient)
 	if err != nil {
 		return nil, err
 	}

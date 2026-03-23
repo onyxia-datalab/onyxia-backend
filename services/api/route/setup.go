@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	middleware "github.com/onyxia-datalab/onyxia-backend/services/api/middleware"
 	oas "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 
@@ -23,13 +24,18 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to initialize OIDC middleware: %w", err)
 	}
 
-	installCtrl, err := SetupInstallController(app)
+	helmClient, err := helm.NewClient("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize helm client: %w", err)
+	}
+
+	installCtrl, err := SetupInstallController(app, helmClient)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup install controller: %w", err)
 	}
 
-	catalogCtrl, err := SetupCatalogController(app)
+	catalogCtrl, err := SetupCatalogController(app, helmClient)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup catalog controller: %w", err)
