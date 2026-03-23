@@ -1,5 +1,7 @@
 package env
 
+import "time"
+
 type CatalogConfig struct {
 	Type CatalogType `json:"type"` // "helm" or "oci"`
 
@@ -19,6 +21,8 @@ type CatalogConfig struct {
 	Password      *string           `mapstructure:"password"          json:"password"`
 	Location      string            `mapstructure:"location"          json:"location"`
 
+	// Specific to helm repo
+	IndexTTL             time.Duration        `mapstructure:"indexTtl"             json:"indexTtl"`
 	MultipleServicesMode MultipleServicesMode `mapstructure:"multipleServicesMode" json:"multipleServicesMode"`
 	MaxNumberOfVersions  *int                 `mapstructure:"maxNumberOfVersions"  json:"maxNumberOfVersions,omitempty"`
 

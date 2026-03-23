@@ -1,4 +1,4 @@
-package usecase
+package catalog
 
 import (
 	"context"
@@ -157,7 +157,11 @@ func (uc *Catalog) GetAvailableVersions(
 		return nil, fmt.Errorf("catalog %q package %q versions: %w", catalogID, packageName, err)
 	}
 
-	return versions, nil
+	filter, err := versionFilterFrom(*cfg)
+	if err != nil {
+		return nil, err
+	}
+	return filter.apply(versions), nil
 }
 
 func (uc *Catalog) buildCatalogs(
