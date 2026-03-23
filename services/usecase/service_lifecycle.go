@@ -38,8 +38,7 @@ func (uc *ServiceLifecycle) Start(
 		return domain.StartResponse{}, fmt.Errorf("get package: %w", err)
 	}
 
-	// 2) Create the  Secret Onyxia
-
+	// 2) Create the Onyxia Secret
 	secretData := map[string][]byte{
 		"catalog":      []byte(req.CatalogID),
 		"friendlyName": []byte(req.FriendlyName),

@@ -617,10 +617,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 			Explode: false,
 		}
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.XOnyxiaProject.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
 		}); err != nil {
 			return res, errors.Wrap(err, "encode header")
 		}

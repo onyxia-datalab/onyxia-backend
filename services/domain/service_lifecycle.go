@@ -5,17 +5,16 @@ import (
 )
 
 type StartRequest struct {
-	Username      string
-	OnyxiaProject string
-	CatalogID     string
-	PackageName   string
-	Version       string
-	ReleaseID     string
-	Namespace     string
-	FriendlyName  string
-	Name          string
-	Share         bool
-	Values        map[string]interface{}
+	Username     string
+	CatalogID    string
+	PackageName  string
+	Version      string
+	ReleaseID    string
+	Namespace    string
+	FriendlyName string
+	Name         string
+	Share        bool
+	Values       map[string]interface{}
 }
 
 type StartResponse struct {

@@ -312,8 +312,8 @@ func decodeGetPackageSchemaParams(args [3]string, argsEscaped bool, r *http.Requ
 type InstallServiceParams struct {
 	// Logical release identifier.
 	ReleaseId string
-	// Project identifier in Onyxia.
-	XOnyxiaProject OptString `json:",omitempty,omitzero"`
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
 }
 
 func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
@@ -329,9 +329,7 @@ func unpackInstallServiceParams(packed middleware.Parameters) (params InstallSer
 			Name: "X-Onyxia-Project",
 			In:   "header",
 		}
-		if v, ok := packed[key]; ok {
-			params.XOnyxiaProject = v.(OptString)
-		}
+		params.XOnyxiaProject = packed[key].(string)
 	}
 	return params
 }
@@ -411,28 +409,23 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 		}
 		if err := h.HasParam(cfg); err == nil {
 			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotXOnyxiaProjectVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotXOnyxiaProjectVal = c
-					return nil
-				}(); err != nil {
+				val, err := d.DecodeValue()
+				if err != nil {
 					return err
 				}
-				params.XOnyxiaProject.SetTo(paramsDotXOnyxiaProjectVal)
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
 				return nil
 			}); err != nil {
 				return err
 			}
+		} else {
+			return err
 		}
 		return nil
 	}(); err != nil {
