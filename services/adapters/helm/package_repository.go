@@ -17,6 +17,7 @@ import (
 	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
 	"helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/registry"
 	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
@@ -26,27 +27,22 @@ var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
 var _ chart.Charter = (*chartv2.Chart)(nil)
 
 type HelmPackageRepository struct {
-	repos    map[string]*repo.ChartRepository
-	catalogs map[string]env.CatalogConfig
-	getters  getter.Providers
-	settings *cli.EnvSettings
-	indexes  *tools.TTLCache[string, *repo.IndexFile]
+	repos          map[string]*repo.ChartRepository
+	catalogs       map[string]env.CatalogConfig
+	getters        getter.Providers
+	settings       *cli.EnvSettings
+	indexes        *tools.TTLCache[string, *repo.IndexFile]
+	registryClient *registry.Client
 }
 
 // --- Public (port interface) ---
 
 func NewPackageRepository(
 	catalogs []env.CatalogConfig,
-	cacheDir string,
+	client *Client,
 ) (*HelmPackageRepository, error) {
-	settings := cli.New()
-	if cacheDir != "" {
-		settings.RepositoryCache = cacheDir
-	}
-
 	repos := make(map[string]*repo.ChartRepository)
 	catalogMap := make(map[string]env.CatalogConfig)
-	getters := getter.All(settings)
 
 	for _, cfg := range catalogs {
 		catalogMap[cfg.ID] = cfg
@@ -64,27 +60,28 @@ func NewPackageRepository(
 			CAFile:                tools.Deref(cfg.CAFile),
 		}
 
-		cr, err := repo.NewChartRepository(entry, getters)
+		cr, err := repo.NewChartRepository(entry, client.Getters)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create repo %q: %w", cfg.ID, err)
 		}
-		cr.CachePath = settings.RepositoryCache
+		cr.CachePath = client.Settings.RepositoryCache
 		repos[cfg.ID] = cr
 
 		slog.Info(
 			"Helm repo configured",
 			slog.String("catalog", cfg.ID),
 			slog.String("url", cfg.Location),
-			slog.String("cache", settings.RepositoryCache),
+			slog.String("cache", client.Settings.RepositoryCache),
 		)
 	}
 
 	return &HelmPackageRepository{
-		repos:    repos,
-		catalogs: catalogMap,
-		getters:  getters,
-		settings: settings,
-		indexes:  tools.NewTTLCache[string, *repo.IndexFile](),
+		repos:          repos,
+		catalogs:       catalogMap,
+		getters:        client.Getters,
+		settings:       client.Settings,
+		indexes:        tools.NewTTLCache[string, *repo.IndexFile](),
+		registryClient: client.RegistryClient,
 	}, nil
 }
 
@@ -199,10 +196,18 @@ func (h *HelmPackageRepository) GetPackageSchema(
 		return nil, fmt.Errorf("%w: catalog %q not found", domain.ErrNotFound, catalogID)
 	}
 
-	chartRef := fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), packageName)
-
-	act := action.NewInstall(new(action.Configuration))
+	schemaCfg := &action.Configuration{RegistryClient: h.registryClient}
+	act := action.NewInstall(schemaCfg)
 	act.Version = version
+
+	var chartRef string
+	switch cfg.Type {
+	case env.CatalogTypeHelmRepo:
+		act.RepoURL = cfg.Location
+		chartRef = packageName
+	default: // OCI
+		chartRef = fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), packageName)
+	}
 
 	chartPath, err := act.LocateChart(chartRef, h.settings)
 	if err != nil {
@@ -332,7 +337,8 @@ func (h *HelmPackageRepository) getOCIPackage(
 
 	chartRef := fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), name)
 
-	act := action.NewInstall(new(action.Configuration))
+	ociCfg := &action.Configuration{RegistryClient: h.registryClient}
+	act := action.NewInstall(ociCfg)
 	act.Version = p.Versions[0]
 
 	chartPath, err := act.LocateChart(chartRef, h.settings)
