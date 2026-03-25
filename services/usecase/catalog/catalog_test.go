@@ -1,7 +1,8 @@
-package usecase
+package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // ---------- Mock Repository ----------
@@ -35,10 +37,19 @@ func (m *MockCatalogRepository) GetPackage(
 	ctx context.Context,
 	catalogID string,
 	name string,
-) (*domain.PackageRef, error) {
+) (domain.Package, error) {
+	args := m.Called(ctx, catalogID, name)
+	return args.Get(0).(domain.Package), args.Error(1)
+}
+
+func (m *MockCatalogRepository) GetAvailableVersions(
+	ctx context.Context,
+	catalogID string,
+	name string,
+) ([]string, error) {
 	args := m.Called(ctx, catalogID, name)
 	if res := args.Get(0); res != nil {
-		return res.(*domain.PackageRef), args.Error(1)
+		return res.([]string), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -54,19 +65,6 @@ func (m *MockCatalogRepository) GetPackageSchema(
 		return res.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
-}
-
-func (m *MockCatalogRepository) ResolvePackage(
-	ctx context.Context,
-	catalogID string,
-	packageName string,
-	version string,
-) (domain.PackageVersion, error) {
-	args := m.Called(ctx, catalogID, packageName, version)
-	if res := args.Get(0); res != nil {
-		return res.(domain.PackageVersion), args.Error(1)
-	}
-	return domain.PackageVersion{}, args.Error(1)
 }
 
 // ---------- Setup Helper ----------
@@ -93,7 +91,7 @@ func setupCatalogUsecase(
 		}
 	}
 
-	uc := NewCatalogService(cfgs, repo, reader)
+	uc := NewCatalogService(cfgs, env.SchemasConfig{}, repo, reader)
 	return uc, ctx, repo
 }
 
@@ -163,7 +161,7 @@ func TestListUserCatalogs_Match(t *testing.T) {
 	repo.AssertNotCalled(t, "ListPackages", mock.Anything, cfgs[1].ID)
 }
 
-// ❌ User doesn’t match any restriction — no catalogs returned.
+// ❌ User doesn't match any restriction — no catalogs returned.
 func TestListUserCatalogs_NoMatch(t *testing.T) {
 	user := &usercontext.User{
 		Username: "guest",
@@ -227,10 +225,7 @@ func TestGetPackage_Found(t *testing.T) {
 	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
-	expected := &domain.PackageRef{
-		Package:  domain.Package{Name: "my-chart", CatalogID: "my-catalog"},
-		Versions: []string{"1.0.0", "0.9.0"},
-	}
+	expected := domain.Package{Name: "my-chart", CatalogID: "my-catalog"}
 	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").Return(expected, nil)
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
@@ -247,7 +242,7 @@ func TestGetPackage_CatalogNotFound(t *testing.T) {
 	result, err := uc.GetPackage(ctx, "unknown-catalog", "my-chart")
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	assert.Nil(t, result)
+	assert.Equal(t, domain.Package{}, result)
 }
 
 // ❌ GetPackage — repo returns an error.
@@ -256,13 +251,13 @@ func TestGetPackage_RepoError(t *testing.T) {
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").
-		Return(nil, errors.New("network failure"))
+		Return(domain.Package{}, errors.New("network failure"))
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "my-chart")
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "network failure")
-	assert.Nil(t, result)
+	assert.Equal(t, domain.Package{}, result)
 }
 
 // ✅ GetPackageSchema returns the schema bytes when found.
@@ -304,4 +299,141 @@ func TestGetPackageSchema_RepoError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema fetch failed")
 	assert.Nil(t, result)
+}
+
+// ✅ GetPackageSchema applies instance-wide override.
+func TestGetPackageSchema_InstanceOverride(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	schemasConfig := env.SchemasConfig{
+		Enabled: true,
+		Files: []env.SchemaFile{
+			{
+				RelativePath: "ide/customImage.json",
+				Content:      `{"type":"string","const":"overridden"}`,
+			},
+		},
+	}
+	ctx, reader, _ := usercontext.NewTestUserContext(usercontext.DefaultTestUser())
+	repo := new(MockCatalogRepository)
+	uc := NewCatalogService(cfgs, schemasConfig, repo, reader)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"ide/customImage.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	assert.Equal(t, "overridden", got["const"])
+}
+
+// ✅ GetPackageSchema applies role-specific override over instance-wide.
+func TestGetPackageSchema_RoleOverrideTakesPrecedenceOverInstance(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	schemasConfig := env.SchemasConfig{
+		Enabled: true,
+		Files: []env.SchemaFile{
+			{RelativePath: "ide/resources.json", Content: `{"title":"instance-override"}`},
+		},
+		Roles: []env.RoleSchemas{
+			{
+				RoleName: "fullgpu",
+				Files: []env.SchemaFile{
+					{RelativePath: "ide/resources.json", Content: `{"title":"role-override"}`},
+				},
+			},
+		},
+	}
+	user := &usercontext.User{
+		Username: "gpu-user",
+		Roles:    []string{"fullgpu"},
+	}
+	ctx, reader, _ := usercontext.NewTestUserContext(user)
+	repo := new(MockCatalogRepository)
+	uc := NewCatalogService(cfgs, schemasConfig, repo, reader)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"ide/resources.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	assert.Equal(t, "role-override", got["title"])
+}
+
+// ✅ GetPackageSchema leaves unknown overwriteSchemaWith paths unchanged.
+func TestGetPackageSchema_UnknownPathLeftUnchanged(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"unknown/path.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	// Node must remain unchanged since the path is unknown.
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	xOnyxia := got["x-onyxia"].(map[string]any)
+	assert.Equal(t, "unknown/path.json", xOnyxia["overwriteSchemaWith"])
+}
+
+// ✅ GetAvailableVersions applies MaxNumber filter.
+func TestGetAvailableVersions_MaxNumber(t *testing.T) {
+	n := 2
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesMaxNumber,
+		MaxNumberOfVersions:  &n,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"3.0.0", "2.0.0", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"3.0.0", "2.0.0"}, versions)
+}
+
+// ✅ GetAvailableVersions applies SkipPatches filter.
+func TestGetAvailableVersions_SkipPatches(t *testing.T) {
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesSkipPatches,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"2.1.1", "2.1.0", "1.0.5", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"2.1.1", "1.0.5"}, versions)
+}
+
+// ✅ GetAvailableVersions applies Latest filter.
+func TestGetAvailableVersions_Latest(t *testing.T) {
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesLatest,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, cfgs[0].ID, "my-chart").
+		Return([]string{"2.0.0", "1.0.0"}, nil)
+
+	versions, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"2.0.0"}, versions)
 }

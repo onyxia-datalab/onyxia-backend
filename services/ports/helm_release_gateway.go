@@ -21,7 +21,8 @@ type HelmReleasesGateway interface {
 	StartInstall(
 		ctx context.Context,
 		releaseName string,
-		pkg domain.PackageVersion,
+		pkg *domain.Package,
+		version string,
 		vals map[string]interface{},
 		opts HelmStartOptions,
 	) error

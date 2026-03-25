@@ -25,24 +25,24 @@ var _ ports.HelmReleasesGateway = (*Helm)(nil)
 
 func NewReleaseGtw(
 	k8sConfig *rest.Config,
+	client *Client,
 	global ports.HelmStartCallbacks,
 ) (*Helm, error) {
-
-	settings := cli.New()
 
 	cfg := new(action.Configuration)
 	err := cfg.Init(
 		&StaticRESTClientGetter{config: k8sConfig},
-		settings.Namespace(),
+		client.Settings.Namespace(),
 		"secret",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init Helm config: %w", err)
 	}
+	cfg.RegistryClient = client.RegistryClient
 
 	return &Helm{
 		cfg:      cfg,
-		settings: settings,
+		settings: client.Settings,
 		global:   global,
 	}, nil
 }
@@ -51,7 +51,8 @@ func NewReleaseGtw(
 func (i *Helm) StartInstall(
 	ctx context.Context,
 	releaseName string,
-	pkg domain.PackageVersion,
+	pkg *domain.Package,
+	version string,
 	vals map[string]interface{},
 	opts ports.HelmStartOptions,
 ) error {
@@ -65,7 +66,7 @@ func (i *Helm) StartInstall(
 	act := action.NewInstall(i.cfg)
 	act.ReleaseName = releaseName
 	act.Namespace = i.settings.Namespace()
-	act.Version = pkg.Version
+	act.Version = version
 
 	chartPath, err := act.LocateChart(chartRef, i.settings)
 	if err != nil {

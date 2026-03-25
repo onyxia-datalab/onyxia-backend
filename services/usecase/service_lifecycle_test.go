@@ -21,11 +21,12 @@ var _ ports.HelmReleasesGateway = (*MockHelmReleasesGateway)(nil)
 func (m *MockHelmReleasesGateway) StartInstall(
 	ctx context.Context,
 	releaseName string,
-	pkg domain.PackageVersion,
+	pkg *domain.Package,
+	version string,
 	vals map[string]interface{},
 	opts ports.HelmStartOptions,
 ) error {
-	return m.Called(ctx, releaseName, pkg, vals, opts).Error(0)
+	return m.Called(ctx, releaseName, pkg, version, vals, opts).Error(0)
 }
 
 type MockOnyxiaSecretGateway struct{ mock.Mock }
@@ -89,14 +90,11 @@ func baseRequest() domain.StartRequest {
 	}
 }
 
-func resolvedPkg(req domain.StartRequest) domain.PackageVersion {
-	return domain.PackageVersion{
-		Package: domain.Package{
-			Name:      req.PackageName,
-			CatalogID: req.CatalogID,
-		},
-		Version: req.Version,
-		RepoURL: "https://charts.example.com",
+func resolvedPkg(req domain.StartRequest) domain.Package {
+	return domain.Package{
+		Name:      req.PackageName,
+		CatalogID: req.CatalogID,
+		RepoURL:   "https://charts.example.com",
 	}
 }
 
@@ -108,11 +106,11 @@ func TestStart_Success(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("ResolvePackage", ctx, req.CatalogID, req.PackageName, req.Version).
+	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", ctx, req.Name, pkg, req.Values, mock.Anything).
+	m.helm.On("StartInstall", ctx, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
@@ -130,7 +128,7 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 	req.Share = true
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("ResolvePackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID,
 		map[string][]byte{
@@ -140,7 +138,7 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 			"share":        []byte("true"),
 		},
 	).Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
@@ -149,13 +147,13 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 	m.secrets.AssertExpectations(t)
 }
 
-// ❌ ResolvePackage fails → error propagated, no further calls.
-func TestStart_ResolvePackageError(t *testing.T) {
+// ❌ GetPackage fails → error propagated, no further calls.
+func TestStart_GetPackageError(t *testing.T) {
 	uc, ctx, m := setupServiceLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("ResolvePackage", ctx, req.CatalogID, req.PackageName, req.Version).
-		Return(domain.PackageVersion{}, errors.New("index unavailable"))
+	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+		Return(domain.Package{}, errors.New("index unavailable"))
 
 	_, err := uc.Start(ctx, req)
 
@@ -164,13 +162,13 @@ func TestStart_ResolvePackageError(t *testing.T) {
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
-// ❌ ResolvePackage returns ErrNotFound → propagated.
+// ❌ GetPackage returns ErrNotFound → propagated.
 func TestStart_PackageNotFound(t *testing.T) {
 	uc, ctx, m := setupServiceLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("ResolvePackage", ctx, req.CatalogID, req.PackageName, req.Version).
-		Return(domain.PackageVersion{}, domain.ErrNotFound)
+	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+		Return(domain.Package{}, domain.ErrNotFound)
 
 	_, err := uc.Start(ctx, req)
 
@@ -185,7 +183,7 @@ func TestStart_SecretError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("ResolvePackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("k8s unavailable"))
@@ -202,11 +200,11 @@ func TestStart_HelmError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("ResolvePackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("invalid release name"))
 
 	_, err := uc.Start(ctx, req)

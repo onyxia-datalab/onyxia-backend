@@ -32,15 +32,13 @@ func (uc *ServiceLifecycle) Start(
 	req domain.StartRequest,
 ) (domain.StartResponse, error) {
 
-	// 1) Get the package from catalog + packageName + packageVersion
-	pkg, err := uc.pkgRepo.ResolvePackage(ctx, req.CatalogID, req.PackageName, req.Version)
-
+	// 1) Get the package from catalog
+	pkg, err := uc.pkgRepo.GetPackage(ctx, req.CatalogID, req.PackageName)
 	if err != nil {
-		return domain.StartResponse{}, fmt.Errorf("resolve package: %w", err)
+		return domain.StartResponse{}, fmt.Errorf("get package: %w", err)
 	}
 
-	// 2) Create the  Secret Onyxia
-
+	// 2) Create the Onyxia Secret
 	secretData := map[string][]byte{
 		"catalog":      []byte(req.CatalogID),
 		"friendlyName": []byte(req.FriendlyName),
@@ -80,7 +78,7 @@ func (uc *ServiceLifecycle) Start(
 		},
 	}
 
-	if err := uc.helm.StartInstall(ctx, req.Name, pkg, req.Values, opts); err != nil {
+	if err := uc.helm.StartInstall(ctx, req.Name, &pkg, req.Version, req.Values, opts); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("helm start: %w", err)
 	}
 
