@@ -50,7 +50,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}:
+  /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema:
     get:
       security:
         - oidc: []
