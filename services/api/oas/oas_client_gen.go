@@ -46,7 +46,7 @@ type Invoker interface {
 	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 	// and roles.
 	//
-	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService invokes installService operation.
 	//
@@ -370,7 +370,7 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 // Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 // and roles.
 //
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 func (c *Client) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error) {
 	res, err := c.sendGetPackageSchema(ctx, params)
 	return res, err
@@ -380,7 +380,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getPackageSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
+		semconv.URLTemplateKey.String("/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -413,8 +413,8 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [6]string
-	pathParts[0] = "/api/services/schemas/"
+	var pathParts [7]string
+	pathParts[0] = "/api/services/catalogs/"
 	{
 		// Encode "catalogId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -433,7 +433,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/packageName/"
+	pathParts[2] = "/packages/"
 	{
 		// Encode "packageName" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -471,6 +471,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 		}
 		pathParts[5] = encoded
 	}
+	pathParts[6] = "/schema"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
