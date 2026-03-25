@@ -37,7 +37,7 @@ func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackag
 // Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 // and roles.
 //
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (r GetPackageSchemaRes, _ error) {
 	return r, ht.ErrNotImplemented
 }

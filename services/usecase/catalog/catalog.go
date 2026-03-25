@@ -18,6 +18,7 @@ type Catalog struct {
 	envCatalogConfig []env.CatalogConfig
 	pkgRepo          ports.PackageRepository
 	userReader       usercontext.Reader
+	schemaResolver   *schemaResolver
 }
 
 var _ domain.CatalogService = (*Catalog)(nil)
@@ -25,6 +26,7 @@ var _ domain.CatalogService = (*Catalog)(nil)
 // Constructor
 func NewCatalogService(
 	envCatalogConfig []env.CatalogConfig,
+	schemasConfig env.SchemasConfig,
 	pkgRepo ports.PackageRepository,
 	userReader usercontext.Reader,
 ) *Catalog {
@@ -32,6 +34,7 @@ func NewCatalogService(
 		envCatalogConfig: envCatalogConfig,
 		pkgRepo:          pkgRepo,
 		userReader:       userReader,
+		schemaResolver:   newSchemaResolver(schemasConfig),
 	}
 }
 
@@ -106,7 +109,14 @@ func (uc *Catalog) GetPackageSchema(
 	if slices.Contains(cfg.Excluded, packageName) {
 		return nil, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
 	}
-	return uc.pkgRepo.GetPackageSchema(ctx, catalogID, packageName, version)
+
+	raw, err := uc.pkgRepo.GetPackageSchema(ctx, catalogID, packageName, version)
+	if err != nil {
+		return nil, err
+	}
+
+	roles, _ := uc.userReader.GetRoles(ctx)
+	return applyOverwrites(raw, uc.schemaResolver, roles)
 }
 
 func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {

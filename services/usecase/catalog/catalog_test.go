@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // ---------- Mock Repository ----------
@@ -89,7 +91,7 @@ func setupCatalogUsecase(
 		}
 	}
 
-	uc := NewCatalogService(cfgs, repo, reader)
+	uc := NewCatalogService(cfgs, env.SchemasConfig{}, repo, reader)
 	return uc, ctx, repo
 }
 
@@ -297,6 +299,90 @@ func TestGetPackageSchema_RepoError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "schema fetch failed")
 	assert.Nil(t, result)
+}
+
+// ✅ GetPackageSchema applies instance-wide override.
+func TestGetPackageSchema_InstanceOverride(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	schemasConfig := env.SchemasConfig{
+		Enabled: true,
+		Files: []env.SchemaFile{
+			{
+				RelativePath: "ide/customImage.json",
+				Content:      `{"type":"string","const":"overridden"}`,
+			},
+		},
+	}
+	ctx, reader, _ := usercontext.NewTestUserContext(usercontext.DefaultTestUser())
+	repo := new(MockCatalogRepository)
+	uc := NewCatalogService(cfgs, schemasConfig, repo, reader)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"ide/customImage.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	assert.Equal(t, "overridden", got["const"])
+}
+
+// ✅ GetPackageSchema applies role-specific override over instance-wide.
+func TestGetPackageSchema_RoleOverrideTakesPrecedenceOverInstance(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	schemasConfig := env.SchemasConfig{
+		Enabled: true,
+		Files: []env.SchemaFile{
+			{RelativePath: "ide/resources.json", Content: `{"title":"instance-override"}`},
+		},
+		Roles: []env.RoleSchemas{
+			{
+				RoleName: "fullgpu",
+				Files: []env.SchemaFile{
+					{RelativePath: "ide/resources.json", Content: `{"title":"role-override"}`},
+				},
+			},
+		},
+	}
+	user := &usercontext.User{
+		Username: "gpu-user",
+		Roles:    []string{"fullgpu"},
+	}
+	ctx, reader, _ := usercontext.NewTestUserContext(user)
+	repo := new(MockCatalogRepository)
+	uc := NewCatalogService(cfgs, schemasConfig, repo, reader)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"ide/resources.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	assert.Equal(t, "role-override", got["title"])
+}
+
+// ✅ GetPackageSchema leaves unknown overwriteSchemaWith paths unchanged.
+func TestGetPackageSchema_UnknownPathLeftUnchanged(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"unknown/path.json"}}`)
+	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
+		Return(raw, nil)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "my-chart", "1.0.0")
+
+	assert.NoError(t, err)
+	// Node must remain unchanged since the path is unknown.
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(result, &got))
+	xOnyxia := got["x-onyxia"].(map[string]any)
+	assert.Equal(t, "unknown/path.json", xOnyxia["overwriteSchemaWith"])
 }
 
 // ✅ GetAvailableVersions applies MaxNumber filter.
