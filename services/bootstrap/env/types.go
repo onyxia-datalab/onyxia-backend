@@ -28,4 +28,5 @@ type Env struct {
 	Security           Security        `mapstructure:"security"           json:"security"`
 	CatalogsConfig     []CatalogConfig `mapstructure:"catalogs"           json:"catalogs"`
 	Kubernetes         Kubernetes      `mapstructure:"kubernetes"         json:"kubernetes"`
+	Schemas            SchemasConfig   `mapstructure:"schemas"            json:"schemas"`
 }

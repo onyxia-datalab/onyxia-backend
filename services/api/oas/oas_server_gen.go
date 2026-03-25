@@ -26,7 +26,7 @@ type Handler interface {
 	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 	// and roles.
 	//
-	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService implements installService operation.
 	//

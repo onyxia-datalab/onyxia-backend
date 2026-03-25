@@ -403,14 +403,14 @@ func (s *Server) handleGetMyPackageRequest(args [2]string, argsEscaped bool, w h
 // Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 // and roles.
 //
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 func (s *Server) handleGetPackageSchemaRequest(args [3]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getPackageSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
+		semconv.HTTPRouteKey.String("/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)

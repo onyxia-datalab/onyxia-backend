@@ -17,16 +17,16 @@ var (
 	rn5AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn17AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id",
-	}
-	rn19AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id",
-	}
-	rn12AllowedHeaders = map[string]string{
+	rn8AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
 	rn14AllowedHeaders = map[string]string{
+		"GET": "Authorization,Last-Event-Id",
+	}
+	rn16AllowedHeaders = map[string]string{
+		"GET": "Authorization,Last-Event-Id",
+	}
+	rn11AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
 	}
 )
@@ -136,16 +136,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						}
 
 						// Param: "packageName"
-						// Leaf parameter, slashes are prohibited
+						// Match until "/"
 						idx := strings.IndexByte(elem, '/')
-						if idx >= 0 {
-							break
+						if idx < 0 {
+							idx = len(elem)
 						}
-						args[1] = elem
-						elem = ""
+						args[1] = elem[:idx]
+						elem = elem[idx:]
 
 						if len(elem) == 0 {
-							// Leaf node.
 							switch r.Method {
 							case "GET":
 								s.handleGetMyPackageRequest([2]string{
@@ -162,6 +161,60 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							}
 
 							return
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/versions/"
+
+							if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "version"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[2] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								break
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/schema"
+
+								if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch r.Method {
+									case "GET":
+										s.handleGetPackageSchemaRequest([3]string{
+											args[0],
+											args[1],
+											args[2],
+										}, elemIsEscaped, w, r)
+									default:
+										s.notAllowed(w, r, notAllowedParams{
+											allowedMethods: "GET",
+											allowedHeaders: rn8AllowedHeaders,
+											acceptPost:     "",
+											acceptPatch:    "",
+										})
+									}
+
+									return
+								}
+
+							}
+
 						}
 
 					}
@@ -220,7 +273,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn17AllowedHeaders,
+									allowedHeaders: rn14AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -247,92 +300,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn19AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
-							}
-
-							return
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			case 's': // Prefix: "schemas/"
-				origElem := elem
-				if l := len("schemas/"); len(elem) >= l && elem[0:l] == "schemas/" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				// Param: "catalogId"
-				// Match until "/"
-				idx := strings.IndexByte(elem, '/')
-				if idx < 0 {
-					idx = len(elem)
-				}
-				args[0] = elem[:idx]
-				elem = elem[idx:]
-
-				if len(elem) == 0 {
-					break
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/packageName/"
-
-					if l := len("/packageName/"); len(elem) >= l && elem[0:l] == "/packageName/" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					// Param: "packageName"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[1] = elem[:idx]
-					elem = elem[idx:]
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/versions/"
-
-						if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						// Param: "version"
-						// Leaf parameter, slashes are prohibited
-						idx := strings.IndexByte(elem, '/')
-						if idx >= 0 {
-							break
-						}
-						args[2] = elem
-						elem = ""
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch r.Method {
-							case "GET":
-								s.handleGetPackageSchemaRequest([3]string{
-									args[0],
-									args[1],
-									args[2],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: rn12AllowedHeaders,
+									allowedHeaders: rn16AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -378,7 +346,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "PUT",
-							allowedHeaders: rn14AllowedHeaders,
+							allowedHeaders: rn11AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -541,16 +509,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						}
 
 						// Param: "packageName"
-						// Leaf parameter, slashes are prohibited
+						// Match until "/"
 						idx := strings.IndexByte(elem, '/')
-						if idx >= 0 {
-							break
+						if idx < 0 {
+							idx = len(elem)
 						}
-						args[1] = elem
-						elem = ""
+						args[1] = elem[:idx]
+						elem = elem[idx:]
 
 						if len(elem) == 0 {
-							// Leaf node.
 							switch method {
 							case "GET":
 								r.name = GetMyPackageOperation
@@ -564,6 +531,56 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							default:
 								return
 							}
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/versions/"
+
+							if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "version"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[2] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								break
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/schema"
+
+								if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								if len(elem) == 0 {
+									// Leaf node.
+									switch method {
+									case "GET":
+										r.name = GetPackageSchemaOperation
+										r.summary = "Get the values.schema.json of a versioned package"
+										r.operationID = "getPackageSchema"
+										r.operationGroup = ""
+										r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"
+										r.args = args
+										r.count = 3
+										return r, true
+									default:
+										return
+									}
+								}
+
+							}
+
 						}
 
 					}
@@ -648,87 +665,6 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
 								r.args = args
 								r.count = 1
-								return r, true
-							default:
-								return
-							}
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			case 's': // Prefix: "schemas/"
-				origElem := elem
-				if l := len("schemas/"); len(elem) >= l && elem[0:l] == "schemas/" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				// Param: "catalogId"
-				// Match until "/"
-				idx := strings.IndexByte(elem, '/')
-				if idx < 0 {
-					idx = len(elem)
-				}
-				args[0] = elem[:idx]
-				elem = elem[idx:]
-
-				if len(elem) == 0 {
-					break
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/packageName/"
-
-					if l := len("/packageName/"); len(elem) >= l && elem[0:l] == "/packageName/" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					// Param: "packageName"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[1] = elem[:idx]
-					elem = elem[idx:]
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/versions/"
-
-						if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						// Param: "version"
-						// Leaf parameter, slashes are prohibited
-						idx := strings.IndexByte(elem, '/')
-						if idx >= 0 {
-							break
-						}
-						args[2] = elem
-						elem = ""
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch method {
-							case "GET":
-								r.name = GetPackageSchemaOperation
-								r.summary = "Get the values.schema.json of a versioned package"
-								r.operationID = "getPackageSchema"
-								r.operationGroup = ""
-								r.pathPattern = "/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"
-								r.args = args
-								r.count = 3
 								return r, true
 							default:
 								return

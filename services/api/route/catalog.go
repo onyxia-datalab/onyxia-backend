@@ -16,6 +16,7 @@ func SetupCatalogController(app *bootstrap.Application, helmClient *helm.Client)
 
 	catalogUc := catalog.NewCatalogService(
 		app.Env.CatalogsConfig,
+		app.Env.Schemas,
 		pkgRepo,
 		app.UserContextReader,
 	)
