@@ -44,6 +44,7 @@ func TestStartInstallEmptyArgs(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"",
 		&domain.Package{},
 		"",
@@ -58,6 +59,7 @@ func TestStartInstallLocateChartError(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
 		&domain.Package{
 			CatalogID: "fake-cat",
@@ -81,6 +83,7 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
 		&domain.Package{
 			CatalogID: "fake-cat",
@@ -109,6 +112,7 @@ func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
 		&domain.Package{
 			CatalogID: "fake-cat",

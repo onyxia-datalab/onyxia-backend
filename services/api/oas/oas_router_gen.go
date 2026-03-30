@@ -11,23 +11,32 @@ import (
 )
 
 var (
-	rn1AllowedHeaders = map[string]string{
+	rn3AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn5AllowedHeaders = map[string]string{
+	rn7AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn8AllowedHeaders = map[string]string{
+	rn10AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn17AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
 	}
-	rn16AllowedHeaders = map[string]string{
+	rn19AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
+	}
+	rn2AllowedHeaders = map[string]string{
+		"DELETE": "Authorization,X-Onyxia-Project",
 	}
 	rn11AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
+	}
+	rn13AllowedHeaders = map[string]string{
+		"POST": "Authorization,X-Onyxia-Project",
+	}
+	rn14AllowedHeaders = map[string]string{
+		"POST": "Authorization,X-Onyxia-Project",
 	}
 )
 
@@ -97,7 +106,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					default:
 						s.notAllowed(w, r, notAllowedParams{
 							allowedMethods: "GET",
-							allowedHeaders: rn1AllowedHeaders,
+							allowedHeaders: rn3AllowedHeaders,
 							acceptPost:     "",
 							acceptPatch:    "",
 						})
@@ -154,7 +163,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn5AllowedHeaders,
+									allowedHeaders: rn7AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -204,7 +213,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									default:
 										s.notAllowed(w, r, notAllowedParams{
 											allowedMethods: "GET",
-											allowedHeaders: rn8AllowedHeaders,
+											allowedHeaders: rn10AllowedHeaders,
 											acceptPost:     "",
 											acceptPatch:    "",
 										})
@@ -273,7 +282,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn14AllowedHeaders,
+									allowedHeaders: rn17AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -300,7 +309,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "GET",
-									allowedHeaders: rn16AllowedHeaders,
+									allowedHeaders: rn19AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -325,34 +334,116 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			elem = elem[idx:]
 
 			if len(elem) == 0 {
-				break
+				switch r.Method {
+				case "DELETE":
+					s.handleDeleteServiceRequest([1]string{
+						args[0],
+					}, elemIsEscaped, w, r)
+				default:
+					s.notAllowed(w, r, notAllowedParams{
+						allowedMethods: "DELETE",
+						allowedHeaders: rn2AllowedHeaders,
+						acceptPost:     "",
+						acceptPatch:    "",
+					})
+				}
+
+				return
 			}
 			switch elem[0] {
-			case '/': // Prefix: "/install"
+			case '/': // Prefix: "/"
 
-				if l := len("/install"); len(elem) >= l && elem[0:l] == "/install" {
+				if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
 				if len(elem) == 0 {
-					// Leaf node.
-					switch r.Method {
-					case "PUT":
-						s.handleInstallServiceRequest([1]string{
-							args[0],
-						}, elemIsEscaped, w, r)
-					default:
-						s.notAllowed(w, r, notAllowedParams{
-							allowedMethods: "PUT",
-							allowedHeaders: rn11AllowedHeaders,
-							acceptPost:     "",
-							acceptPatch:    "",
-						})
+					break
+				}
+				switch elem[0] {
+				case 'i': // Prefix: "install"
+
+					if l := len("install"); len(elem) >= l && elem[0:l] == "install" {
+						elem = elem[l:]
+					} else {
+						break
 					}
 
-					return
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "PUT":
+							s.handleInstallServiceRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "PUT",
+								allowedHeaders: rn11AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 'r': // Prefix: "resume"
+
+					if l := len("resume"); len(elem) >= l && elem[0:l] == "resume" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "POST":
+							s.handleResumeServiceRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "POST",
+								allowedHeaders: rn13AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
+				case 's': // Prefix: "suspend"
+
+					if l := len("suspend"); len(elem) >= l && elem[0:l] == "suspend" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch r.Method {
+						case "POST":
+							s.handleSuspendServiceRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "POST",
+								allowedHeaders: rn14AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+
 				}
 
 			}
@@ -687,32 +778,108 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			elem = elem[idx:]
 
 			if len(elem) == 0 {
-				break
+				switch method {
+				case "DELETE":
+					r.name = DeleteServiceOperation
+					r.summary = "Uninstall a service"
+					r.operationID = "deleteService"
+					r.operationGroup = ""
+					r.pathPattern = "/api/services/{releaseId}"
+					r.args = args
+					r.count = 1
+					return r, true
+				default:
+					return
+				}
 			}
 			switch elem[0] {
-			case '/': // Prefix: "/install"
+			case '/': // Prefix: "/"
 
-				if l := len("/install"); len(elem) >= l && elem[0:l] == "/install" {
+				if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 					elem = elem[l:]
 				} else {
 					break
 				}
 
 				if len(elem) == 0 {
-					// Leaf node.
-					switch method {
-					case "PUT":
-						r.name = InstallServiceOperation
-						r.summary = "Trigger service installation (async)"
-						r.operationID = "installService"
-						r.operationGroup = ""
-						r.pathPattern = "/api/services/{releaseId}/install"
-						r.args = args
-						r.count = 1
-						return r, true
-					default:
-						return
+					break
+				}
+				switch elem[0] {
+				case 'i': // Prefix: "install"
+
+					if l := len("install"); len(elem) >= l && elem[0:l] == "install" {
+						elem = elem[l:]
+					} else {
+						break
 					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "PUT":
+							r.name = InstallServiceOperation
+							r.summary = "Trigger service installation (async)"
+							r.operationID = "installService"
+							r.operationGroup = ""
+							r.pathPattern = "/api/services/{releaseId}/install"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 'r': // Prefix: "resume"
+
+					if l := len("resume"); len(elem) >= l && elem[0:l] == "resume" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "POST":
+							r.name = ResumeServiceOperation
+							r.summary = "Resume a suspended service"
+							r.operationID = "resumeService"
+							r.operationGroup = ""
+							r.pathPattern = "/api/services/{releaseId}/resume"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+
+				case 's': // Prefix: "suspend"
+
+					if l := len("suspend"); len(elem) >= l && elem[0:l] == "suspend" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					if len(elem) == 0 {
+						// Leaf node.
+						switch method {
+						case "POST":
+							r.name = SuspendServiceOperation
+							r.summary = "Suspend a running service"
+							r.operationID = "suspendService"
+							r.operationGroup = ""
+							r.pathPattern = "/api/services/{releaseId}/suspend"
+							r.args = args
+							r.count = 1
+							return r, true
+						default:
+							return
+						}
+					}
+
 				}
 
 			}
