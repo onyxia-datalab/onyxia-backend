@@ -111,6 +111,91 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /api/services/{releaseId}/suspend:
+    post:
+      tags: [services]
+      operationId: suspendService
+      summary: Suspend a running service
+      description: >
+        Runs helm upgrade --reuse-values with global.suspend=true. The chart must
+        expose global.suspend in its default values, otherwise 422 is returned.
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "204":
+          description: No Content – service suspended
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/services/{releaseId}/resume:
+    post:
+      tags: [services]
+      operationId: resumeService
+      summary: Resume a suspended service
+      description: >
+        Runs helm upgrade --reuse-values with global.suspend=false. The chart must
+        expose global.suspend in its default values, otherwise 422 is returned.
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "204":
+          description: No Content – service resumed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/services/{releaseId}:
+    delete:
+      tags: [services]
+      operationId: deleteService
+      summary: Uninstall a service
+      description: >
+        Runs helm uninstall for the release and removes the associated Onyxia
+        secret. This operation is irreversible.
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "204":
+          description: No Content – service deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /api/services/{releaseId}/install:
     put:
       tags: [services]
@@ -249,6 +334,11 @@ components:
       description: Resume SSE from a specific event id (client reconnection)
 
   responses:
+    UnprocessableEntity:
+      description: Unprocessable entity — operation not supported by this service
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     BadRequest:
       description: Bad request
       content:

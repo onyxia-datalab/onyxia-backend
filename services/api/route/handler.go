@@ -22,6 +22,27 @@ func NewHandler(
 	return &Handler{install: install, catalogs: catalogs}
 }
 
+func (h *Handler) SuspendService(
+	ctx context.Context,
+	p api.SuspendServiceParams,
+) (api.SuspendServiceRes, error) {
+	return h.install.SuspendService(ctx, p)
+}
+
+func (h *Handler) ResumeService(
+	ctx context.Context,
+	p api.ResumeServiceParams,
+) (api.ResumeServiceRes, error) {
+	return h.install.ResumeService(ctx, p)
+}
+
+func (h *Handler) DeleteService(
+	ctx context.Context,
+	p api.DeleteServiceParams,
+) (api.DeleteServiceRes, error) {
+	return h.install.DeleteService(ctx, p)
+}
+
 func (h *Handler) InstallService(
 	ctx context.Context,
 	req *api.ServiceInstallRequest,

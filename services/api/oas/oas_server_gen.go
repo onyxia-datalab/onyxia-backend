@@ -8,6 +8,13 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// DeleteService implements deleteService operation.
+	//
+	// Runs helm uninstall for the release and removes the associated Onyxia secret. This operation is
+	// irreversible.
+	//
+	// DELETE /api/services/{releaseId}
+	DeleteService(ctx context.Context, params DeleteServiceParams) (DeleteServiceRes, error)
 	// GetMyCatalogs implements getMyCatalogs operation.
 	//
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -35,6 +42,20 @@ type Handler interface {
 	//
 	// PUT /api/services/{releaseId}/install
 	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
+	// ResumeService implements resumeService operation.
+	//
+	// Runs helm upgrade --reuse-values with global.suspend=false. The chart must expose global.suspend
+	// in its default values, otherwise 422 is returned.
+	//
+	// POST /api/services/{releaseId}/resume
+	ResumeService(ctx context.Context, params ResumeServiceParams) (ResumeServiceRes, error)
+	// SuspendService implements suspendService operation.
+	//
+	// Runs helm upgrade --reuse-values with global.suspend=true. The chart must expose global.suspend in
+	// its default values, otherwise 422 is returned.
+	//
+	// POST /api/services/{releaseId}/suspend
+	SuspendService(ctx context.Context, params SuspendServiceParams) (SuspendServiceRes, error)
 	// WatchRelease implements watchRelease operation.
 	//
 	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".

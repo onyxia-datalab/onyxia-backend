@@ -20,13 +20,26 @@ var _ ports.HelmReleasesGateway = (*MockHelmReleasesGateway)(nil)
 
 func (m *MockHelmReleasesGateway) StartInstall(
 	ctx context.Context,
+	namespace string,
 	releaseName string,
 	pkg *domain.Package,
 	version string,
 	vals map[string]interface{},
 	opts ports.HelmStartOptions,
 ) error {
-	return m.Called(ctx, releaseName, pkg, version, vals, opts).Error(0)
+	return m.Called(ctx, namespace, releaseName, pkg, version, vals, opts).Error(0)
+}
+
+func (m *MockHelmReleasesGateway) SuspendRelease(ctx context.Context, namespace, releaseName string) error {
+	return m.Called(ctx, namespace, releaseName).Error(0)
+}
+
+func (m *MockHelmReleasesGateway) ResumeRelease(ctx context.Context, namespace, releaseName string) error {
+	return m.Called(ctx, namespace, releaseName).Error(0)
+}
+
+func (m *MockHelmReleasesGateway) UninstallRelease(ctx context.Context, namespace, releaseName string) error {
+	return m.Called(ctx, namespace, releaseName).Error(0)
 }
 
 type MockOnyxiaSecretGateway struct{ mock.Mock }
@@ -110,7 +123,7 @@ func TestStart_Success(t *testing.T) {
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", ctx, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).
+	m.helm.On("StartInstall", ctx, req.Namespace, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
@@ -138,7 +151,7 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 			"share":        []byte("true"),
 		},
 	).Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
@@ -204,7 +217,7 @@ func TestStart_HelmError(t *testing.T) {
 		Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("invalid release name"))
 
 	_, err := uc.Start(ctx, req)

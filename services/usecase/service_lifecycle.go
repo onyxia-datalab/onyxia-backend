@@ -78,18 +78,28 @@ func (uc *ServiceLifecycle) Start(
 		},
 	}
 
-	if err := uc.helm.StartInstall(ctx, req.Name, &pkg, req.Version, req.Values, opts); err != nil {
+	if err := uc.helm.StartInstall(ctx, req.Namespace, req.Name, &pkg, req.Version, req.Values, opts); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("helm start: %w", err)
 	}
 
 	return domain.StartResponse{}, nil
 }
 
-func (uc *ServiceLifecycle) Resume(ctx context.Context) error {
-	return nil
+func (uc *ServiceLifecycle) Suspend(ctx context.Context, req domain.SuspendRequest) error {
+	return uc.helm.SuspendRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
-func (uc *ServiceLifecycle) Delete(ctx context.Context) error {
+func (uc *ServiceLifecycle) Resume(ctx context.Context, req domain.ResumeRequest) error {
+	return uc.helm.ResumeRelease(ctx, req.Namespace, req.ReleaseName)
+}
+
+func (uc *ServiceLifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error {
+	if err := uc.helm.UninstallRelease(ctx, req.Namespace, req.ReleaseName); err != nil {
+		return fmt.Errorf("helm uninstall: %w", err)
+	}
+	if err := uc.secrets.DeleteOnyxiaSecret(ctx, req.Namespace, req.ReleaseName); err != nil {
+		return fmt.Errorf("delete onyxia secret: %w", err)
+	}
 	return nil
 }
 
