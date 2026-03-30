@@ -169,6 +169,27 @@ func (s *CatalogVisible) SetProject(val bool) {
 	s.Project = val
 }
 
+type DeleteServiceForbidden Problem
+
+func (*DeleteServiceForbidden) deleteServiceRes() {}
+
+type DeleteServiceInternalServerError Problem
+
+func (*DeleteServiceInternalServerError) deleteServiceRes() {}
+
+// DeleteServiceNoContent is response for DeleteService operation.
+type DeleteServiceNoContent struct{}
+
+func (*DeleteServiceNoContent) deleteServiceRes() {}
+
+type DeleteServiceNotFound Problem
+
+func (*DeleteServiceNotFound) deleteServiceRes() {}
+
+type DeleteServiceUnauthorized Problem
+
+func (*DeleteServiceUnauthorized) deleteServiceRes() {}
+
 // Merged schema.
 // Ref: #/components/schemas/DetailedPackage
 type DetailedPackage struct {
@@ -916,6 +937,31 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 	return m
 }
 
+type ResumeServiceForbidden Problem
+
+func (*ResumeServiceForbidden) resumeServiceRes() {}
+
+type ResumeServiceInternalServerError Problem
+
+func (*ResumeServiceInternalServerError) resumeServiceRes() {}
+
+// ResumeServiceNoContent is response for ResumeService operation.
+type ResumeServiceNoContent struct{}
+
+func (*ResumeServiceNoContent) resumeServiceRes() {}
+
+type ResumeServiceNotFound Problem
+
+func (*ResumeServiceNotFound) resumeServiceRes() {}
+
+type ResumeServiceUnauthorized Problem
+
+func (*ResumeServiceUnauthorized) resumeServiceRes() {}
+
+type ResumeServiceUnprocessableEntity Problem
+
+func (*ResumeServiceUnprocessableEntity) resumeServiceRes() {}
+
 // Ref: #/components/schemas/ServiceInstallRequest
 type ServiceInstallRequest struct {
 	// Catalog where the package is taken from.
@@ -1027,6 +1073,31 @@ func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 	}
 	return m
 }
+
+type SuspendServiceForbidden Problem
+
+func (*SuspendServiceForbidden) suspendServiceRes() {}
+
+type SuspendServiceInternalServerError Problem
+
+func (*SuspendServiceInternalServerError) suspendServiceRes() {}
+
+// SuspendServiceNoContent is response for SuspendService operation.
+type SuspendServiceNoContent struct{}
+
+func (*SuspendServiceNoContent) suspendServiceRes() {}
+
+type SuspendServiceNotFound Problem
+
+func (*SuspendServiceNotFound) suspendServiceRes() {}
+
+type SuspendServiceUnauthorized Problem
+
+func (*SuspendServiceUnauthorized) suspendServiceRes() {}
+
+type SuspendServiceUnprocessableEntity Problem
+
+func (*SuspendServiceUnprocessableEntity) suspendServiceRes() {}
 
 type WatchReleaseForbidden Problem
 

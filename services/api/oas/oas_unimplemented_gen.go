@@ -13,6 +13,16 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// DeleteService implements deleteService operation.
+//
+// Runs helm uninstall for the release and removes the associated Onyxia secret. This operation is
+// irreversible.
+//
+// DELETE /api/services/{releaseId}
+func (UnimplementedHandler) DeleteService(ctx context.Context, params DeleteServiceParams) (r DeleteServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetMyCatalogs implements getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -49,6 +59,26 @@ func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPack
 //
 // PUT /api/services/{releaseId}/install
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ResumeService implements resumeService operation.
+//
+// Runs helm upgrade --reuse-values with global.suspend=false. The chart must expose global.suspend
+// in its default values, otherwise 422 is returned.
+//
+// POST /api/services/{releaseId}/resume
+func (UnimplementedHandler) ResumeService(ctx context.Context, params ResumeServiceParams) (r ResumeServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SuspendService implements suspendService operation.
+//
+// Runs helm upgrade --reuse-values with global.suspend=true. The chart must expose global.suspend in
+// its default values, otherwise 422 is returned.
+//
+// POST /api/services/{releaseId}/suspend
+func (UnimplementedHandler) SuspendService(ctx context.Context, params SuspendServiceParams) (r SuspendServiceRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

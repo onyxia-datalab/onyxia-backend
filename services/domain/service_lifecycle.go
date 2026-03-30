@@ -20,10 +20,26 @@ type StartRequest struct {
 type StartResponse struct {
 }
 
+type SuspendRequest struct {
+	ReleaseName string
+	Namespace   string
+}
+
+type ResumeRequest struct {
+	ReleaseName string
+	Namespace   string
+}
+
+type DeleteRequest struct {
+	ReleaseName string
+	Namespace   string
+}
+
 type ServiceLifecycle interface {
 	Start(ctx context.Context, req StartRequest) (StartResponse, error)
-	Resume(ctx context.Context) error
-	Delete(ctx context.Context) error
+	Suspend(ctx context.Context, req SuspendRequest) error
+	Resume(ctx context.Context, req ResumeRequest) error
+	Delete(ctx context.Context, req DeleteRequest) error
 	Rename(ctx context.Context) error
 	Share(ctx context.Context) error
 }

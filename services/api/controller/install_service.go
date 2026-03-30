@@ -27,6 +27,85 @@ func NewInstallController(
 	}
 }
 
+func (ic *InstallController) SuspendService(
+	ctx context.Context,
+	params api.SuspendServiceParams,
+) (api.SuspendServiceRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, "user not found in context")
+		return &api.SuspendServiceForbidden{}, errors.New("user not found")
+	}
+
+	req := domain.SuspendRequest{
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+	}
+
+	if err := ic.serviceLifecycleUc.Suspend(ctx, req); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotSupported):
+			return &api.SuspendServiceUnprocessableEntity{}, err
+		default:
+			slog.ErrorContext(ctx, "suspend failed", slog.Any("error", err))
+			return &api.SuspendServiceInternalServerError{}, err
+		}
+	}
+
+	return &api.SuspendServiceNoContent{}, nil
+}
+
+func (ic *InstallController) ResumeService(
+	ctx context.Context,
+	params api.ResumeServiceParams,
+) (api.ResumeServiceRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, "user not found in context")
+		return &api.ResumeServiceForbidden{}, errors.New("user not found")
+	}
+
+	req := domain.ResumeRequest{
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+	}
+
+	if err := ic.serviceLifecycleUc.Resume(ctx, req); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrNotSupported):
+			return &api.ResumeServiceUnprocessableEntity{}, err
+		default:
+			slog.ErrorContext(ctx, "resume failed", slog.Any("error", err))
+			return &api.ResumeServiceInternalServerError{}, err
+		}
+	}
+
+	return &api.ResumeServiceNoContent{}, nil
+}
+
+func (ic *InstallController) DeleteService(
+	ctx context.Context,
+	params api.DeleteServiceParams,
+) (api.DeleteServiceRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, "user not found in context")
+		return &api.DeleteServiceForbidden{}, errors.New("user not found")
+	}
+
+	req := domain.DeleteRequest{
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+	}
+
+	if err := ic.serviceLifecycleUc.Delete(ctx, req); err != nil {
+		slog.ErrorContext(ctx, "delete failed", slog.Any("error", err))
+		return &api.DeleteServiceInternalServerError{}, err
+	}
+
+	return &api.DeleteServiceNoContent{}, nil
+}
+
 func (ic *InstallController) InstallService(
 	ctx context.Context,
 	req *api.ServiceInstallRequest,

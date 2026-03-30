@@ -20,10 +20,20 @@ type HelmReleasesGateway interface {
 	// Start a Helm install in the background and returns immediately.
 	StartInstall(
 		ctx context.Context,
+		namespace string,
 		releaseName string,
 		pkg *domain.Package,
 		version string,
 		vals map[string]interface{},
 		opts HelmStartOptions,
 	) error
+
+	// SuspendRelease scales all Deployments and StatefulSets of a release to 0.
+	SuspendRelease(ctx context.Context, namespace, releaseName string) error
+
+	// ResumeRelease restores the replica counts saved during SuspendRelease.
+	ResumeRelease(ctx context.Context, namespace, releaseName string) error
+
+	// UninstallRelease removes the Helm release from the namespace.
+	UninstallRelease(ctx context.Context, namespace, releaseName string) error
 }
