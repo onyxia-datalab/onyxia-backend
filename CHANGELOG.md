@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.21](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.20...v0.1.21) (2026-03-31)
+
+
+### Bug Fixes
+
+* **deps:** update go minor and patch updates to v0.35.3 ([#32](https://github.com/onyxia-datalab/onyxia-backend/issues/32)) ([16cc68d](https://github.com/onyxia-datalab/onyxia-backend/commit/16cc68de9e44fd4fe3e2e5fb2ea86561fc5c9f08))
+* **deps:** update module github.com/ogen-go/ogen to v1.20.2 ([#51](https://github.com/onyxia-datalab/onyxia-backend/issues/51)) ([0f95f7e](https://github.com/onyxia-datalab/onyxia-backend/commit/0f95f7e05c3b6c5ee65ad9b3b88a022f25539b4e))
+* **lint:** replace deprecated NewSimpleClientset with NewClientset ([5e66b64](https://github.com/onyxia-datalab/onyxia-backend/commit/5e66b643c53782964ca80014f1b1a9008d99a65d))
+
 ## [0.1.20](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.19...v0.1.20) (2026-03-12)
 
 
