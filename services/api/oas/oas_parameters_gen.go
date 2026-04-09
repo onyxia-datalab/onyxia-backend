@@ -438,6 +438,136 @@ func decodeGetPackageSchemaParams(args [3]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
+// GetServiceParams is parameters of getService operation.
+type GetServiceParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackGetServiceParams(packed middleware.Parameters) (params GetServiceParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params GetServiceParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // InstallServiceParams is parameters of installService operation.
 type InstallServiceParams struct {
 	// Logical release identifier.
@@ -568,22 +698,13 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 	return params, nil
 }
 
-// ResumeServiceParams is parameters of resumeService operation.
-type ResumeServiceParams struct {
-	// Logical release identifier.
-	ReleaseId string
+// ListServicesParams is parameters of listServices operation.
+type ListServicesParams struct {
 	// Project identifier in Onyxia (user or group namespace).
 	XOnyxiaProject string
 }
 
-func unpackResumeServiceParams(packed middleware.Parameters) (params ResumeServiceParams) {
-	{
-		key := middleware.ParameterKey{
-			Name: "releaseId",
-			In:   "path",
-		}
-		params.ReleaseId = packed[key].(string)
-	}
+func unpackListServicesParams(packed middleware.Parameters) (params ListServicesParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "X-Onyxia-Project",
@@ -594,73 +715,8 @@ func unpackResumeServiceParams(packed middleware.Parameters) (params ResumeServi
 	return params
 }
 
-func decodeResumeServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params ResumeServiceParams, _ error) {
+func decodeListServicesParams(args [0]string, argsEscaped bool, r *http.Request) (params ListServicesParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
-	// Decode path: releaseId.
-	if err := func() error {
-		param := args[0]
-		if argsEscaped {
-			unescaped, err := url.PathUnescape(args[0])
-			if err != nil {
-				return errors.Wrap(err, "unescape path")
-			}
-			param = unescaped
-		}
-		if len(param) > 0 {
-			d := uri.NewPathDecoder(uri.PathDecoderConfig{
-				Param:   "releaseId",
-				Value:   param,
-				Style:   uri.PathStyleSimple,
-				Explode: false,
-			})
-
-			if err := func() error {
-				val, err := d.DecodeValue()
-				if err != nil {
-					return err
-				}
-
-				c, err := conv.ToString(val)
-				if err != nil {
-					return err
-				}
-
-				params.ReleaseId = c
-				return nil
-			}(); err != nil {
-				return err
-			}
-			if err := func() error {
-				if err := (validate.String{
-					MinLength:     1,
-					MinLengthSet:  true,
-					MaxLength:     0,
-					MaxLengthSet:  false,
-					Email:         false,
-					Hostname:      false,
-					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
-					MinNumeric:    0,
-					MinNumericSet: false,
-					MaxNumeric:    0,
-					MaxNumericSet: false,
-				}).Validate(string(params.ReleaseId)); err != nil {
-					return errors.Wrap(err, "string")
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		} else {
-			return validate.ErrFieldRequired
-		}
-		return nil
-	}(); err != nil {
-		return params, &ogenerrors.DecodeParamError{
-			Name: "releaseId",
-			In:   "path",
-			Err:  err,
-		}
-	}
 	// Decode header: X-Onyxia-Project.
 	if err := func() error {
 		cfg := uri.HeaderParameterDecodingConfig{
@@ -698,15 +754,15 @@ func decodeResumeServiceParams(args [1]string, argsEscaped bool, r *http.Request
 	return params, nil
 }
 
-// SuspendServiceParams is parameters of suspendService operation.
-type SuspendServiceParams struct {
+// SetServiceSuspendedParams is parameters of setServiceSuspended operation.
+type SetServiceSuspendedParams struct {
 	// Logical release identifier.
 	ReleaseId string
 	// Project identifier in Onyxia (user or group namespace).
 	XOnyxiaProject string
 }
 
-func unpackSuspendServiceParams(packed middleware.Parameters) (params SuspendServiceParams) {
+func unpackSetServiceSuspendedParams(packed middleware.Parameters) (params SetServiceSuspendedParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "releaseId",
@@ -724,7 +780,7 @@ func unpackSuspendServiceParams(packed middleware.Parameters) (params SuspendSer
 	return params
 }
 
-func decodeSuspendServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params SuspendServiceParams, _ error) {
+func decodeSetServiceSuspendedParams(args [1]string, argsEscaped bool, r *http.Request) (params SetServiceSuspendedParams, _ error) {
 	h := uri.NewHeaderDecoder(r.Header)
 	// Decode path: releaseId.
 	if err := func() error {

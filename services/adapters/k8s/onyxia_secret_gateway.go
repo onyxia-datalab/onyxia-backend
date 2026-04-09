@@ -2,7 +2,9 @@ package k8s
 
 import (
 	"context"
+	"strings"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 
 	corev1 "k8s.io/api/core/v1"
@@ -98,6 +100,9 @@ func (g *K8sOnyxiaSecretGateway) ReadOnyxiaSecretData(
 		Secrets(namespace).
 		Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, domain.ErrNotFound
+		}
 		return nil, err
 	}
 
@@ -106,4 +111,22 @@ func (g *K8sOnyxiaSecretGateway) ReadOnyxiaSecretData(
 	}
 
 	return sec.Data, nil
+}
+
+func (g *K8sOnyxiaSecretGateway) ListOnyxiaSecretNames(
+	ctx context.Context,
+	namespace string,
+) ([]string, error) {
+	list, err := g.client.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, sec := range list.Items {
+		if sec.Type == onyxiaSecretType && strings.HasPrefix(sec.Name, onyxiaNamePrefix) {
+			names = append(names, strings.TrimPrefix(sec.Name, onyxiaNamePrefix))
+		}
+	}
+	return names, nil
 }

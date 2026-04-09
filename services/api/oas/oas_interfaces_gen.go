@@ -17,16 +17,20 @@ type GetPackageSchemaRes interface {
 	getPackageSchemaRes()
 }
 
+type GetServiceRes interface {
+	getServiceRes()
+}
+
 type InstallServiceRes interface {
 	installServiceRes()
 }
 
-type ResumeServiceRes interface {
-	resumeServiceRes()
+type ListServicesRes interface {
+	listServicesRes()
 }
 
-type SuspendServiceRes interface {
-	suspendServiceRes()
+type SetServiceSuspendedRes interface {
+	setServiceSuspendedRes()
 }
 
 type WatchReleaseRes interface {

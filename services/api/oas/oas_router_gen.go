@@ -11,6 +11,9 @@ import (
 )
 
 var (
+	rn11AllowedHeaders = map[string]string{
+		"GET": "Authorization,X-Onyxia-Project",
+	}
 	rn3AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
@@ -20,23 +23,19 @@ var (
 	rn10AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn17AllowedHeaders = map[string]string{
+	rn15AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
 	}
-	rn19AllowedHeaders = map[string]string{
+	rn17AllowedHeaders = map[string]string{
 		"GET": "Authorization,Last-Event-Id",
 	}
 	rn2AllowedHeaders = map[string]string{
 		"DELETE": "Authorization,X-Onyxia-Project",
+		"GET":    "Authorization,X-Onyxia-Project",
+		"PUT":    "Authorization,Content-Type,X-Onyxia-Project",
 	}
-	rn11AllowedHeaders = map[string]string{
+	rn12AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
-	}
-	rn13AllowedHeaders = map[string]string{
-		"POST": "Authorization,X-Onyxia-Project",
-	}
-	rn14AllowedHeaders = map[string]string{
-		"POST": "Authorization,X-Onyxia-Project",
 	}
 )
 
@@ -79,270 +78,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/services/"
+		case '/': // Prefix: "/api/services"
 
-			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
+			if l := len("/api/services"); len(elem) >= l && elem[0:l] == "/api/services" {
 				elem = elem[l:]
 			} else {
 				break
 			}
 
 			if len(elem) == 0 {
-				break
-			}
-			switch elem[0] {
-			case 'c': // Prefix: "catalogs"
-				origElem := elem
-				if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				if len(elem) == 0 {
-					switch r.Method {
-					case "GET":
-						s.handleGetMyCatalogsRequest([0]string{}, elemIsEscaped, w, r)
-					default:
-						s.notAllowed(w, r, notAllowedParams{
-							allowedMethods: "GET",
-							allowedHeaders: rn3AllowedHeaders,
-							acceptPost:     "",
-							acceptPatch:    "",
-						})
-					}
-
-					return
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/"
-
-					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					// Param: "catalogId"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/packages/"
-
-						if l := len("/packages/"); len(elem) >= l && elem[0:l] == "/packages/" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						// Param: "packageName"
-						// Match until "/"
-						idx := strings.IndexByte(elem, '/')
-						if idx < 0 {
-							idx = len(elem)
-						}
-						args[1] = elem[:idx]
-						elem = elem[idx:]
-
-						if len(elem) == 0 {
-							switch r.Method {
-							case "GET":
-								s.handleGetMyPackageRequest([2]string{
-									args[0],
-									args[1],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: rn7AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
-							}
-
-							return
-						}
-						switch elem[0] {
-						case '/': // Prefix: "/versions/"
-
-							if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							// Param: "version"
-							// Match until "/"
-							idx := strings.IndexByte(elem, '/')
-							if idx < 0 {
-								idx = len(elem)
-							}
-							args[2] = elem[:idx]
-							elem = elem[idx:]
-
-							if len(elem) == 0 {
-								break
-							}
-							switch elem[0] {
-							case '/': // Prefix: "/schema"
-
-								if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
-									elem = elem[l:]
-								} else {
-									break
-								}
-
-								if len(elem) == 0 {
-									// Leaf node.
-									switch r.Method {
-									case "GET":
-										s.handleGetPackageSchemaRequest([3]string{
-											args[0],
-											args[1],
-											args[2],
-										}, elemIsEscaped, w, r)
-									default:
-										s.notAllowed(w, r, notAllowedParams{
-											allowedMethods: "GET",
-											allowedHeaders: rn10AllowedHeaders,
-											acceptPost:     "",
-											acceptPatch:    "",
-										})
-									}
-
-									return
-								}
-
-							}
-
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			case 'e': // Prefix: "events/"
-				origElem := elem
-				if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				// Param: "releaseId"
-				// Match until "/"
-				idx := strings.IndexByte(elem, '/')
-				if idx < 0 {
-					idx = len(elem)
-				}
-				args[0] = elem[:idx]
-				elem = elem[idx:]
-
-				if len(elem) == 0 {
-					break
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/watch-re"
-
-					if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case 'l': // Prefix: "lease"
-
-						if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch r.Method {
-							case "GET":
-								s.handleWatchReleaseRequest([1]string{
-									args[0],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: rn17AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
-							}
-
-							return
-						}
-
-					case 's': // Prefix: "sources"
-
-						if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch r.Method {
-							case "GET":
-								s.handleWatchResourcesRequest([1]string{
-									args[0],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "GET",
-									allowedHeaders: rn19AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
-							}
-
-							return
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			}
-			// Param: "releaseId"
-			// Match until "/"
-			idx := strings.IndexByte(elem, '/')
-			if idx < 0 {
-				idx = len(elem)
-			}
-			args[0] = elem[:idx]
-			elem = elem[idx:]
-
-			if len(elem) == 0 {
 				switch r.Method {
-				case "DELETE":
-					s.handleDeleteServiceRequest([1]string{
-						args[0],
-					}, elemIsEscaped, w, r)
+				case "GET":
+					s.handleListServicesRequest([0]string{}, elemIsEscaped, w, r)
 				default:
 					s.notAllowed(w, r, notAllowedParams{
-						allowedMethods: "DELETE",
-						allowedHeaders: rn2AllowedHeaders,
+						allowedMethods: "GET",
+						allowedHeaders: rn11AllowedHeaders,
 						acceptPost:     "",
 						acceptPatch:    "",
 					})
@@ -363,9 +114,277 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 				switch elem[0] {
-				case 'i': // Prefix: "install"
+				case 'c': // Prefix: "catalogs"
+					origElem := elem
+					if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
 
-					if l := len("install"); len(elem) >= l && elem[0:l] == "install" {
+					if len(elem) == 0 {
+						switch r.Method {
+						case "GET":
+							s.handleGetMyCatalogsRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: rn3AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
+						}
+
+						return
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
+
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "catalogId"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
+						}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/packages/"
+
+							if l := len("/packages/"); len(elem) >= l && elem[0:l] == "/packages/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "packageName"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[1] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								switch r.Method {
+								case "GET":
+									s.handleGetMyPackageRequest([2]string{
+										args[0],
+										args[1],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "GET",
+										allowedHeaders: rn7AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/versions/"
+
+								if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								// Param: "version"
+								// Match until "/"
+								idx := strings.IndexByte(elem, '/')
+								if idx < 0 {
+									idx = len(elem)
+								}
+								args[2] = elem[:idx]
+								elem = elem[idx:]
+
+								if len(elem) == 0 {
+									break
+								}
+								switch elem[0] {
+								case '/': // Prefix: "/schema"
+
+									if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
+										elem = elem[l:]
+									} else {
+										break
+									}
+
+									if len(elem) == 0 {
+										// Leaf node.
+										switch r.Method {
+										case "GET":
+											s.handleGetPackageSchemaRequest([3]string{
+												args[0],
+												args[1],
+												args[2],
+											}, elemIsEscaped, w, r)
+										default:
+											s.notAllowed(w, r, notAllowedParams{
+												allowedMethods: "GET",
+												allowedHeaders: rn10AllowedHeaders,
+												acceptPost:     "",
+												acceptPatch:    "",
+											})
+										}
+
+										return
+									}
+
+								}
+
+							}
+
+						}
+
+					}
+
+					elem = origElem
+				case 'e': // Prefix: "events/"
+					origElem := elem
+					if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "releaseId"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/watch-re"
+
+						if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case 'l': // Prefix: "lease"
+
+							if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch r.Method {
+								case "GET":
+									s.handleWatchReleaseRequest([1]string{
+										args[0],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "GET",
+										allowedHeaders: rn15AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+
+						case 's': // Prefix: "sources"
+
+							if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch r.Method {
+								case "GET":
+									s.handleWatchResourcesRequest([1]string{
+										args[0],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "GET",
+										allowedHeaders: rn17AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+
+						}
+
+					}
+
+					elem = origElem
+				}
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					switch r.Method {
+					case "DELETE":
+						s.handleDeleteServiceRequest([1]string{
+							args[0],
+						}, elemIsEscaped, w, r)
+					case "GET":
+						s.handleGetServiceRequest([1]string{
+							args[0],
+						}, elemIsEscaped, w, r)
+					case "PUT":
+						s.handleInstallServiceRequest([1]string{
+							args[0],
+						}, elemIsEscaped, w, r)
+					default:
+						s.notAllowed(w, r, notAllowedParams{
+							allowedMethods: "DELETE,GET,PUT",
+							allowedHeaders: rn2AllowedHeaders,
+							acceptPost:     "",
+							acceptPatch:    "",
+						})
+					}
+
+					return
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/suspended"
+
+					if l := len("/suspended"); len(elem) >= l && elem[0:l] == "/suspended" {
 						elem = elem[l:]
 					} else {
 						break
@@ -375,67 +394,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						// Leaf node.
 						switch r.Method {
 						case "PUT":
-							s.handleInstallServiceRequest([1]string{
+							s.handleSetServiceSuspendedRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
 								allowedMethods: "PUT",
-								allowedHeaders: rn11AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
-						}
-
-						return
-					}
-
-				case 'r': // Prefix: "resume"
-
-					if l := len("resume"); len(elem) >= l && elem[0:l] == "resume" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "POST":
-							s.handleResumeServiceRequest([1]string{
-								args[0],
-							}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "POST",
-								allowedHeaders: rn13AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
-						}
-
-						return
-					}
-
-				case 's': // Prefix: "suspend"
-
-					if l := len("suspend"); len(elem) >= l && elem[0:l] == "suspend" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "POST":
-							s.handleSuspendServiceRequest([1]string{
-								args[0],
-							}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "POST",
-								allowedHeaders: rn14AllowedHeaders,
+								allowedHeaders: rn12AllowedHeaders,
 								acceptPost:     "",
 								acceptPatch:    "",
 							})
@@ -534,259 +499,24 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 			break
 		}
 		switch elem[0] {
-		case '/': // Prefix: "/api/services/"
+		case '/': // Prefix: "/api/services"
 
-			if l := len("/api/services/"); len(elem) >= l && elem[0:l] == "/api/services/" {
+			if l := len("/api/services"); len(elem) >= l && elem[0:l] == "/api/services" {
 				elem = elem[l:]
 			} else {
 				break
 			}
 
 			if len(elem) == 0 {
-				break
-			}
-			switch elem[0] {
-			case 'c': // Prefix: "catalogs"
-				origElem := elem
-				if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				if len(elem) == 0 {
-					switch method {
-					case "GET":
-						r.name = GetMyCatalogsOperation
-						r.summary = "List available catalogs and packages for installing for the user"
-						r.operationID = "getMyCatalogs"
-						r.operationGroup = ""
-						r.pathPattern = "/api/services/catalogs"
-						r.args = args
-						r.count = 0
-						return r, true
-					default:
-						return
-					}
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/"
-
-					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					// Param: "catalogId"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/packages/"
-
-						if l := len("/packages/"); len(elem) >= l && elem[0:l] == "/packages/" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						// Param: "packageName"
-						// Match until "/"
-						idx := strings.IndexByte(elem, '/')
-						if idx < 0 {
-							idx = len(elem)
-						}
-						args[1] = elem[:idx]
-						elem = elem[idx:]
-
-						if len(elem) == 0 {
-							switch method {
-							case "GET":
-								r.name = GetMyPackageOperation
-								r.summary = "Get detailed information about a package in a catalog"
-								r.operationID = "getMyPackage"
-								r.operationGroup = ""
-								r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}"
-								r.args = args
-								r.count = 2
-								return r, true
-							default:
-								return
-							}
-						}
-						switch elem[0] {
-						case '/': // Prefix: "/versions/"
-
-							if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							// Param: "version"
-							// Match until "/"
-							idx := strings.IndexByte(elem, '/')
-							if idx < 0 {
-								idx = len(elem)
-							}
-							args[2] = elem[:idx]
-							elem = elem[idx:]
-
-							if len(elem) == 0 {
-								break
-							}
-							switch elem[0] {
-							case '/': // Prefix: "/schema"
-
-								if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
-									elem = elem[l:]
-								} else {
-									break
-								}
-
-								if len(elem) == 0 {
-									// Leaf node.
-									switch method {
-									case "GET":
-										r.name = GetPackageSchemaOperation
-										r.summary = "Get the values.schema.json of a versioned package"
-										r.operationID = "getPackageSchema"
-										r.operationGroup = ""
-										r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"
-										r.args = args
-										r.count = 3
-										return r, true
-									default:
-										return
-									}
-								}
-
-							}
-
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			case 'e': // Prefix: "events/"
-				origElem := elem
-				if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
-					elem = elem[l:]
-				} else {
-					break
-				}
-
-				// Param: "releaseId"
-				// Match until "/"
-				idx := strings.IndexByte(elem, '/')
-				if idx < 0 {
-					idx = len(elem)
-				}
-				args[0] = elem[:idx]
-				elem = elem[idx:]
-
-				if len(elem) == 0 {
-					break
-				}
-				switch elem[0] {
-				case '/': // Prefix: "/watch-re"
-
-					if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case 'l': // Prefix: "lease"
-
-						if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch method {
-							case "GET":
-								r.name = WatchReleaseOperation
-								r.summary = "Release-level status stream (SSE)"
-								r.operationID = "watchRelease"
-								r.operationGroup = ""
-								r.pathPattern = "/api/services/events/{releaseId}/watch-release"
-								r.args = args
-								r.count = 1
-								return r, true
-							default:
-								return
-							}
-						}
-
-					case 's': // Prefix: "sources"
-
-						if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
-							elem = elem[l:]
-						} else {
-							break
-						}
-
-						if len(elem) == 0 {
-							// Leaf node.
-							switch method {
-							case "GET":
-								r.name = WatchResourcesOperation
-								r.summary = "Kubernetes resources status stream (SSE)"
-								r.operationID = "watchResources"
-								r.operationGroup = ""
-								r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
-								r.args = args
-								r.count = 1
-								return r, true
-							default:
-								return
-							}
-						}
-
-					}
-
-				}
-
-				elem = origElem
-			}
-			// Param: "releaseId"
-			// Match until "/"
-			idx := strings.IndexByte(elem, '/')
-			if idx < 0 {
-				idx = len(elem)
-			}
-			args[0] = elem[:idx]
-			elem = elem[idx:]
-
-			if len(elem) == 0 {
 				switch method {
-				case "DELETE":
-					r.name = DeleteServiceOperation
-					r.summary = "Uninstall a service"
-					r.operationID = "deleteService"
+				case "GET":
+					r.name = ListServicesOperation
+					r.summary = "List all services in a project namespace"
+					r.operationID = "listServices"
 					r.operationGroup = ""
-					r.pathPattern = "/api/services/{releaseId}"
+					r.pathPattern = "/api/services"
 					r.args = args
-					r.count = 1
+					r.count = 0
 					return r, true
 				default:
 					return
@@ -805,9 +535,274 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					break
 				}
 				switch elem[0] {
-				case 'i': // Prefix: "install"
+				case 'c': // Prefix: "catalogs"
+					origElem := elem
+					if l := len("catalogs"); len(elem) >= l && elem[0:l] == "catalogs" {
+						elem = elem[l:]
+					} else {
+						break
+					}
 
-					if l := len("install"); len(elem) >= l && elem[0:l] == "install" {
+					if len(elem) == 0 {
+						switch method {
+						case "GET":
+							r.name = GetMyCatalogsOperation
+							r.summary = "List available catalogs and packages for installing for the user"
+							r.operationID = "getMyCatalogs"
+							r.operationGroup = ""
+							r.pathPattern = "/api/services/catalogs"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
+						}
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/"
+
+						if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						// Param: "catalogId"
+						// Match until "/"
+						idx := strings.IndexByte(elem, '/')
+						if idx < 0 {
+							idx = len(elem)
+						}
+						args[0] = elem[:idx]
+						elem = elem[idx:]
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case '/': // Prefix: "/packages/"
+
+							if l := len("/packages/"); len(elem) >= l && elem[0:l] == "/packages/" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							// Param: "packageName"
+							// Match until "/"
+							idx := strings.IndexByte(elem, '/')
+							if idx < 0 {
+								idx = len(elem)
+							}
+							args[1] = elem[:idx]
+							elem = elem[idx:]
+
+							if len(elem) == 0 {
+								switch method {
+								case "GET":
+									r.name = GetMyPackageOperation
+									r.summary = "Get detailed information about a package in a catalog"
+									r.operationID = "getMyPackage"
+									r.operationGroup = ""
+									r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}"
+									r.args = args
+									r.count = 2
+									return r, true
+								default:
+									return
+								}
+							}
+							switch elem[0] {
+							case '/': // Prefix: "/versions/"
+
+								if l := len("/versions/"); len(elem) >= l && elem[0:l] == "/versions/" {
+									elem = elem[l:]
+								} else {
+									break
+								}
+
+								// Param: "version"
+								// Match until "/"
+								idx := strings.IndexByte(elem, '/')
+								if idx < 0 {
+									idx = len(elem)
+								}
+								args[2] = elem[:idx]
+								elem = elem[idx:]
+
+								if len(elem) == 0 {
+									break
+								}
+								switch elem[0] {
+								case '/': // Prefix: "/schema"
+
+									if l := len("/schema"); len(elem) >= l && elem[0:l] == "/schema" {
+										elem = elem[l:]
+									} else {
+										break
+									}
+
+									if len(elem) == 0 {
+										// Leaf node.
+										switch method {
+										case "GET":
+											r.name = GetPackageSchemaOperation
+											r.summary = "Get the values.schema.json of a versioned package"
+											r.operationID = "getPackageSchema"
+											r.operationGroup = ""
+											r.pathPattern = "/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"
+											r.args = args
+											r.count = 3
+											return r, true
+										default:
+											return
+										}
+									}
+
+								}
+
+							}
+
+						}
+
+					}
+
+					elem = origElem
+				case 'e': // Prefix: "events/"
+					origElem := elem
+					if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
+						elem = elem[l:]
+					} else {
+						break
+					}
+
+					// Param: "releaseId"
+					// Match until "/"
+					idx := strings.IndexByte(elem, '/')
+					if idx < 0 {
+						idx = len(elem)
+					}
+					args[0] = elem[:idx]
+					elem = elem[idx:]
+
+					if len(elem) == 0 {
+						break
+					}
+					switch elem[0] {
+					case '/': // Prefix: "/watch-re"
+
+						if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							break
+						}
+						switch elem[0] {
+						case 'l': // Prefix: "lease"
+
+							if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch method {
+								case "GET":
+									r.name = WatchReleaseOperation
+									r.summary = "Release-level status stream (SSE)"
+									r.operationID = "watchRelease"
+									r.operationGroup = ""
+									r.pathPattern = "/api/services/events/{releaseId}/watch-release"
+									r.args = args
+									r.count = 1
+									return r, true
+								default:
+									return
+								}
+							}
+
+						case 's': // Prefix: "sources"
+
+							if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch method {
+								case "GET":
+									r.name = WatchResourcesOperation
+									r.summary = "Kubernetes resources status stream (SSE)"
+									r.operationID = "watchResources"
+									r.operationGroup = ""
+									r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
+									r.args = args
+									r.count = 1
+									return r, true
+								default:
+									return
+								}
+							}
+
+						}
+
+					}
+
+					elem = origElem
+				}
+				// Param: "releaseId"
+				// Match until "/"
+				idx := strings.IndexByte(elem, '/')
+				if idx < 0 {
+					idx = len(elem)
+				}
+				args[0] = elem[:idx]
+				elem = elem[idx:]
+
+				if len(elem) == 0 {
+					switch method {
+					case "DELETE":
+						r.name = DeleteServiceOperation
+						r.summary = "Uninstall a service"
+						r.operationID = "deleteService"
+						r.operationGroup = ""
+						r.pathPattern = "/api/services/{releaseId}"
+						r.args = args
+						r.count = 1
+						return r, true
+					case "GET":
+						r.name = GetServiceOperation
+						r.summary = "Get the current state of a service"
+						r.operationID = "getService"
+						r.operationGroup = ""
+						r.pathPattern = "/api/services/{releaseId}"
+						r.args = args
+						r.count = 1
+						return r, true
+					case "PUT":
+						r.name = InstallServiceOperation
+						r.summary = "Trigger service installation (async)"
+						r.operationID = "installService"
+						r.operationGroup = ""
+						r.pathPattern = "/api/services/{releaseId}"
+						r.args = args
+						r.count = 1
+						return r, true
+					default:
+						return
+					}
+				}
+				switch elem[0] {
+				case '/': // Prefix: "/suspended"
+
+					if l := len("/suspended"); len(elem) >= l && elem[0:l] == "/suspended" {
 						elem = elem[l:]
 					} else {
 						break
@@ -817,61 +812,11 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						// Leaf node.
 						switch method {
 						case "PUT":
-							r.name = InstallServiceOperation
-							r.summary = "Trigger service installation (async)"
-							r.operationID = "installService"
+							r.name = SetServiceSuspendedOperation
+							r.summary = "Suspend or resume a service"
+							r.operationID = "setServiceSuspended"
 							r.operationGroup = ""
-							r.pathPattern = "/api/services/{releaseId}/install"
-							r.args = args
-							r.count = 1
-							return r, true
-						default:
-							return
-						}
-					}
-
-				case 'r': // Prefix: "resume"
-
-					if l := len("resume"); len(elem) >= l && elem[0:l] == "resume" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "POST":
-							r.name = ResumeServiceOperation
-							r.summary = "Resume a suspended service"
-							r.operationID = "resumeService"
-							r.operationGroup = ""
-							r.pathPattern = "/api/services/{releaseId}/resume"
-							r.args = args
-							r.count = 1
-							return r, true
-						default:
-							return
-						}
-					}
-
-				case 's': // Prefix: "suspend"
-
-					if l := len("suspend"); len(elem) >= l && elem[0:l] == "suspend" {
-						elem = elem[l:]
-					} else {
-						break
-					}
-
-					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "POST":
-							r.name = SuspendServiceOperation
-							r.summary = "Suspend a running service"
-							r.operationID = "suspendService"
-							r.operationGroup = ""
-							r.pathPattern = "/api/services/{releaseId}/suspend"
+							r.pathPattern = "/api/services/{releaseId}/suspended"
 							r.args = args
 							r.count = 1
 							return r, true
