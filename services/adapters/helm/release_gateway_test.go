@@ -15,7 +15,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
+func newAdapter(t *testing.T, cb ports.InstallCallbacks) *Helm {
 	t.Helper()
 
 	k8sCfg := &rest.Config{
@@ -31,8 +31,8 @@ func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
 	return adapter
 }
 
-func defaultCallbacks() ports.HelmStartCallbacks {
-	return ports.HelmStartCallbacks{
+func defaultCallbacks() ports.InstallCallbacks {
+	return ports.InstallCallbacks{
 		OnStart:   func(_, _ string) {},
 		OnSuccess: func(_, _ string) {},
 		OnError:   func(_, _ string, _ error) {},
@@ -49,7 +49,7 @@ func TestStartInstallEmptyArgs(t *testing.T) {
 		&domain.Package{},
 		"",
 		nil,
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
 }
@@ -68,7 +68,7 @@ func TestStartInstallLocateChartError(t *testing.T) {
 		},
 		"0.1.0",
 		nil,
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "locating chart")
@@ -92,7 +92,7 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 		},
 		"0.1.0",
 		map[string]interface{}{},
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading chart")
@@ -104,7 +104,7 @@ func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 	successCalled := false
 	errorCalled := false
 
-	i := newAdapter(t, ports.HelmStartCallbacks{
+	i := newAdapter(t, ports.InstallCallbacks{
 		OnStart:   func(_, _ string) { startCalled = true },
 		OnSuccess: func(_, _ string) { successCalled = true },
 		OnError:   func(_, _ string, _ error) { errorCalled = true },
@@ -121,8 +121,8 @@ func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 		},
 		"0.1.0",
 		nil,
-		ports.HelmStartOptions{
-			Callbacks: ports.HelmStartCallbacks{
+		ports.InstallOptions{
+			Callbacks: ports.InstallCallbacks{
 				OnStart:   func(_, _ string) { startCalled = true },
 				OnSuccess: func(_, _ string) { successCalled = true },
 				OnError:   func(_, _ string, _ error) { errorCalled = true },

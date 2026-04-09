@@ -6,13 +6,14 @@ package api
 type OperationName = string
 
 const (
-	DeleteServiceOperation    OperationName = "DeleteService"
-	GetMyCatalogsOperation    OperationName = "GetMyCatalogs"
-	GetMyPackageOperation     OperationName = "GetMyPackage"
-	GetPackageSchemaOperation OperationName = "GetPackageSchema"
-	InstallServiceOperation   OperationName = "InstallService"
-	ResumeServiceOperation    OperationName = "ResumeService"
-	SuspendServiceOperation   OperationName = "SuspendService"
-	WatchReleaseOperation     OperationName = "WatchRelease"
-	WatchResourcesOperation   OperationName = "WatchResources"
+	DeleteServiceOperation       OperationName = "DeleteService"
+	GetMyCatalogsOperation       OperationName = "GetMyCatalogs"
+	GetMyPackageOperation        OperationName = "GetMyPackage"
+	GetPackageSchemaOperation    OperationName = "GetPackageSchema"
+	GetServiceOperation          OperationName = "GetService"
+	InstallServiceOperation      OperationName = "InstallService"
+	ListServicesOperation        OperationName = "ListServices"
+	SetServiceSuspendedOperation OperationName = "SetServiceSuspended"
+	WatchReleaseOperation        OperationName = "WatchRelease"
+	WatchResourcesOperation      OperationName = "WatchResources"
 )

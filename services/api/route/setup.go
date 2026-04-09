@@ -41,7 +41,13 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to setup catalog controller: %w", err)
 	}
 
-	h := NewHandler(installCtrl, catalogCtrl)
+	serviceQueryCtrl, err := SetupServiceQueryController(app, helmClient)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup service query controller: %w", err)
+	}
+
+	h := NewHandler(installCtrl, catalogCtrl, serviceQueryCtrl)
 
 	srv, err := oas.NewServer(
 		h,
