@@ -52,33 +52,40 @@ func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPack
 	return r, ht.ErrNotImplemented
 }
 
+// GetService implements getService operation.
+//
+// Get the current state of a service.
+//
+// GET /api/services/{releaseId}
+func (UnimplementedHandler) GetService(ctx context.Context, params GetServiceParams) (r GetServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // InstallService implements installService operation.
 //
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 // the release already exists (returns 202 with the same event URLs).
 //
-// PUT /api/services/{releaseId}/install
+// PUT /api/services/{releaseId}
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
-// ResumeService implements resumeService operation.
+// ListServices implements listServices operation.
 //
-// Runs helm upgrade --reuse-values with global.suspend=false. The chart must expose global.suspend
-// in its default values, otherwise 422 is returned.
+// List all services in a project namespace.
 //
-// POST /api/services/{releaseId}/resume
-func (UnimplementedHandler) ResumeService(ctx context.Context, params ResumeServiceParams) (r ResumeServiceRes, _ error) {
+// GET /api/services
+func (UnimplementedHandler) ListServices(ctx context.Context, params ListServicesParams) (r ListServicesRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
-// SuspendService implements suspendService operation.
+// SetServiceSuspended implements setServiceSuspended operation.
 //
-// Runs helm upgrade --reuse-values with global.suspend=true. The chart must expose global.suspend in
-// its default values, otherwise 422 is returned.
+// Suspend or resume a service.
 //
-// POST /api/services/{releaseId}/suspend
-func (UnimplementedHandler) SuspendService(ctx context.Context, params SuspendServiceParams) (r SuspendServiceRes, _ error) {
+// PUT /api/services/{releaseId}/suspended
+func (UnimplementedHandler) SetServiceSuspended(ctx context.Context, req *SetServiceSuspendedReq, params SetServiceSuspendedParams) (r SetServiceSuspendedRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

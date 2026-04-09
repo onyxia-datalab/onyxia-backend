@@ -40,6 +40,4 @@ type ServiceLifecycle interface {
 	Suspend(ctx context.Context, req SuspendRequest) error
 	Resume(ctx context.Context, req ResumeRequest) error
 	Delete(ctx context.Context, req DeleteRequest) error
-	Rename(ctx context.Context) error
-	Share(ctx context.Context) error
 }

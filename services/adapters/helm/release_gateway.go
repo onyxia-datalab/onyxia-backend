@@ -2,6 +2,7 @@ package helm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -14,22 +15,24 @@ import (
 	"helm.sh/helm/v4/pkg/cli/values"
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/release"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/rest"
 )
 
 type Helm struct {
 	settings   *cli.EnvSettings
-	global     ports.HelmStartCallbacks
+	global     ports.InstallCallbacks
 	restConfig *rest.Config
 	helmClient *Client
 }
 
-var _ ports.HelmReleasesGateway = (*Helm)(nil)
+var _ ports.ReleaseGateway = (*Helm)(nil)
 
 func NewReleaseGtw(
 	k8sConfig *rest.Config,
 	client *Client,
-	global ports.HelmStartCallbacks,
+	global ports.InstallCallbacks,
 ) (*Helm, error) {
 
 	return &Helm{
@@ -58,7 +61,7 @@ func (i *Helm) StartInstall(
 	pkg *domain.Package,
 	version string,
 	vals map[string]interface{},
-	opts ports.HelmStartOptions,
+	opts ports.InstallOptions,
 ) error {
 
 	if releaseName == "" {
@@ -202,4 +205,39 @@ func globalSuspendSupported(chartValues map[string]interface{}) bool {
 	}
 	_, ok = global["suspend"]
 	return ok
+}
+
+// GetReleaseState returns whether the release exists and whether global.suspend is true.
+// Returns ReleaseState{Exists: false} (no error) when the release is not found.
+func (h *Helm) GetReleaseState(
+	ctx context.Context,
+	namespace, releaseName string,
+) (ports.ReleaseState, error) {
+	cfg, err := h.cfgForNamespace(namespace)
+	if err != nil {
+		return ports.ReleaseState{}, err
+	}
+
+	rel, err := action.NewGet(cfg).Run(releaseName)
+	if err != nil {
+		if errors.Is(err, driver.ErrReleaseNotFound) {
+			return ports.ReleaseState{Exists: false}, nil
+		}
+		return ports.ReleaseState{}, err
+	}
+
+	suspended := false
+	status := ""
+	if r, ok := rel.(*releasev1.Release); ok {
+		if global, ok := r.Config["global"].(map[string]interface{}); ok {
+			if v, ok := global["suspend"].(bool); ok {
+				suspended = v
+			}
+		}
+		if r.Info != nil {
+			status = string(r.Info.Status)
+		}
+	}
+
+	return ports.ReleaseState{Exists: true, Suspended: suspended, Status: status}, nil
 }

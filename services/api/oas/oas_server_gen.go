@@ -35,27 +35,31 @@ type Handler interface {
 	//
 	// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
+	// GetService implements getService operation.
+	//
+	// Get the current state of a service.
+	//
+	// GET /api/services/{releaseId}
+	GetService(ctx context.Context, params GetServiceParams) (GetServiceRes, error)
 	// InstallService implements installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 	// the release already exists (returns 202 with the same event URLs).
 	//
-	// PUT /api/services/{releaseId}/install
+	// PUT /api/services/{releaseId}
 	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
-	// ResumeService implements resumeService operation.
+	// ListServices implements listServices operation.
 	//
-	// Runs helm upgrade --reuse-values with global.suspend=false. The chart must expose global.suspend
-	// in its default values, otherwise 422 is returned.
+	// List all services in a project namespace.
 	//
-	// POST /api/services/{releaseId}/resume
-	ResumeService(ctx context.Context, params ResumeServiceParams) (ResumeServiceRes, error)
-	// SuspendService implements suspendService operation.
+	// GET /api/services
+	ListServices(ctx context.Context, params ListServicesParams) (ListServicesRes, error)
+	// SetServiceSuspended implements setServiceSuspended operation.
 	//
-	// Runs helm upgrade --reuse-values with global.suspend=true. The chart must expose global.suspend in
-	// its default values, otherwise 422 is returned.
+	// Suspend or resume a service.
 	//
-	// POST /api/services/{releaseId}/suspend
-	SuspendService(ctx context.Context, params SuspendServiceParams) (SuspendServiceRes, error)
+	// PUT /api/services/{releaseId}/suspended
+	SetServiceSuspended(ctx context.Context, req *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error)
 	// WatchRelease implements watchRelease operation.
 	//
 	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".

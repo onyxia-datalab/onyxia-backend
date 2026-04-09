@@ -290,6 +290,22 @@ func (s *GetPackageSchemaOK) init() GetPackageSchemaOK {
 
 func (*GetPackageSchemaOK) getPackageSchemaRes() {}
 
+type GetServiceForbidden Problem
+
+func (*GetServiceForbidden) getServiceRes() {}
+
+type GetServiceInternalServerError Problem
+
+func (*GetServiceInternalServerError) getServiceRes() {}
+
+type GetServiceNotFound Problem
+
+func (*GetServiceNotFound) getServiceRes() {}
+
+type GetServiceUnauthorized Problem
+
+func (*GetServiceUnauthorized) getServiceRes() {}
+
 // Ref: #/components/schemas/InstallAccepted
 type InstallAccepted struct {
 	EventsUrl InstallAcceptedEventsUrl `json:"eventsUrl"`
@@ -377,6 +393,22 @@ func (*InstallServiceInternalServerError) installServiceRes() {}
 type InstallServiceUnauthorized Problem
 
 func (*InstallServiceUnauthorized) installServiceRes() {}
+
+type ListServicesForbidden Problem
+
+func (*ListServicesForbidden) listServicesRes() {}
+
+type ListServicesInternalServerError Problem
+
+func (*ListServicesInternalServerError) listServicesRes() {}
+
+type ListServicesOKApplicationJSON []Service
+
+func (*ListServicesOKApplicationJSON) listServicesRes() {}
+
+type ListServicesUnauthorized Problem
+
+func (*ListServicesUnauthorized) listServicesRes() {}
 
 // A string or a map of localized strings by language code.
 // Ref: #/components/schemas/LocalizedString
@@ -710,6 +742,52 @@ func (o OptLocalizedString) Or(d LocalizedString) LocalizedString {
 	return d
 }
 
+// NewOptServiceError returns new OptServiceError with value set to v.
+func NewOptServiceError(v ServiceError) OptServiceError {
+	return OptServiceError{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptServiceError is optional ServiceError.
+type OptServiceError struct {
+	Value ServiceError
+	Set   bool
+}
+
+// IsSet returns true if OptServiceError was set.
+func (o OptServiceError) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptServiceError) Reset() {
+	var v ServiceError
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptServiceError) SetTo(v ServiceError) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptServiceError) Get() (v ServiceError, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptServiceError) Or(d ServiceError) ServiceError {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptString returns new OptString with value set to v.
 func NewOptString(v string) OptString {
 	return OptString{
@@ -937,30 +1015,244 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 	return m
 }
 
-type ResumeServiceForbidden Problem
+// Ref: #/components/schemas/Service
+type Service struct {
+	// Release identifier.
+	ReleaseId string `json:"releaseId"`
+	// Current lifecycle state of the service.
+	Status ServiceStatus `json:"status"`
+	// Display name.
+	FriendlyName string `json:"friendlyName"`
+	// Username of the service owner.
+	Owner string `json:"owner"`
+	// Source catalog identifier.
+	CatalogId string `json:"catalogId"`
+	// Whether the service is visible to all namespace users.
+	Share bool            `json:"share"`
+	Error OptServiceError `json:"error"`
+}
 
-func (*ResumeServiceForbidden) resumeServiceRes() {}
+// GetReleaseId returns the value of ReleaseId.
+func (s *Service) GetReleaseId() string {
+	return s.ReleaseId
+}
 
-type ResumeServiceInternalServerError Problem
+// GetStatus returns the value of Status.
+func (s *Service) GetStatus() ServiceStatus {
+	return s.Status
+}
 
-func (*ResumeServiceInternalServerError) resumeServiceRes() {}
+// GetFriendlyName returns the value of FriendlyName.
+func (s *Service) GetFriendlyName() string {
+	return s.FriendlyName
+}
 
-// ResumeServiceNoContent is response for ResumeService operation.
-type ResumeServiceNoContent struct{}
+// GetOwner returns the value of Owner.
+func (s *Service) GetOwner() string {
+	return s.Owner
+}
 
-func (*ResumeServiceNoContent) resumeServiceRes() {}
+// GetCatalogId returns the value of CatalogId.
+func (s *Service) GetCatalogId() string {
+	return s.CatalogId
+}
 
-type ResumeServiceNotFound Problem
+// GetShare returns the value of Share.
+func (s *Service) GetShare() bool {
+	return s.Share
+}
 
-func (*ResumeServiceNotFound) resumeServiceRes() {}
+// GetError returns the value of Error.
+func (s *Service) GetError() OptServiceError {
+	return s.Error
+}
 
-type ResumeServiceUnauthorized Problem
+// SetReleaseId sets the value of ReleaseId.
+func (s *Service) SetReleaseId(val string) {
+	s.ReleaseId = val
+}
 
-func (*ResumeServiceUnauthorized) resumeServiceRes() {}
+// SetStatus sets the value of Status.
+func (s *Service) SetStatus(val ServiceStatus) {
+	s.Status = val
+}
 
-type ResumeServiceUnprocessableEntity Problem
+// SetFriendlyName sets the value of FriendlyName.
+func (s *Service) SetFriendlyName(val string) {
+	s.FriendlyName = val
+}
 
-func (*ResumeServiceUnprocessableEntity) resumeServiceRes() {}
+// SetOwner sets the value of Owner.
+func (s *Service) SetOwner(val string) {
+	s.Owner = val
+}
+
+// SetCatalogId sets the value of CatalogId.
+func (s *Service) SetCatalogId(val string) {
+	s.CatalogId = val
+}
+
+// SetShare sets the value of Share.
+func (s *Service) SetShare(val bool) {
+	s.Share = val
+}
+
+// SetError sets the value of Error.
+func (s *Service) SetError(val OptServiceError) {
+	s.Error = val
+}
+
+func (*Service) getServiceRes() {}
+
+// Ref: #/components/schemas/ServiceError
+type ServiceError struct {
+	Reason       ServiceErrorReason `json:"reason"`
+	PodName      string             `json:"podName"`
+	Message      OptString          `json:"message"`
+	RestartCount OptInt             `json:"restartCount"`
+	ExitCode     OptInt             `json:"exitCode"`
+	Image        OptString          `json:"image"`
+	Limit        OptString          `json:"limit"`
+}
+
+// GetReason returns the value of Reason.
+func (s *ServiceError) GetReason() ServiceErrorReason {
+	return s.Reason
+}
+
+// GetPodName returns the value of PodName.
+func (s *ServiceError) GetPodName() string {
+	return s.PodName
+}
+
+// GetMessage returns the value of Message.
+func (s *ServiceError) GetMessage() OptString {
+	return s.Message
+}
+
+// GetRestartCount returns the value of RestartCount.
+func (s *ServiceError) GetRestartCount() OptInt {
+	return s.RestartCount
+}
+
+// GetExitCode returns the value of ExitCode.
+func (s *ServiceError) GetExitCode() OptInt {
+	return s.ExitCode
+}
+
+// GetImage returns the value of Image.
+func (s *ServiceError) GetImage() OptString {
+	return s.Image
+}
+
+// GetLimit returns the value of Limit.
+func (s *ServiceError) GetLimit() OptString {
+	return s.Limit
+}
+
+// SetReason sets the value of Reason.
+func (s *ServiceError) SetReason(val ServiceErrorReason) {
+	s.Reason = val
+}
+
+// SetPodName sets the value of PodName.
+func (s *ServiceError) SetPodName(val string) {
+	s.PodName = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ServiceError) SetMessage(val OptString) {
+	s.Message = val
+}
+
+// SetRestartCount sets the value of RestartCount.
+func (s *ServiceError) SetRestartCount(val OptInt) {
+	s.RestartCount = val
+}
+
+// SetExitCode sets the value of ExitCode.
+func (s *ServiceError) SetExitCode(val OptInt) {
+	s.ExitCode = val
+}
+
+// SetImage sets the value of Image.
+func (s *ServiceError) SetImage(val OptString) {
+	s.Image = val
+}
+
+// SetLimit sets the value of Limit.
+func (s *ServiceError) SetLimit(val OptString) {
+	s.Limit = val
+}
+
+type ServiceErrorReason string
+
+const (
+	ServiceErrorReasonCrashLoop       ServiceErrorReason = "crash_loop"
+	ServiceErrorReasonOomKilled       ServiceErrorReason = "oom_killed"
+	ServiceErrorReasonImagePull       ServiceErrorReason = "image_pull"
+	ServiceErrorReasonConfigError     ServiceErrorReason = "config_error"
+	ServiceErrorReasonUnschedulable   ServiceErrorReason = "unschedulable"
+	ServiceErrorReasonReadinessFailed ServiceErrorReason = "readiness_failed"
+)
+
+// AllValues returns all ServiceErrorReason values.
+func (ServiceErrorReason) AllValues() []ServiceErrorReason {
+	return []ServiceErrorReason{
+		ServiceErrorReasonCrashLoop,
+		ServiceErrorReasonOomKilled,
+		ServiceErrorReasonImagePull,
+		ServiceErrorReasonConfigError,
+		ServiceErrorReasonUnschedulable,
+		ServiceErrorReasonReadinessFailed,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ServiceErrorReason) MarshalText() ([]byte, error) {
+	switch s {
+	case ServiceErrorReasonCrashLoop:
+		return []byte(s), nil
+	case ServiceErrorReasonOomKilled:
+		return []byte(s), nil
+	case ServiceErrorReasonImagePull:
+		return []byte(s), nil
+	case ServiceErrorReasonConfigError:
+		return []byte(s), nil
+	case ServiceErrorReasonUnschedulable:
+		return []byte(s), nil
+	case ServiceErrorReasonReadinessFailed:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ServiceErrorReason) UnmarshalText(data []byte) error {
+	switch ServiceErrorReason(data) {
+	case ServiceErrorReasonCrashLoop:
+		*s = ServiceErrorReasonCrashLoop
+		return nil
+	case ServiceErrorReasonOomKilled:
+		*s = ServiceErrorReasonOomKilled
+		return nil
+	case ServiceErrorReasonImagePull:
+		*s = ServiceErrorReasonImagePull
+		return nil
+	case ServiceErrorReasonConfigError:
+		*s = ServiceErrorReasonConfigError
+		return nil
+	case ServiceErrorReasonUnschedulable:
+		*s = ServiceErrorReasonUnschedulable
+		return nil
+	case ServiceErrorReasonReadinessFailed:
+		*s = ServiceErrorReasonReadinessFailed
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Ref: #/components/schemas/ServiceInstallRequest
 type ServiceInstallRequest struct {
@@ -1074,30 +1366,111 @@ func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 	return m
 }
 
-type SuspendServiceForbidden Problem
+// Current lifecycle state of the service.
+type ServiceStatus string
 
-func (*SuspendServiceForbidden) suspendServiceRes() {}
+const (
+	ServiceStatusDeploying   ServiceStatus = "Deploying"
+	ServiceStatusRunning     ServiceStatus = "Running"
+	ServiceStatusError       ServiceStatus = "Error"
+	ServiceStatusGhost       ServiceStatus = "Ghost"
+	ServiceStatusSuspended   ServiceStatus = "Suspended"
+	ServiceStatusTerminating ServiceStatus = "Terminating"
+)
 
-type SuspendServiceInternalServerError Problem
+// AllValues returns all ServiceStatus values.
+func (ServiceStatus) AllValues() []ServiceStatus {
+	return []ServiceStatus{
+		ServiceStatusDeploying,
+		ServiceStatusRunning,
+		ServiceStatusError,
+		ServiceStatusGhost,
+		ServiceStatusSuspended,
+		ServiceStatusTerminating,
+	}
+}
 
-func (*SuspendServiceInternalServerError) suspendServiceRes() {}
+// MarshalText implements encoding.TextMarshaler.
+func (s ServiceStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ServiceStatusDeploying:
+		return []byte(s), nil
+	case ServiceStatusRunning:
+		return []byte(s), nil
+	case ServiceStatusError:
+		return []byte(s), nil
+	case ServiceStatusGhost:
+		return []byte(s), nil
+	case ServiceStatusSuspended:
+		return []byte(s), nil
+	case ServiceStatusTerminating:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
 
-// SuspendServiceNoContent is response for SuspendService operation.
-type SuspendServiceNoContent struct{}
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ServiceStatus) UnmarshalText(data []byte) error {
+	switch ServiceStatus(data) {
+	case ServiceStatusDeploying:
+		*s = ServiceStatusDeploying
+		return nil
+	case ServiceStatusRunning:
+		*s = ServiceStatusRunning
+		return nil
+	case ServiceStatusError:
+		*s = ServiceStatusError
+		return nil
+	case ServiceStatusGhost:
+		*s = ServiceStatusGhost
+		return nil
+	case ServiceStatusSuspended:
+		*s = ServiceStatusSuspended
+		return nil
+	case ServiceStatusTerminating:
+		*s = ServiceStatusTerminating
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
-func (*SuspendServiceNoContent) suspendServiceRes() {}
+type SetServiceSuspendedForbidden Problem
 
-type SuspendServiceNotFound Problem
+func (*SetServiceSuspendedForbidden) setServiceSuspendedRes() {}
 
-func (*SuspendServiceNotFound) suspendServiceRes() {}
+type SetServiceSuspendedInternalServerError Problem
 
-type SuspendServiceUnauthorized Problem
+func (*SetServiceSuspendedInternalServerError) setServiceSuspendedRes() {}
 
-func (*SuspendServiceUnauthorized) suspendServiceRes() {}
+// SetServiceSuspendedNoContent is response for SetServiceSuspended operation.
+type SetServiceSuspendedNoContent struct{}
 
-type SuspendServiceUnprocessableEntity Problem
+func (*SetServiceSuspendedNoContent) setServiceSuspendedRes() {}
 
-func (*SuspendServiceUnprocessableEntity) suspendServiceRes() {}
+type SetServiceSuspendedNotFound Problem
+
+func (*SetServiceSuspendedNotFound) setServiceSuspendedRes() {}
+
+type SetServiceSuspendedReq struct {
+	// True to suspend, false to resume.
+	Suspended bool `json:"suspended"`
+}
+
+// GetSuspended returns the value of Suspended.
+func (s *SetServiceSuspendedReq) GetSuspended() bool {
+	return s.Suspended
+}
+
+// SetSuspended sets the value of Suspended.
+func (s *SetServiceSuspendedReq) SetSuspended(val bool) {
+	s.Suspended = val
+}
+
+type SetServiceSuspendedUnauthorized Problem
+
+func (*SetServiceSuspendedUnauthorized) setServiceSuspendedRes() {}
 
 type WatchReleaseForbidden Problem
 
