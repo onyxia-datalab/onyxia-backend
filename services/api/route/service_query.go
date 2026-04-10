@@ -8,7 +8,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/query"
 )
 
 func SetupServiceQueryController(
@@ -28,7 +28,7 @@ func SetupServiceQueryController(
 	secretGtw := k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset())
 	podGtw := k8s.NewWorkloadStateGtw(app.K8sClient.Clientset())
 
-	serviceQueryUc := service.NewQuery(secretGtw, helmReleaseGtw, podGtw, app.UserContextReader)
+	serviceQueryUc := query.NewReader(secretGtw, helmReleaseGtw, podGtw, app.UserContextReader)
 
 	return controller.NewServiceQueryController(serviceQueryUc, app.UserContextReader), nil
 }
