@@ -1,4 +1,4 @@
-package service
+package lifecycle
 
 import (
 	"context"
@@ -130,27 +130,4 @@ func (m *MockCatalogRepository) GetPackageSchema(
 		return res.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
-}
-
-type MockWorkloadStateGateway struct{ mock.Mock }
-
-var _ ports.WorkloadStateGateway = (*MockWorkloadStateGateway)(nil)
-
-func (m *MockWorkloadStateGateway) GetPodsForRelease(
-	ctx context.Context,
-	namespace, releaseID string,
-) ([]ports.PodInfo, error) {
-	args := m.Called(ctx, namespace, releaseID)
-	if v := args.Get(0); v != nil {
-		return v.([]ports.PodInfo), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-func (m *MockWorkloadStateGateway) GetWorkloadReadiness(
-	ctx context.Context,
-	namespace, releaseID string,
-) (bool, error) {
-	args := m.Called(ctx, namespace, releaseID)
-	return args.Bool(0), args.Error(1)
 }

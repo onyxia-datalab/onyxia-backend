@@ -1,4 +1,4 @@
-package service
+package query
 
 import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"

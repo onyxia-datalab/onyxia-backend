@@ -1,4 +1,4 @@
-package service
+package query
 
 import (
 	"context"
@@ -10,26 +10,26 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-type Query struct {
+type Reader struct {
 	secrets    ports.OnyxiaSecretGateway
 	helm       ports.ReleaseGateway
 	pods       ports.WorkloadStateGateway
 	userReader usercontext.UsernameGetter
 }
 
-var _ domain.ServiceQuery = (*Query)(nil)
+var _ domain.ServiceQuery = (*Reader)(nil)
 
-func NewQuery(
+func NewReader(
 	secrets ports.OnyxiaSecretGateway,
 	helm ports.ReleaseGateway,
 	pods ports.WorkloadStateGateway,
 	userReader usercontext.UsernameGetter,
-) *Query {
-	return &Query{secrets: secrets, helm: helm, pods: pods, userReader: userReader}
+) *Reader {
+	return &Reader{secrets: secrets, helm: helm, pods: pods, userReader: userReader}
 }
 
 // GetService returns the full service state including error details.
-func (uc *Query) GetService(
+func (uc *Reader) GetService(
 	ctx context.Context,
 	namespace, releaseID string,
 ) (domain.Service, error) {
@@ -60,7 +60,7 @@ func (uc *Query) GetService(
 
 // ListServices returns services visible to the current user: owned by them or shared.
 // Pod queries are skipped — status is derived from the Helm release state only.
-func (uc *Query) ListServices(
+func (uc *Reader) ListServices(
 	ctx context.Context,
 	namespace string,
 ) ([]domain.Service, error) {
@@ -90,7 +90,7 @@ func (uc *Query) ListServices(
 }
 
 // buildLightService builds a service entry for the list — no pod query, no error detail.
-func (uc *Query) buildLightService(
+func (uc *Reader) buildLightService(
 	ctx context.Context,
 	namespace, releaseID string,
 ) (domain.Service, error) {
@@ -125,7 +125,7 @@ func (uc *Query) buildLightService(
 
 // deriveStatusLight maps a Helm release state to a ServiceStatus using the workload
 // controller status when deployed — no pod listing.
-func (uc *Query) deriveStatusLight(
+func (uc *Reader) deriveStatusLight(
 	ctx context.Context,
 	namespace, releaseID string,
 	releaseState ports.ReleaseState,
@@ -143,8 +143,8 @@ func (uc *Query) deriveStatusLight(
 	return domain.ServiceStatusDeploying, nil
 }
 
-// deriveStatusWithDetail applies the full 6-step derivation including pod queries.
-func (uc *Query) deriveStatusWithDetail(
+// deriveStatusWithDetail applies the full derivation including pod queries.
+func (uc *Reader) deriveStatusWithDetail(
 	ctx context.Context,
 	namespace, releaseID string,
 ) (domain.ServiceStatus, *domain.ServiceError, error) {

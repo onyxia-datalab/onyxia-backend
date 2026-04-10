@@ -9,7 +9,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/lifecycle"
 )
 
 func SetupInstallController(
@@ -49,7 +49,7 @@ func SetupInstallController(
 		return nil, err
 	}
 
-	serviceLifecycleUc := service.NewLifecycle(
+	serviceLifecycleUc := lifecycle.NewLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
 		helmRealeaseGtw,
 		pkgRepo,
