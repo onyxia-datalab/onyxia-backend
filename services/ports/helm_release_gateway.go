@@ -6,6 +6,13 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
+// ManifestResource is a neutral reference to a resource declared in a Helm release manifest.
+// Kind and Name are raw values from the manifest — no Kubernetes-specific semantics.
+type ManifestResource struct {
+	Kind string
+	Name string
+}
+
 // ReleaseState is the minimal release information needed for state derivation.
 type ReleaseState struct {
 	Exists    bool
@@ -48,4 +55,7 @@ type ReleaseGateway interface {
 
 	// GetReleaseState returns whether the release exists and whether global.suspend is true.
 	GetReleaseState(ctx context.Context, namespace, releaseName string) (ReleaseState, error)
+
+	// GetReleaseResources returns all resources declared in the release manifest.
+	GetReleaseResources(ctx context.Context, namespace, releaseName string) ([]ManifestResource, error)
 }
