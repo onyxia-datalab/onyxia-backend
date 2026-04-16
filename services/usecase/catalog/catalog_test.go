@@ -385,6 +385,168 @@ func TestGetPackageSchema_UnknownPathLeftUnchanged(t *testing.T) {
 	assert.Equal(t, "unknown/path.json", xOnyxia["overwriteSchemaWith"])
 }
 
+// ❌ GetPackageSchema — package is excluded.
+func TestGetPackageSchema_ExcludedPackage(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	result, err := uc.GetPackageSchema(ctx, "my-catalog", "excluded-chart", "1.0.0")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Nil(t, result)
+}
+
+// ❌ GetPackage — package is excluded.
+func TestGetPackage_ExcludedPackage(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	result, err := uc.GetPackage(ctx, "my-catalog", "excluded-chart")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Equal(t, domain.Package{}, result)
+}
+
+// ❌ GetAvailableVersions — catalog not found.
+func TestGetAvailableVersions_CatalogNotFound(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	_, err := uc.GetAvailableVersions(ctx, "unknown-catalog", "my-chart")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// ❌ GetAvailableVersions — package is excluded.
+func TestGetAvailableVersions_ExcludedPackage(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	_, err := uc.GetAvailableVersions(ctx, "my-catalog", "excluded-chart")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+// ❌ GetAvailableVersions — repo returns an error.
+func TestGetAvailableVersions_RepoError(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, "my-catalog", "my-chart").
+		Return(nil, errors.New("index unavailable"))
+
+	_, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.ErrorContains(t, err, "index unavailable")
+}
+
+// ❌ GetAvailableVersions — maxNumber mode without maxNumberOfVersions set.
+func TestGetAvailableVersions_InvalidMaxNumber(t *testing.T) {
+	cfgs := []env.CatalogConfig{{
+		ID:                   "my-catalog",
+		MultipleServicesMode: env.MultipleServicesMaxNumber,
+		MaxNumberOfVersions:  nil,
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("GetAvailableVersions", mock.Anything, "my-catalog", "my-chart").
+		Return([]string{"1.0.0"}, nil)
+
+	_, err := uc.GetAvailableVersions(ctx, "my-catalog", "my-chart")
+
+	assert.ErrorContains(t, err, "maxNumberOfVersions")
+}
+
+// ✅ ListUserCatalogs — unrestricted catalog is always included.
+func TestListUserCatalogs_UnrestrictedIncluded(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "public"}}
+	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	repo.On("ListPackages", mock.Anything, "public").Return([]domain.Package{}, nil)
+
+	result, err := uc.ListUserCatalogs(ctx)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.Equal(t, "public", result[0].ID)
+}
+
+// ❌ ListUserCatalogs — user has no attributes, restricted catalog excluded.
+func TestListUserCatalogs_NoAttributes(t *testing.T) {
+	user := &usercontext.User{Username: "anon"}
+	cfgs := []env.CatalogConfig{{
+		ID:           "restricted",
+		Restrictions: []env.Restriction{{UserAttributeKey: "groups", Match: "admin"}},
+	}}
+	uc, ctx, _ := setupCatalogUsecase(t, user, cfgs)
+
+	result, err := uc.ListUserCatalogs(ctx)
+
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+// ❌ ListUserCatalogs — restrictions with empty key/match are skipped, no match found.
+func TestListUserCatalogs_SkipsEmptyAndInvalidRestrictions(t *testing.T) {
+	user := &usercontext.User{
+		Username:   "alice",
+		Attributes: map[string]any{"groups": []string{"users"}},
+	}
+	cfgs := []env.CatalogConfig{{
+		ID: "restricted",
+		Restrictions: []env.Restriction{
+			{UserAttributeKey: "", Match: "admin"},          // empty key → skip
+			{UserAttributeKey: "groups", Match: ""},         // empty match → skip
+			{UserAttributeKey: "missing-key", Match: ".*"},  // key absent → skip
+			{UserAttributeKey: "groups", Match: "[invalid"}, // bad regex → skip
+		},
+	}}
+	uc, ctx, _ := setupCatalogUsecase(t, user, cfgs)
+
+	result, err := uc.ListUserCatalogs(ctx)
+
+	assert.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+// ✅ ListUserCatalogs — string attribute matched by restriction.
+func TestListUserCatalogs_StringAttribute(t *testing.T) {
+	user := &usercontext.User{
+		Username:   "alice",
+		Attributes: map[string]any{"role": "admin"},
+	}
+	cfgs := []env.CatalogConfig{{
+		ID:           "admin-catalog",
+		Restrictions: []env.Restriction{{UserAttributeKey: "role", Match: "admin"}},
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, "admin-catalog").Return([]domain.Package{}, nil)
+
+	result, err := uc.ListUserCatalogs(ctx)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+}
+
+// ✅ ListUserCatalogs — []any attribute matched by restriction.
+func TestListUserCatalogs_AnySliceAttribute(t *testing.T) {
+	user := &usercontext.User{
+		Username:   "alice",
+		Attributes: map[string]any{"groups": []any{"sspcloud-dev", "users"}},
+	}
+	cfgs := []env.CatalogConfig{{
+		ID:           "dev-catalog",
+		Restrictions: []env.Restriction{{UserAttributeKey: "groups", Match: "sspcloud-dev"}},
+	}}
+	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
+	repo.On("ListPackages", mock.Anything, "dev-catalog").Return([]domain.Package{}, nil)
+
+	result, err := uc.ListUserCatalogs(ctx)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+}
+
 // ✅ GetAvailableVersions applies MaxNumber filter.
 func TestGetAvailableVersions_MaxNumber(t *testing.T) {
 	n := 2
