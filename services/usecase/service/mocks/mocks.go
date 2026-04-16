@@ -1,4 +1,4 @@
-package lifecycle
+package mocks
 
 import (
 	"context"
@@ -42,6 +42,17 @@ func (m *MockReleaseGateway) GetReleaseState(
 ) (ports.ReleaseState, error) {
 	args := m.Called(ctx, namespace, releaseName)
 	return args.Get(0).(ports.ReleaseState), args.Error(1)
+}
+
+func (m *MockReleaseGateway) GetReleaseResources(
+	ctx context.Context,
+	namespace, releaseName string,
+) ([]ports.ManifestResource, error) {
+	args := m.Called(ctx, namespace, releaseName)
+	if v := args.Get(0); v != nil {
+		return v.([]ports.ManifestResource), args.Error(1)
+	}
+	return nil, args.Error(1)
 }
 
 type MockOnyxiaSecretGateway struct{ mock.Mock }
@@ -130,4 +141,28 @@ func (m *MockCatalogRepository) GetPackageSchema(
 		return res.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+type MockWorkloadStateGateway struct{ mock.Mock }
+
+var _ ports.WorkloadStateGateway = (*MockWorkloadStateGateway)(nil)
+
+func (m *MockWorkloadStateGateway) GetPodsForRelease(
+	ctx context.Context,
+	namespace, releaseID string,
+) ([]ports.PodInfo, error) {
+	args := m.Called(ctx, namespace, releaseID)
+	if v := args.Get(0); v != nil {
+		return v.([]ports.PodInfo), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockWorkloadStateGateway) GetControllerReadiness(
+	ctx context.Context,
+	namespace string,
+	resources []ports.ManifestResource,
+) (bool, error) {
+	args := m.Called(ctx, namespace, resources)
+	return args.Bool(0), args.Error(1)
 }
