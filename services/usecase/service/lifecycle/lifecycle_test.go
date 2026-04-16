@@ -6,23 +6,25 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
 type lifecycleMocks struct {
-	helm    *MockReleaseGateway
-	secrets *MockOnyxiaSecretGateway
-	pkgRepo *MockCatalogRepository
+	helm    *mocks.MockReleaseGateway
+	secrets *mocks.MockOnyxiaSecretGateway
+	pkgRepo *mocks.MockCatalogRepository
 }
 
 func setupLifecycle(t *testing.T) (*Lifecycle, context.Context, lifecycleMocks) {
 	t.Helper()
 	m := lifecycleMocks{
-		helm:    new(MockReleaseGateway),
-		secrets: new(MockOnyxiaSecretGateway),
-		pkgRepo: new(MockCatalogRepository),
+		helm:    new(mocks.MockReleaseGateway),
+		secrets: new(mocks.MockOnyxiaSecretGateway),
+		pkgRepo: new(mocks.MockCatalogRepository),
 	}
 	uc := NewLifecycle(m.secrets, m.helm, m.pkgRepo)
 	return uc, context.Background(), m
@@ -58,7 +60,8 @@ func TestStart_Success(t *testing.T) {
 
 	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).Return(nil)
-	m.helm.On("StartInstall", ctx, req.Namespace, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).Return(nil)
+	m.helm.On("StartInstall", ctx, req.Namespace, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).
+		Return(nil)
 
 	_, err := uc.Start(ctx, req)
 
@@ -83,7 +86,8 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 			"share":        []byte("true"),
 		},
 	).Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
 
 	_, err := uc.Start(ctx, req)
 
@@ -95,7 +99,8 @@ func TestStart_GetPackageError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(domain.Package{}, errors.New("index unavailable"))
+	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+		Return(domain.Package{}, errors.New("index unavailable"))
 
 	_, err := uc.Start(ctx, req)
 
@@ -108,7 +113,8 @@ func TestStart_PackageNotFound(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(domain.Package{}, domain.ErrNotFound)
+	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+		Return(domain.Package{}, domain.ErrNotFound)
 
 	_, err := uc.Start(ctx, req)
 
@@ -123,7 +129,8 @@ func TestStart_SecretError(t *testing.T) {
 	pkg := resolvedPkg(req)
 
 	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("k8s unavailable"))
+	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("k8s unavailable"))
 
 	_, err := uc.Start(ctx, req)
 
@@ -137,10 +144,116 @@ func TestStart_HelmError(t *testing.T) {
 	pkg := resolvedPkg(req)
 
 	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("invalid release name"))
+	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("invalid release name"))
 
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "invalid release name")
+}
+
+func TestStart_InvokesInstallCallbacks(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	pkg := resolvedPkg(req)
+
+	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			opts := args.Get(6).(ports.InstallOptions)
+			opts.Callbacks.OnStart("release", "chart")
+			opts.Callbacks.OnSuccess("release", "chart")
+			opts.Callbacks.OnError("release", "chart", errors.New("simulated"))
+		}).
+		Return(nil)
+
+	_, err := uc.Start(ctx, req)
+
+	require.NoError(t, err)
+}
+
+// --- Suspend ----------------------------------------------------------------
+
+func TestSuspend_Success(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("SuspendRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
+
+	err := uc.Suspend(ctx, domain.SuspendRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	require.NoError(t, err)
+	m.helm.AssertExpectations(t)
+}
+
+func TestSuspend_HelmError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("SuspendRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
+
+	err := uc.Suspend(ctx, domain.SuspendRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	assert.ErrorContains(t, err, "helm unavailable")
+}
+
+// --- Resume -----------------------------------------------------------------
+
+func TestResume_Success(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("ResumeRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
+
+	err := uc.Resume(ctx, domain.ResumeRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	require.NoError(t, err)
+	m.helm.AssertExpectations(t)
+}
+
+func TestResume_HelmError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("ResumeRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
+
+	err := uc.Resume(ctx, domain.ResumeRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	assert.ErrorContains(t, err, "helm unavailable")
+}
+
+// --- Delete -----------------------------------------------------------------
+
+func TestDelete_Success(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
+	m.secrets.On("DeleteOnyxiaSecret", ctx, "user-alice", "jupyter-alice").Return(nil)
+
+	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	require.NoError(t, err)
+	m.helm.AssertExpectations(t)
+	m.secrets.AssertExpectations(t)
+}
+
+func TestDelete_HelmError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
+
+	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	assert.ErrorContains(t, err, "helm unavailable")
+	m.secrets.AssertNotCalled(t, "DeleteOnyxiaSecret")
+}
+
+func TestDelete_SecretError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+
+	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
+	m.secrets.On("DeleteOnyxiaSecret", ctx, "user-alice", "jupyter-alice").Return(errors.New("k8s unavailable"))
+
+	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+
+	assert.ErrorContains(t, err, "k8s unavailable")
 }
