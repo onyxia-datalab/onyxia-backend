@@ -11,46 +11,42 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// GetWorkloadReadiness returns true when every Deployment and StatefulSet for the release
-// has its desired replica count ready according to the controller status.
-func (g *K8sWorkloadStateGateway) GetWorkloadReadiness(
+// GetControllerReadiness returns true when all Deployments and StatefulSets in the
+// provided resource list have their desired replica count ready.
+// Other resource kinds are ignored.
+func (g *K8sWorkloadStateGateway) GetControllerReadiness(
 	ctx context.Context,
-	namespace, releaseID string,
+	namespace string,
+	resources []ports.ManifestResource,
 ) (bool, error) {
-	labelSelector := fmt.Sprintf("%s=%s", labelHelmInstance, releaseID)
-
-	deps, err := g.client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return false, err
-	}
-	for _, d := range deps.Items {
-		desired := int32(1)
-		if d.Spec.Replicas != nil {
-			desired = *d.Spec.Replicas
-		}
-		if d.Status.ReadyReplicas < desired {
-			return false, nil
-		}
-	}
-
-	sts, err := g.client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
-	if err != nil {
-		return false, err
-	}
-	for _, s := range sts.Items {
-		desired := int32(1)
-		if s.Spec.Replicas != nil {
-			desired = *s.Spec.Replicas
-		}
-		if s.Status.ReadyReplicas < desired {
-			return false, nil
+	for _, r := range resources {
+		switch r.Kind {
+		case "Deployment":
+			d, err := g.client.AppsV1().Deployments(namespace).Get(ctx, r.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			desired := int32(1)
+			if d.Spec.Replicas != nil {
+				desired = *d.Spec.Replicas
+			}
+			if d.Status.ReadyReplicas < desired {
+				return false, nil
+			}
+		case "StatefulSet":
+			s, err := g.client.AppsV1().StatefulSets(namespace).Get(ctx, r.Name, metav1.GetOptions{})
+			if err != nil {
+				return false, err
+			}
+			desired := int32(1)
+			if s.Spec.Replicas != nil {
+				desired = *s.Spec.Replicas
+			}
+			if s.Status.ReadyReplicas < desired {
+				return false, nil
+			}
 		}
 	}
-
 	return true, nil
 }
 
