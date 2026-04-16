@@ -16,5 +16,8 @@ type Package struct {
 }
 
 func (p Package) ChartRef() string {
+	if strings.HasPrefix(p.RepoURL, "oci://") {
+		return p.RepoURL
+	}
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(p.RepoURL, "/"), p.Name)
 }
