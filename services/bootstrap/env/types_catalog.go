@@ -6,20 +6,22 @@ type CatalogConfig struct {
 	Type CatalogType `json:"type"` // "helm" or "oci"`
 
 	// Common fields
-	ID            string            `mapstructure:"id"                json:"id"`
-	Name          map[string]string `mapstructure:"name"              json:"name"`
-	Description   map[string]string `mapstructure:"description"       json:"description"`
-	Maintainer    string            `mapstructure:"maintainer"        json:"maintainer"`
-	Status        CatalogStatus     `mapstructure:"status"            json:"status"`
-	Highlighted   []string          `mapstructure:"highlightedCharts" json:"highlightedCharts"`
-	Excluded      []string          `mapstructure:"excludedCharts"    json:"excludedCharts"`
-	SkipTLSVerify bool              `mapstructure:"skipTlsVerify"     json:"skipTlsVerify"`
-	CAFile        *string           `mapstructure:"caFile"            json:"caFile"`
-	AllowSharing  bool              `mapstructure:"allowSharing"      json:"allowSharing"`
-	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
-	Username      *string           `mapstructure:"username"          json:"username"`
-	Password      *string           `mapstructure:"password"          json:"password"`
-	Location      string            `mapstructure:"location"          json:"location"`
+	ID          string            `mapstructure:"id"                json:"id"`
+	Name        map[string]string `mapstructure:"name"              json:"name"`
+	Description map[string]string `mapstructure:"description"       json:"description"`
+	Maintainer  string            `mapstructure:"maintainer"        json:"maintainer"`
+	Status      CatalogStatus     `mapstructure:"status"            json:"status"`
+	Highlighted []string          `mapstructure:"highlightedCharts" json:"highlightedCharts"`
+
+	// TODO Specific to helm repo when location moved from CatalogConfig to package
+	Excluded      []string      `mapstructure:"excludedCharts" json:"excludedCharts"`
+	SkipTLSVerify bool          `mapstructure:"skipTlsVerify"  json:"skipTlsVerify"`
+	CAFile        *string       `mapstructure:"caFile"         json:"caFile"`
+	AllowSharing  bool          `mapstructure:"allowSharing"   json:"allowSharing"`
+	Restrictions  []Restriction `mapstructure:"restrictions"   json:"restrictions"`
+	Username      *string       `mapstructure:"username"       json:"username"`
+	Password      *string       `mapstructure:"password"       json:"password"`
+	Location      string        `mapstructure:"location"       json:"location"`
 
 	// Specific to helm repo
 	IndexTTL             time.Duration        `mapstructure:"indexTtl"             json:"indexTtl"`

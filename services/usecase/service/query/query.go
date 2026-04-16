@@ -133,7 +133,11 @@ func (uc *Reader) deriveStatusLight(
 	if releaseState.Status != "deployed" {
 		return deriveStatusFromHelm(releaseState), nil
 	}
-	ready, err := uc.pods.GetWorkloadReadiness(ctx, namespace, releaseID)
+	resources, err := uc.helm.GetReleaseResources(ctx, namespace, releaseID)
+	if err != nil {
+		return "", fmt.Errorf("get release resources: %w", err)
+	}
+	ready, err := uc.pods.GetControllerReadiness(ctx, namespace, resources)
 	if err != nil {
 		return "", err
 	}

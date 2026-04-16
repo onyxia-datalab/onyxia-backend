@@ -6,7 +6,6 @@ import (
 )
 
 // deriveStatusFromHelm maps a Helm release state to a ServiceStatus without querying pods.
-// Used by ListServices where pod queries would be too expensive.
 func deriveStatusFromHelm(releaseState ports.ReleaseState) domain.ServiceStatus {
 	if !releaseState.Exists {
 		return domain.ServiceStatusGhost

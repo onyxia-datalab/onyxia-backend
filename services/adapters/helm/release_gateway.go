@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
@@ -18,6 +19,7 @@ import (
 	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/rest"
+	sigsyaml "sigs.k8s.io/yaml"
 )
 
 type Helm struct {
@@ -205,6 +207,59 @@ func globalSuspendSupported(chartValues map[string]interface{}) bool {
 	}
 	_, ok = global["suspend"]
 	return ok
+}
+
+// GetReleaseResources parses the release manifest and returns all declared resources.
+func (h *Helm) GetReleaseResources(
+	ctx context.Context,
+	namespace, releaseName string,
+) ([]ports.ManifestResource, error) {
+	cfg, err := h.cfgForNamespace(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	rel, err := action.NewGet(cfg).Run(releaseName)
+	if err != nil {
+		if errors.Is(err, driver.ErrReleaseNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get release %q: %w", releaseName, err)
+	}
+
+	r, ok := rel.(*releasev1.Release)
+	if !ok {
+		return nil, fmt.Errorf("unexpected release type for %q", releaseName)
+	}
+
+	return parseManifestResources(r.Manifest), nil
+}
+
+// parseManifestResources splits a multi-document YAML manifest and extracts
+// the Kind and metadata.name of each resource.
+func parseManifestResources(manifest string) []ports.ManifestResource {
+	var resources []ports.ManifestResource
+
+	type meta struct {
+		Kind     string `json:"kind"`
+		Metadata struct {
+			Name string `json:"name"`
+		} `json:"metadata"`
+	}
+
+	for _, doc := range strings.Split(manifest, "\n---") {
+		doc = strings.TrimSpace(doc)
+		if doc == "" {
+			continue
+		}
+		var m meta
+		if err := sigsyaml.Unmarshal([]byte(doc), &m); err != nil || m.Kind == "" || m.Metadata.Name == "" {
+			continue
+		}
+		resources = append(resources, ports.ManifestResource{Kind: m.Kind, Name: m.Metadata.Name})
+	}
+
+	return resources
 }
 
 // GetReleaseState returns whether the release exists and whether global.suspend is true.
