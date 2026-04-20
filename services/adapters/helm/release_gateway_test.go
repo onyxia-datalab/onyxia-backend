@@ -87,8 +87,7 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 		"rel",
 		&domain.Package{
 			CatalogID: "fake-cat",
-			Name:      "",
-			RepoURL:   nonChartDir,
+			Name:      nonChartDir, // local path used as chartRef when no RepoURL is set
 		},
 		"0.1.0",
 		map[string]interface{}{},

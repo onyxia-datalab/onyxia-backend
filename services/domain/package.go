@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"fmt"
-	"net/url"
-	"strings"
-)
+import "net/url"
 
 type Package struct {
 	CatalogID   string
@@ -12,12 +8,6 @@ type Package struct {
 	Description string
 	HomeUrl     url.URL
 	IconUrl     url.URL
-	RepoURL     string
-}
-
-func (p Package) ChartRef() string {
-	if strings.HasPrefix(p.RepoURL, "oci://") {
-		return p.RepoURL
-	}
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(p.RepoURL, "/"), p.Name)
+	RepoURL     string // helm repo URL (empty for OCI)
+	ChartRef    string // full OCI reference, e.g. oci://registry/path/chart (empty for helm repos)
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
@@ -151,6 +150,7 @@ func (h *HelmPackageRepository) GetPackage(
 			Description: cv.Description,
 			HomeUrl:     tools.MustParseURL(cv.Home),
 			IconUrl:     tools.MustParseURL(cv.Icon),
+			RepoURL:     cfg.Location,
 		}, nil
 	case env.CatalogTypeOCI:
 		return h.getOCIPackage(cfg, name)
@@ -217,7 +217,7 @@ func (h *HelmPackageRepository) GetPackageSchema(
 		if err != nil {
 			return nil, err
 		}
-		chartRef = ociChartRef(cfg, p)
+		chartRef = p.ChartRef
 	}
 
 	chartPath, err := act.LocateChart(chartRef, h.settings)
@@ -321,24 +321,13 @@ func (h *HelmPackageRepository) getChartVersions(
 
 // --- OCI ---
 
-// ociChartRef returns the full OCI chart reference for a package.
-// If the package has its own location set, that is used directly.
-// Otherwise it falls back to the catalog-level location with the package name appended.
-func ociChartRef(cfg env.CatalogConfig, p *env.OCIPackage) string {
-	if p.Location != "" {
-		return p.Location
-	}
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(cfg.Location, "/"), p.Name)
-}
-
 func (h *HelmPackageRepository) listOCIPackages(cfg env.CatalogConfig) []domain.Package {
 	pkgs := make([]domain.Package, 0, len(cfg.Packages))
-	for i := range cfg.Packages {
-		p := &cfg.Packages[i]
+	for _, p := range cfg.Packages {
 		pkgs = append(pkgs, domain.Package{
 			CatalogID: cfg.ID,
 			Name:      p.Name,
-			RepoURL:   ociChartRef(cfg, p),
+			ChartRef:  p.ChartRef,
 		})
 	}
 	return pkgs
@@ -354,10 +343,10 @@ func (h *HelmPackageRepository) getOCIPackage(
 		return domain.Package{}, err
 	}
 
-	chartRef := ociChartRef(cfg, p)
+	chartRef := p.ChartRef
 
 	if len(p.Versions) == 0 {
-		return domain.Package{CatalogID: cfg.ID, Name: p.Name, RepoURL: chartRef}, nil
+		return domain.Package{CatalogID: cfg.ID, Name: p.Name, ChartRef: chartRef}, nil
 	}
 
 	return h.ociPkgs.Get(cfg.ID+"/"+name, ociPackageTTL, func() (domain.Package, error) {
@@ -385,7 +374,7 @@ func (h *HelmPackageRepository) getOCIPackage(
 			Description: ch.Metadata.Description,
 			HomeUrl:     tools.MustParseURL(ch.Metadata.Home),
 			IconUrl:     tools.MustParseURL(ch.Metadata.Icon),
-			RepoURL:     chartRef,
+			ChartRef:    chartRef,
 		}, nil
 	})
 }

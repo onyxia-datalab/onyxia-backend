@@ -119,12 +119,25 @@ func validateCommon(cc CatalogConfig) error {
 }
 
 func validateOCI(o CatalogConfig) error {
+	if o.Location != "" {
+		return fmt.Errorf(
+			"catalog %q: location must not be set on OCI catalogs (set it per package instead)",
+			o.ID,
+		)
+	}
 	if len(o.Packages) == 0 {
 		return fmt.Errorf("catalog %q: oci.packages must not be empty", o.ID)
 	}
 	for _, p := range o.Packages {
 		if p.Name == "" {
-			return fmt.Errorf("catalog %q: oci.package name is required", o.ID)
+			return fmt.Errorf("catalog %q: oci package: name is required", o.ID)
+		}
+		if p.ChartRef == "" {
+			return fmt.Errorf(
+				"catalog %q: oci package %q: chartRef is required",
+				o.ID,
+				p.Name,
+			)
 		}
 	}
 	return nil
