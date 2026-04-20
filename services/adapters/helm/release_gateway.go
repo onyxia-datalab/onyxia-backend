@@ -70,8 +70,6 @@ func (i *Helm) StartInstall(
 		return fmt.Errorf("releaseName is required")
 	}
 
-	chartRef := pkg.ChartRef()
-
 	cfg, err := i.cfgForNamespace(namespace)
 	if err != nil {
 		return err
@@ -81,6 +79,14 @@ func (i *Helm) StartInstall(
 	act.ReleaseName = releaseName
 	act.Namespace = namespace
 	act.Version = version
+
+	var chartRef string
+	if pkg.ChartRef != "" {
+		chartRef = pkg.ChartRef
+	} else {
+		act.RepoURL = pkg.RepoURL
+		chartRef = pkg.Name
+	}
 
 	chartPath, err := act.LocateChart(chartRef, i.settings)
 	if err != nil {

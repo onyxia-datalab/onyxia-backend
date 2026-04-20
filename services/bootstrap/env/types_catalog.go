@@ -6,24 +6,22 @@ type CatalogConfig struct {
 	Type CatalogType `json:"type"` // "helm" or "oci"`
 
 	// Common fields
-	ID          string            `mapstructure:"id"                json:"id"`
-	Name        map[string]string `mapstructure:"name"              json:"name"`
-	Description map[string]string `mapstructure:"description"       json:"description"`
-	Maintainer  string            `mapstructure:"maintainer"        json:"maintainer"`
-	Status      CatalogStatus     `mapstructure:"status"            json:"status"`
-	Highlighted []string          `mapstructure:"highlightedCharts" json:"highlightedCharts"`
-
-	// Specific to helm repo
-	Excluded      []string      `mapstructure:"excludedCharts" json:"excludedCharts"`
-	SkipTLSVerify bool          `mapstructure:"skipTlsVerify"  json:"skipTlsVerify"`
-	CAFile        *string       `mapstructure:"caFile"         json:"caFile"`
-	AllowSharing  bool          `mapstructure:"allowSharing"   json:"allowSharing"`
-	Restrictions  []Restriction `mapstructure:"restrictions"   json:"restrictions"`
-	Username      *string       `mapstructure:"username"       json:"username"`
-	Password      *string       `mapstructure:"password"       json:"password"`
-	Location      string        `mapstructure:"location"       json:"location"`
+	ID            string            `mapstructure:"id"                json:"id"`
+	Name          map[string]string `mapstructure:"name"              json:"name"`
+	Description   map[string]string `mapstructure:"description"       json:"description"`
+	Maintainer    string            `mapstructure:"maintainer"        json:"maintainer"`
+	Status        CatalogStatus     `mapstructure:"status"            json:"status"`
+	Highlighted   []string          `mapstructure:"highlightedCharts" json:"highlightedCharts"`
+	Excluded      []string          `mapstructure:"excludedCharts"    json:"excludedCharts"`
+	SkipTLSVerify bool              `mapstructure:"skipTlsVerify"     json:"skipTlsVerify"`
+	CAFile        *string           `mapstructure:"caFile"            json:"caFile"`
+	AllowSharing  bool              `mapstructure:"allowSharing"      json:"allowSharing"`
+	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
+	Username      *string           `mapstructure:"username"          json:"username"`
+	Password      *string           `mapstructure:"password"          json:"password"`
 
 	// Specific to helm repo (index)
+	Location             string               `mapstructure:"location"             json:"location"` // helm repo URL; must not be set on OCI catalogs (use Packages instead)
 	IndexTTL             time.Duration        `mapstructure:"indexTtl"             json:"indexTtl"`
 	MultipleServicesMode MultipleServicesMode `mapstructure:"multipleServicesMode" json:"multipleServicesMode"`
 	MaxNumberOfVersions  *int                 `mapstructure:"maxNumberOfVersions"  json:"maxNumberOfVersions,omitempty"`
@@ -64,6 +62,6 @@ type Restriction struct {
 
 type OCIPackage struct {
 	Name     string   `mapstructure:"name"     json:"name"`
-	Location string   `mapstructure:"location" json:"location"` // full OCI chart ref; overrides catalog-level location
+	ChartRef string   `mapstructure:"chartRef" json:"chartRef"` // full OCI chart ref, e.g. oci://registry/path/chart (required)
 	Versions []string `mapstructure:"versions" json:"versions"` // if empty we refresh with ttl (same as helm index)
 }

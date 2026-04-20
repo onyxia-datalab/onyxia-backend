@@ -2,6 +2,7 @@ package env
 
 import (
 	_ "embed"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
 )
 
