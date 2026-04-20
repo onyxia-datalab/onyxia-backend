@@ -9,8 +9,9 @@ import (
 )
 
 type Handler struct {
-	install  *controller.InstallController
-	catalogs *controller.CatalogController
+	install      *controller.InstallController
+	catalogs     *controller.CatalogController
+	serviceQuery *controller.ServiceQueryController
 }
 
 var _ api.Handler = (*Handler)(nil)
@@ -18,8 +19,24 @@ var _ api.Handler = (*Handler)(nil)
 func NewHandler(
 	install *controller.InstallController,
 	catalogs *controller.CatalogController,
+	serviceQuery *controller.ServiceQueryController,
 ) *Handler {
-	return &Handler{install: install, catalogs: catalogs}
+	return &Handler{install: install, catalogs: catalogs, serviceQuery: serviceQuery}
+}
+
+func (h *Handler) SetServiceSuspended(
+	ctx context.Context,
+	req *api.SetServiceSuspendedReq,
+	p api.SetServiceSuspendedParams,
+) (api.SetServiceSuspendedRes, error) {
+	return h.install.SetServiceSuspended(ctx, req, p)
+}
+
+func (h *Handler) DeleteService(
+	ctx context.Context,
+	p api.DeleteServiceParams,
+) (api.DeleteServiceRes, error) {
+	return h.install.DeleteService(ctx, p)
 }
 
 func (h *Handler) InstallService(
@@ -28,6 +45,20 @@ func (h *Handler) InstallService(
 	p api.InstallServiceParams,
 ) (api.InstallServiceRes, error) {
 	return h.install.InstallService(ctx, req, p)
+}
+
+func (h *Handler) GetService(
+	ctx context.Context,
+	p api.GetServiceParams,
+) (api.GetServiceRes, error) {
+	return h.serviceQuery.GetService(ctx, p)
+}
+
+func (h *Handler) ListServices(
+	ctx context.Context,
+	p api.ListServicesParams,
+) (api.ListServicesRes, error) {
+	return h.serviceQuery.ListServices(ctx, p)
 }
 
 func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, error) {

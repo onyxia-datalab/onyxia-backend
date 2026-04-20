@@ -27,6 +27,63 @@ func NewInstallController(
 	}
 }
 
+func (ic *InstallController) SetServiceSuspended(
+	ctx context.Context,
+	req *api.SetServiceSuspendedReq,
+	params api.SetServiceSuspendedParams,
+) (api.SetServiceSuspendedRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, "user not found in context")
+		return &api.SetServiceSuspendedForbidden{}, errors.New("user not found")
+	}
+
+	if req.Suspended {
+		suspendReq := domain.SuspendRequest{
+			ReleaseName: params.ReleaseId,
+			Namespace:   params.XOnyxiaProject,
+		}
+		if err := ic.serviceLifecycleUc.Suspend(ctx, suspendReq); err != nil {
+			slog.ErrorContext(ctx, "suspend failed", slog.Any("error", err))
+			return &api.SetServiceSuspendedInternalServerError{}, err
+		}
+	} else {
+		resumeReq := domain.ResumeRequest{
+			ReleaseName: params.ReleaseId,
+			Namespace:   params.XOnyxiaProject,
+		}
+		if err := ic.serviceLifecycleUc.Resume(ctx, resumeReq); err != nil {
+			slog.ErrorContext(ctx, "resume failed", slog.Any("error", err))
+			return &api.SetServiceSuspendedInternalServerError{}, err
+		}
+	}
+
+	return &api.SetServiceSuspendedNoContent{}, nil
+}
+
+func (ic *InstallController) DeleteService(
+	ctx context.Context,
+	params api.DeleteServiceParams,
+) (api.DeleteServiceRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, "user not found in context")
+		return &api.DeleteServiceForbidden{}, errors.New("user not found")
+	}
+
+	req := domain.DeleteRequest{
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+	}
+
+	if err := ic.serviceLifecycleUc.Delete(ctx, req); err != nil {
+		slog.ErrorContext(ctx, "delete failed", slog.Any("error", err))
+		return &api.DeleteServiceInternalServerError{}, err
+	}
+
+	return &api.DeleteServiceNoContent{}, nil
+}
+
 func (ic *InstallController) InstallService(
 	ctx context.Context,
 	req *api.ServiceInstallRequest,
@@ -67,15 +124,16 @@ func (ic *InstallController) InstallService(
 	}
 
 	dreq := domain.StartRequest{
-		Username:      u.Username,
-		CatalogID:     req.CatalogId,
-		PackageName:   req.PackageName,
-		Name:          req.Name,
-		Version:       req.Version.Or("latest"),
-		ReleaseID:     params.ReleaseId,
-		OnyxiaProject: params.XOnyxiaProject.Or(""),
-		FriendlyName:  req.FriendlyName.Or(req.PackageName),
-		Values:        values,
+		Username:     u.Username,
+		CatalogID:    req.CatalogId,
+		PackageName:  req.PackageName,
+		Name:         req.Name,
+		Version:      req.Version.Or("latest"),
+		ReleaseID:    params.ReleaseId,
+		Namespace:    params.XOnyxiaProject,
+		FriendlyName: req.FriendlyName.Or(req.PackageName),
+		Share:        req.Share.Or(false),
+		Values:       values,
 	}
 
 	// Execute use case.

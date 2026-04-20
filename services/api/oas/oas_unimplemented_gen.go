@@ -13,6 +13,16 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
+// DeleteService implements deleteService operation.
+//
+// Runs helm uninstall for the release and removes the associated Onyxia secret. This operation is
+// irreversible.
+//
+// DELETE /api/services/{releaseId}
+func (UnimplementedHandler) DeleteService(ctx context.Context, params DeleteServiceParams) (r DeleteServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetMyCatalogs implements getMyCatalogs operation.
 //
 // Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -37,8 +47,17 @@ func (UnimplementedHandler) GetMyPackage(ctx context.Context, params GetMyPackag
 // Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 // and roles.
 //
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (r GetPackageSchemaRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetService implements getService operation.
+//
+// Get the current state of a service.
+//
+// GET /api/services/{releaseId}
+func (UnimplementedHandler) GetService(ctx context.Context, params GetServiceParams) (r GetServiceRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -47,8 +66,26 @@ func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPack
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
 // the release already exists (returns 202 with the same event URLs).
 //
-// PUT /api/services/{releaseId}/install
+// PUT /api/services/{releaseId}
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListServices implements listServices operation.
+//
+// List all services in a project namespace.
+//
+// GET /api/services
+func (UnimplementedHandler) ListServices(ctx context.Context, params ListServicesParams) (r ListServicesRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// SetServiceSuspended implements setServiceSuspended operation.
+//
+// Suspend or resume a service.
+//
+// PUT /api/services/{releaseId}/suspended
+func (UnimplementedHandler) SetServiceSuspended(ctx context.Context, req *SetServiceSuspendedReq, params SetServiceSuspendedParams) (r SetServiceSuspendedRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

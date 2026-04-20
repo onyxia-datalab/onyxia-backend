@@ -15,21 +15,24 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
+func newAdapter(t *testing.T, cb ports.InstallCallbacks) *Helm {
 	t.Helper()
 
 	k8sCfg := &rest.Config{
 		Host: "https://fake-cluster",
 	}
 
-	adapter, err := NewReleaseGtw(k8sCfg, cb)
+	client, err := NewClient("")
+	require.NoError(t, err)
+
+	adapter, err := NewReleaseGtw(k8sCfg, client, cb)
 	require.NoError(t, err)
 
 	return adapter
 }
 
-func defaultCallbacks() ports.HelmStartCallbacks {
-	return ports.HelmStartCallbacks{
+func defaultCallbacks() ports.InstallCallbacks {
+	return ports.InstallCallbacks{
 		OnStart:   func(_, _ string) {},
 		OnSuccess: func(_, _ string) {},
 		OnError:   func(_, _ string, _ error) {},
@@ -41,32 +44,31 @@ func TestStartInstallEmptyArgs(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"",
-		domain.PackageVersion{},
+		&domain.Package{},
+		"",
 		nil,
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
-
 }
 
 func TestStartInstallLocateChartError(t *testing.T) {
 	i := newAdapter(t, defaultCallbacks())
 
-	// Chart inexistant → act.LocateChart renvoie une erreur (pré-flight)
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "this-chart-does-not-exist",
-			},
-			Version: "0.1.0",
-			RepoURL: "fake-repo",
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      "this-chart-does-not-exist",
+			RepoURL:   "fake-repo",
 		},
+		"0.1.0",
 		nil,
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "locating chart")
@@ -81,17 +83,15 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "",
-			},
-			Version: "0.1.0",
-			RepoURL: nonChartDir,
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      nonChartDir, // local path used as chartRef when no RepoURL is set
 		},
+		"0.1.0",
 		map[string]interface{}{},
-		ports.HelmStartOptions{},
+		ports.InstallOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading chart")
@@ -103,26 +103,31 @@ func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
 	successCalled := false
 	errorCalled := false
 
-	i := newAdapter(t, ports.HelmStartCallbacks{
+	i := newAdapter(t, ports.InstallCallbacks{
 		OnStart:   func(_, _ string) { startCalled = true },
 		OnSuccess: func(_, _ string) { successCalled = true },
 		OnError:   func(_, _ string, _ error) { errorCalled = true },
 	})
 
-	err := i.StartInstall(context.Background(), "rel", domain.PackageVersion{
-		Package: domain.Package{
+	err := i.StartInstall(
+		context.Background(),
+		"test-ns",
+		"rel",
+		&domain.Package{
 			CatalogID: "fake-cat",
 			Name:      "unknown-chart",
+			RepoURL:   "fake-repo",
 		},
-		Version: "0.1.0",
-		RepoURL: "fake-repo",
-	}, nil, ports.HelmStartOptions{
-		Callbacks: ports.HelmStartCallbacks{
-			OnStart:   func(_, _ string) { startCalled = true },
-			OnSuccess: func(_, _ string) { successCalled = true },
-			OnError:   func(_, _ string, _ error) { errorCalled = true },
+		"0.1.0",
+		nil,
+		ports.InstallOptions{
+			Callbacks: ports.InstallCallbacks{
+				OnStart:   func(_, _ string) { startCalled = true },
+				OnSuccess: func(_, _ string) { successCalled = true },
+				OnError:   func(_, _ string, _ error) { errorCalled = true },
+			},
 		},
-	})
+	)
 	require.Error(t, err)
 
 	time.Sleep(50 * time.Millisecond)

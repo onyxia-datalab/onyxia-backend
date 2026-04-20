@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"fmt"
-	"net/url"
-	"strings"
-)
+import "net/url"
 
 type Package struct {
 	CatalogID   string
@@ -12,19 +8,6 @@ type Package struct {
 	Description string
 	HomeUrl     url.URL
 	IconUrl     url.URL
-}
-
-type PackageRef struct {
-	Package
-	Versions []string
-}
-
-type PackageVersion struct {
-	Package
-	Version string
-	RepoURL string
-}
-
-func (r PackageVersion) ChartRef() string {
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(r.RepoURL, "/"), r.Name)
+	RepoURL     string // helm repo URL (empty for OCI)
+	ChartRef    string // full OCI reference, e.g. oci://registry/path/chart (empty for helm repos)
 }

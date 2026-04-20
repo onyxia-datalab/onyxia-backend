@@ -9,15 +9,16 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/lifecycle"
 )
 
 func SetupInstallController(
 	app *bootstrap.Application,
+	helmClient *helm.Client,
 ) (*controller.InstallController, error) {
 
 	//TODO: pass callbacks properly
-	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), ports.HelmStartCallbacks{
+	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), helmClient, ports.InstallCallbacks{
 		OnStart: func(release, chart string) {
 			slog.Info("Helm install started",
 				slog.String("release", release),
@@ -43,12 +44,12 @@ func SetupInstallController(
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, helmClient)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceLifecycleUc := usecase.NewServiceLifecycle(
+	serviceLifecycleUc := lifecycle.NewLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
 		helmRealeaseGtw,
 		pkgRepo,

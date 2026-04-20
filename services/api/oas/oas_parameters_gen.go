@@ -14,6 +14,136 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
+// DeleteServiceParams is parameters of deleteService operation.
+type DeleteServiceParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackDeleteServiceParams(packed middleware.Parameters) (params DeleteServiceParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeDeleteServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params DeleteServiceParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetMyPackageParams is parameters of getMyPackage operation.
 type GetMyPackageParams struct {
 	// Catalog identifier.
@@ -308,12 +438,142 @@ func decodeGetPackageSchemaParams(args [3]string, argsEscaped bool, r *http.Requ
 	return params, nil
 }
 
+// GetServiceParams is parameters of getService operation.
+type GetServiceParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackGetServiceParams(packed middleware.Parameters) (params GetServiceParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetServiceParams(args [1]string, argsEscaped bool, r *http.Request) (params GetServiceParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // InstallServiceParams is parameters of installService operation.
 type InstallServiceParams struct {
 	// Logical release identifier.
 	ReleaseId string
-	// Project identifier in Onyxia.
-	XOnyxiaProject OptString `json:",omitempty,omitzero"`
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
 }
 
 func unpackInstallServiceParams(packed middleware.Parameters) (params InstallServiceParams) {
@@ -329,9 +589,7 @@ func unpackInstallServiceParams(packed middleware.Parameters) (params InstallSer
 			Name: "X-Onyxia-Project",
 			In:   "header",
 		}
-		if v, ok := packed[key]; ok {
-			params.XOnyxiaProject = v.(OptString)
-		}
+		params.XOnyxiaProject = packed[key].(string)
 	}
 	return params
 }
@@ -411,28 +669,209 @@ func decodeInstallServiceParams(args [1]string, argsEscaped bool, r *http.Reques
 		}
 		if err := h.HasParam(cfg); err == nil {
 			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotXOnyxiaProjectVal string
-				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
-						return err
-					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotXOnyxiaProjectVal = c
-					return nil
-				}(); err != nil {
+				val, err := d.DecodeValue()
+				if err != nil {
 					return err
 				}
-				params.XOnyxiaProject.SetTo(paramsDotXOnyxiaProjectVal)
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
 				return nil
 			}); err != nil {
 				return err
 			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// ListServicesParams is parameters of listServices operation.
+type ListServicesParams struct {
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackListServicesParams(packed middleware.Parameters) (params ListServicesParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeListServicesParams(args [0]string, argsEscaped bool, r *http.Request) (params ListServicesParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// SetServiceSuspendedParams is parameters of setServiceSuspended operation.
+type SetServiceSuspendedParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackSetServiceSuspendedParams(packed middleware.Parameters) (params SetServiceSuspendedParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeSetServiceSuspendedParams(args [1]string, argsEscaped bool, r *http.Request) (params SetServiceSuspendedParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
 		}
 		return nil
 	}(); err != nil {

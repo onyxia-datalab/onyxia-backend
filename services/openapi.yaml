@@ -50,7 +50,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}:
+  /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema:
     get:
       security:
         - oidc: []
@@ -111,7 +111,83 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/services/{releaseId}/install:
+  /api/services:
+    get:
+      tags: [services]
+      operationId: listServices
+      summary: List all services in a project namespace
+      parameters:
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Service" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/services/{releaseId}:
+    get:
+      tags: [services]
+      operationId: getService
+      summary: Get the current state of a service
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Service" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: [services]
+      operationId: deleteService
+      summary: Uninstall a service
+      description: >
+        Runs helm uninstall for the release and removes the associated Onyxia
+        secret. This operation is irreversible.
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      responses:
+        "204":
+          description: No Content – service deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
     put:
       tags: [services]
       operationId: installService
@@ -124,9 +200,9 @@ paths:
         - $ref: "#/components/parameters/releaseId"
         - name: X-Onyxia-Project
           in: header
-          required: false
+          required: true
           schema: { type: string }
-          description: Project identifier in Onyxia
+          description: Project identifier in Onyxia (user or group namespace)
       requestBody:
         required: true
         content:
@@ -166,6 +242,41 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/services/{releaseId}/suspended:
+    put:
+      tags: [services]
+      operationId: setServiceSuspended
+      summary: Suspend or resume a service
+      parameters:
+        - $ref: "#/components/parameters/releaseId"
+        - name: X-Onyxia-Project
+          in: header
+          required: true
+          schema: { type: string }
+          description: Project identifier in Onyxia (user or group namespace)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [suspended]
+              properties:
+                suspended:
+                  type: boolean
+                  description: true to suspend, false to resume
+      responses:
+        "204":
+          description: No Content
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -249,6 +360,11 @@ components:
       description: Resume SSE from a specific event id (client reconnection)
 
   responses:
+    UnprocessableEntity:
+      description: Unprocessable entity — operation not supported by this service
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
     BadRequest:
       description: Bad request
       content:
@@ -339,6 +455,7 @@ components:
                 type: string
                 format: semver
 
+    # I want to add each key of the values that has been explicitly set by the user in the request to be able to upgrade with --reuse-values and override only the values that as been computed (such as s3 key) without overriding the user values set during the installation.
     ServiceInstallRequest:
       type: object
       required: [packageName, options, catalogId, name]
@@ -482,6 +599,48 @@ components:
           example:
             en: "Hello"
             fr: "Bonjour"
+
+    Service:
+      type: object
+      required: [releaseId, status, friendlyName, owner, catalogId, share]
+      properties:
+        releaseId: { type: string, description: Release identifier }
+        status:
+          type: string
+          enum: [Deploying, Running, Error, Ghost, Suspended, Terminating]
+          description: Current lifecycle state of the service
+        friendlyName: { type: string, description: Display name }
+        owner: { type: string, description: Username of the service owner }
+        catalogId: { type: string, description: Source catalog identifier }
+        share:
+          {
+            type: boolean,
+            description: Whether the service is visible to all namespace users,
+          }
+        error:
+          $ref: "#/components/schemas/ServiceError"
+
+    ServiceError:
+      type: object
+      required: [reason, podName]
+      properties:
+        reason:
+          type: string
+          enum:
+            [
+              crash_loop,
+              oom_killed,
+              image_pull,
+              config_error,
+              unschedulable,
+              readiness_failed,
+            ]
+        podName: { type: string }
+        message: { type: string }
+        restartCount: { type: integer, minimum: 0 }
+        exitCode: { type: integer }
+        image: { type: string }
+        limit: { type: string }
 
     Problem:
       type: object
