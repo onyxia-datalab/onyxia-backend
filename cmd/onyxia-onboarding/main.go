@@ -54,6 +54,7 @@ func main() {
 			"Accept",
 			"Authorization",
 			"Content-Type",
+			"DPoP",
 			"X-CSRF-Token",
 			"Origin",
 			"X-Requested-With",
