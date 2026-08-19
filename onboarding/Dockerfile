@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27 AS builder
 ARG TARGETOS TARGETARCH VERSION BUILD_SHA
 
 WORKDIR /src
@@ -19,7 +19,7 @@ COPY internal/ ./internal/
 # Build
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH CGO_ENABLED=0 \
+    GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" CGO_ENABLED=0 \
     go build -trimpath -ldflags "-s -w -X=main.Version=${VERSION} -X=main.Build=${BUILD_SHA}" \
     -o /out/app ./cmd/onyxia-onboarding/main.go
 
