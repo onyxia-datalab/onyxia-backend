@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.21...v0.1.22) (2026-08-31)
+
+
+### Bug Fixes
+
+* **deps:** update go minor and patch updates ([#52](https://github.com/onyxia-datalab/onyxia-backend/issues/52)) ([bc0b924](https://github.com/onyxia-datalab/onyxia-backend/commit/bc0b924cf0577119e458d57511ebe3005232828d))
+
 ## [0.1.21](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.20...v0.1.21) (2026-07-08)
 
 
