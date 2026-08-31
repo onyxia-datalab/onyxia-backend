@@ -35,13 +35,12 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 
 // handleOnboardRequest handles onboard operation.
 //
-// This endpoint manages all tasks performed when a user logs into the region. It handles the
-// creation or update of a namespace, along with metadata information, similar to the current API
-// behavior like quota. We should also consider whether to maintain the behavior of creating a
-// RoleBinding for the OIDC user. While this supports external API server calls, it is not the
-// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
-//
-//	we can retain an option to explicitly create this RoleBinding if needed.
+// This endpoint manages all tasks performed when a user logs into the region. It handles the creation
+// or update of a namespace, along with metadata information, similar to the current API behavior like
+// quota. We should also consider whether to maintain the behavior of creating a RoleBinding for the
+// OIDC user. While this supports external API server calls, it is not the primary goal of Onyxia. At
+// the very least, this behavior should not be enabled by default. However, we can retain an option to
+// explicitly create this RoleBinding if needed.
 //
 // POST /api/onboarding
 func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -77,7 +76,7 @@ func (s *Server) handleOnboardRequest(args [0]string, argsEscaped bool, w http.R
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 

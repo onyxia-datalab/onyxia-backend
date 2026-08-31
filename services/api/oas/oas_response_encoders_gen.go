@@ -19,7 +19,6 @@ func encodeGetMyCatalogsResponse(response GetMyCatalogsRes, w http.ResponseWrite
 	case *GetMyCatalogsOKApplicationJSON:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -52,7 +51,6 @@ func encodeGetMyPackageResponse(response GetMyPackageRes, w http.ResponseWriter,
 	case *DetailedPackage:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -65,7 +63,6 @@ func encodeGetMyPackageResponse(response GetMyPackageRes, w http.ResponseWriter,
 	case *GetMyPackageNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -98,7 +95,6 @@ func encodeGetPackageSchemaResponse(response GetPackageSchemaRes, w http.Respons
 	case *GetPackageSchemaOK:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -111,7 +107,6 @@ func encodeGetPackageSchemaResponse(response GetPackageSchemaRes, w http.Respons
 	case *GetPackageSchemaBadRequest:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -164,7 +159,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(202)
-		span.SetStatus(codes.Ok, http.StatusText(202))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -177,7 +171,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 	case *InstallServiceBadRequest:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -190,7 +183,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 	case *InstallServiceUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -203,7 +195,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 	case *InstallServiceForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -216,7 +207,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 	case *InstallServiceConflict:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -284,7 +274,6 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		writer := w
 		if closer, ok := response.Response.Data.(io.Closer); ok {
@@ -299,7 +288,6 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 	case *WatchReleaseUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -312,7 +300,6 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 	case *WatchReleaseForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -325,7 +312,6 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 	case *WatchReleaseNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -380,7 +366,6 @@ func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		writer := w
 		if closer, ok := response.Response.Data.(io.Closer); ok {
@@ -395,7 +380,6 @@ func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWri
 	case *WatchResourcesUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -408,7 +392,6 @@ func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWri
 	case *WatchResourcesForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -421,7 +404,6 @@ func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWri
 	case *WatchResourcesNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)

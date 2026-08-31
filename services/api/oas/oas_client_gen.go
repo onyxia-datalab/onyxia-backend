@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -50,8 +51,8 @@ type Invoker interface {
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService invokes installService operation.
 	//
-	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-	// the release already exists (returns 202 with the same event URLs).
+	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
+	// release already exists (returns 202 with the same event URLs).
 	//
 	// PUT /api/services/{releaseId}/install
 	InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
@@ -63,9 +64,9 @@ type Invoker interface {
 	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
 	// WatchResources invokes watchResources operation.
 	//
-	// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
-	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
-	// "done".
+	// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
+	// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
+	// (aggregated readiness), "done".
 	//
 	// GET /api/services/events/{releaseId}/watch-resources
 	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
@@ -210,7 +211,13 @@ func (c *Client) sendGetMyCatalogs(ctx context.Context) (res GetMyCatalogsRes, e
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyCatalogsResponse(resp)
@@ -354,7 +361,13 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyPackageResponse(resp)
@@ -518,7 +531,13 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeGetPackageSchemaResponse(resp)
@@ -531,8 +550,8 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 
 // InstallService invokes installService operation.
 //
-// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-// the release already exists (returns 202 with the same event URLs).
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
+// release already exists (returns 202 with the same event URLs).
 //
 // PUT /api/services/{releaseId}/install
 func (c *Client) InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error) {
@@ -665,7 +684,13 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeInstallServiceResponse(resp)
@@ -808,7 +833,13 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeWatchReleaseResponse(resp)
@@ -821,9 +852,9 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 
 // WatchResources invokes watchResources operation.
 //
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
-// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
-// "done".
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
+// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
+// (aggregated readiness), "done".
 //
 // GET /api/services/events/{releaseId}/watch-resources
 func (c *Client) WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error) {
@@ -953,7 +984,13 @@ func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesPa
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeWatchResourcesResponse(resp)

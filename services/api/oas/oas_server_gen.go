@@ -30,8 +30,8 @@ type Handler interface {
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
 	// InstallService implements installService operation.
 	//
-	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-	// the release already exists (returns 202 with the same event URLs).
+	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
+	// release already exists (returns 202 with the same event URLs).
 	//
 	// PUT /api/services/{releaseId}/install
 	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
@@ -43,9 +43,9 @@ type Handler interface {
 	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
 	// WatchResources implements watchResources operation.
 	//
-	// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
-	// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
-	// "done".
+	// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
+	// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
+	// (aggregated readiness), "done".
 	//
 	// GET /api/services/events/{releaseId}/watch-resources
 	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)

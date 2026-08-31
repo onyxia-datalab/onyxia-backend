@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/go-faster/errors"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -14,19 +13,16 @@ func encodeOnboardResponse(response OnboardRes, w http.ResponseWriter, span trac
 	switch response := response.(type) {
 	case *OnboardOK:
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		return nil
 
 	case *OnboardUnauthorized:
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		return nil
 
 	case *OnboardForbidden:
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		return nil
 
