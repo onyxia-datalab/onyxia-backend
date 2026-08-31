@@ -60,7 +60,7 @@ func TestStart_Success(t *testing.T) {
 
 	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
 	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).Return(nil)
-	m.helm.On("StartInstall", ctx, req.Namespace, req.Name, mock.Anything, req.Version, req.Values, mock.Anything).
+	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)

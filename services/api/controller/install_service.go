@@ -45,7 +45,7 @@ func (ic *InstallController) SetServiceSuspended(
 		}
 		if err := ic.serviceLifecycleUc.Suspend(ctx, suspendReq); err != nil {
 			slog.ErrorContext(ctx, "suspend failed", slog.Any("error", err))
-			return &api.SetServiceSuspendedInternalServerError{}, err
+			return mapSetServiceSuspendedError(err), err
 		}
 	} else {
 		resumeReq := domain.ResumeRequest{
@@ -54,11 +54,22 @@ func (ic *InstallController) SetServiceSuspended(
 		}
 		if err := ic.serviceLifecycleUc.Resume(ctx, resumeReq); err != nil {
 			slog.ErrorContext(ctx, "resume failed", slog.Any("error", err))
-			return &api.SetServiceSuspendedInternalServerError{}, err
+			return mapSetServiceSuspendedError(err), err
 		}
 	}
 
 	return &api.SetServiceSuspendedNoContent{}, nil
+}
+
+func mapSetServiceSuspendedError(err error) api.SetServiceSuspendedRes {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		return &api.SetServiceSuspendedNotFound{}
+	case errors.Is(err, domain.ErrNotSupported):
+		return &api.SetServiceSuspendedUnprocessableEntity{}
+	default:
+		return &api.SetServiceSuspendedInternalServerError{}
+	}
 }
 
 func (ic *InstallController) DeleteService(
@@ -109,6 +120,8 @@ func (ic *InstallController) InstallService(
 		return &api.InstallServiceBadRequest{}, errors.New("options are required")
 	}
 
+	version := req.PackageVersion.Or(req.Version.Or(""))
+
 	values := make(map[string]interface{}, len(req.Options))
 
 	for k, raw := range req.Options {
@@ -128,7 +141,7 @@ func (ic *InstallController) InstallService(
 		CatalogID:    req.CatalogId,
 		PackageName:  req.PackageName,
 		Name:         req.Name,
-		Version:      req.Version.Or("latest"),
+		Version:      version,
 		ReleaseID:    params.ReleaseId,
 		Namespace:    params.XOnyxiaProject,
 		FriendlyName: req.FriendlyName.Or(req.PackageName),
