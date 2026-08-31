@@ -44,8 +44,8 @@ func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPack
 
 // InstallService implements installService operation.
 //
-// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-// the release already exists (returns 202 with the same event URLs).
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
+// release already exists (returns 202 with the same event URLs).
 //
 // PUT /api/services/{releaseId}/install
 func (UnimplementedHandler) InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (r InstallServiceRes, _ error) {
@@ -63,9 +63,9 @@ func (UnimplementedHandler) WatchRelease(ctx context.Context, params WatchReleas
 
 // WatchResources implements watchResources operation.
 //
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
-// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
-// "done".
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
+// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
+// (aggregated readiness), "done".
 //
 // GET /api/services/events/{releaseId}/watch-resources
 func (UnimplementedHandler) WatchResources(ctx context.Context, params WatchResourcesParams) (r WatchResourcesRes, _ error) {

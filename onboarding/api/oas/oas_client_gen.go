@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"io"
 	"net/url"
 	"strings"
 	"time"
@@ -29,12 +30,12 @@ func trimTrailingSlashes(u *url.URL) {
 type Invoker interface {
 	// Onboard invokes onboard operation.
 	//
-	// This endpoint manages all tasks performed when a user logs into the region. It handles the
-	// creation or update of a namespace, along with metadata information, similar to the current API
-	// behavior like quota. We should also consider whether to maintain the behavior of creating a
-	// RoleBinding for the OIDC user. While this supports external API server calls, it is not the
-	// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
-	//  we can retain an option to explicitly create this RoleBinding if needed.
+	// This endpoint manages all tasks performed when a user logs into the region. It handles the creation
+	// or update of a namespace, along with metadata information, similar to the current API behavior like
+	// quota. We should also consider whether to maintain the behavior of creating a RoleBinding for the
+	// OIDC user. While this supports external API server calls, it is not the primary goal of Onyxia. At
+	// the very least, this behavior should not be enabled by default. However, we can retain an option to
+	// explicitly create this RoleBinding if needed.
 	//
 	// POST /api/onboarding
 	Onboard(ctx context.Context, request *OnboardingRequest) (OnboardRes, error)
@@ -83,13 +84,12 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 
 // Onboard invokes onboard operation.
 //
-// This endpoint manages all tasks performed when a user logs into the region. It handles the
-// creation or update of a namespace, along with metadata information, similar to the current API
-// behavior like quota. We should also consider whether to maintain the behavior of creating a
-// RoleBinding for the OIDC user. While this supports external API server calls, it is not the
-// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
-//
-//	we can retain an option to explicitly create this RoleBinding if needed.
+// This endpoint manages all tasks performed when a user logs into the region. It handles the creation
+// or update of a namespace, along with metadata information, similar to the current API behavior like
+// quota. We should also consider whether to maintain the behavior of creating a RoleBinding for the
+// OIDC user. While this supports external API server calls, it is not the primary goal of Onyxia. At
+// the very least, this behavior should not be enabled by default. However, we can retain an option to
+// explicitly create this RoleBinding if needed.
 //
 // POST /api/onboarding
 func (c *Client) Onboard(ctx context.Context, request *OnboardingRequest) (OnboardRes, error) {
@@ -186,7 +186,13 @@ func (c *Client) sendOnboard(ctx context.Context, request *OnboardingRequest) (r
 		return res, errors.Wrap(err, "do request")
 	}
 	body := resp.Body
-	defer body.Close()
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
 
 	stage = "DecodeResponse"
 	result, err := decodeOnboardResponse(resp)

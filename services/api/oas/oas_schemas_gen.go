@@ -361,7 +361,8 @@ func (*InstallServiceUnauthorized) installServiceRes() {}
 // Ref: #/components/schemas/LocalizedString
 // LocalizedString represents sum type.
 type LocalizedString struct {
-	Type             LocalizedStringType // switch on this field
+	// Type selects the active sum variant, switch on this field.
+	Type             LocalizedStringType
 	String           string
 	LocalizedString1 LocalizedString1
 }

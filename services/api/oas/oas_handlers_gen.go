@@ -72,7 +72,7 @@ func (s *Server) handleGetMyCatalogsRequest(args [0]string, argsEscaped bool, w 
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 
@@ -245,7 +245,7 @@ func (s *Server) handleGetMyPackageRequest(args [2]string, argsEscaped bool, w h
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 
@@ -437,7 +437,7 @@ func (s *Server) handleGetPackageSchemaRequest(args [3]string, argsEscaped bool,
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 
@@ -596,8 +596,8 @@ func (s *Server) handleGetPackageSchemaRequest(args [3]string, argsEscaped bool,
 
 // handleInstallServiceRequest handles installService operation.
 //
-// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if
-// the release already exists (returns 202 with the same event URLs).
+// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
+// release already exists (returns 202 with the same event URLs).
 //
 // PUT /api/services/{releaseId}/install
 func (s *Server) handleInstallServiceRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -633,7 +633,7 @@ func (s *Server) handleInstallServiceRequest(args [1]string, argsEscaped bool, w
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 
@@ -839,7 +839,7 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 
@@ -994,9 +994,9 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 
 // handleWatchResourcesRequest handles watchResources operation.
 //
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector: app.kubernetes.
-// io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress" (aggregated readiness),
-// "done".
+// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
+// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
+// (aggregated readiness), "done".
 //
 // GET /api/services/events/{releaseId}/watch-resources
 func (s *Server) handleWatchResourcesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1032,7 +1032,7 @@ func (s *Server) handleWatchResourcesRequest(args [1]string, argsEscaped bool, w
 		if code != 0 {
 			codeAttr := semconv.HTTPResponseStatusCode(code)
 			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
+			span.SetAttributes(attrs...)
 		}
 		attrOpt := metric.WithAttributes(attrs...)
 

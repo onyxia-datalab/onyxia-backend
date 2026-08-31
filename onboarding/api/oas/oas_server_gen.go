@@ -10,12 +10,12 @@ import (
 type Handler interface {
 	// Onboard implements onboard operation.
 	//
-	// This endpoint manages all tasks performed when a user logs into the region. It handles the
-	// creation or update of a namespace, along with metadata information, similar to the current API
-	// behavior like quota. We should also consider whether to maintain the behavior of creating a
-	// RoleBinding for the OIDC user. While this supports external API server calls, it is not the
-	// primary goal of Onyxia. At the very least, this behavior should not be enabled by default. However,
-	//  we can retain an option to explicitly create this RoleBinding if needed.
+	// This endpoint manages all tasks performed when a user logs into the region. It handles the creation
+	// or update of a namespace, along with metadata information, similar to the current API behavior like
+	// quota. We should also consider whether to maintain the behavior of creating a RoleBinding for the
+	// OIDC user. While this supports external API server calls, it is not the primary goal of Onyxia. At
+	// the very least, this behavior should not be enabled by default. However, we can retain an option to
+	// explicitly create this RoleBinding if needed.
 	//
 	// POST /api/onboarding
 	Onboard(ctx context.Context, req *OnboardingRequest) (OnboardRes, error)
