@@ -36,12 +36,16 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesOidc is a private map storing roles per operation.
 var operationRolesOidc = map[string][]string{
-	GetMyCatalogsOperation:    {},
-	GetMyPackageOperation:     {},
-	GetPackageSchemaOperation: {},
-	InstallServiceOperation:   {},
-	WatchReleaseOperation:     {},
-	WatchResourcesOperation:   {},
+	DeleteServiceOperation:       {},
+	GetMyCatalogsOperation:       {},
+	GetMyPackageOperation:        {},
+	GetPackageSchemaOperation:    {},
+	GetServiceOperation:          {},
+	InstallServiceOperation:      {},
+	ListServicesOperation:        {},
+	SetServiceSuspendedOperation: {},
+	WatchReleaseOperation:        {},
+	WatchResourcesOperation:      {},
 }
 
 // GetRolesForOidc returns the required roles for the given operation.

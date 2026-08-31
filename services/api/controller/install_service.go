@@ -12,6 +12,13 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
+const (
+	userNotFoundMessage          = "user not found"
+	userNotFoundInContextMessage = userNotFoundMessage + " in context"
+)
+
+var errUserNotFound = errors.New(userNotFoundMessage)
+
 type InstallController struct {
 	serviceLifecycleUc domain.ServiceLifecycle
 	userGetter         usercontext.UserGetter
@@ -27,6 +34,74 @@ func NewInstallController(
 	}
 }
 
+func (ic *InstallController) SetServiceSuspended(
+	ctx context.Context,
+	req *api.SetServiceSuspendedReq,
+	params api.SetServiceSuspendedParams,
+) (api.SetServiceSuspendedRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.SetServiceSuspendedForbidden{}, errUserNotFound
+	}
+
+	if req.Suspended {
+		suspendReq := domain.SuspendRequest{
+			ReleaseName: params.ReleaseId,
+			Namespace:   params.XOnyxiaProject,
+		}
+		if err := ic.serviceLifecycleUc.Suspend(ctx, suspendReq); err != nil {
+			slog.ErrorContext(ctx, "suspend failed", slog.Any("error", err))
+			return mapSetServiceSuspendedError(err), err
+		}
+	} else {
+		resumeReq := domain.ResumeRequest{
+			ReleaseName: params.ReleaseId,
+			Namespace:   params.XOnyxiaProject,
+		}
+		if err := ic.serviceLifecycleUc.Resume(ctx, resumeReq); err != nil {
+			slog.ErrorContext(ctx, "resume failed", slog.Any("error", err))
+			return mapSetServiceSuspendedError(err), err
+		}
+	}
+
+	return &api.SetServiceSuspendedNoContent{}, nil
+}
+
+func mapSetServiceSuspendedError(err error) api.SetServiceSuspendedRes {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		return &api.SetServiceSuspendedNotFound{}
+	case errors.Is(err, domain.ErrNotSupported):
+		return &api.SetServiceSuspendedUnprocessableEntity{}
+	default:
+		return &api.SetServiceSuspendedInternalServerError{}
+	}
+}
+
+func (ic *InstallController) DeleteService(
+	ctx context.Context,
+	params api.DeleteServiceParams,
+) (api.DeleteServiceRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.DeleteServiceForbidden{}, errUserNotFound
+	}
+
+	req := domain.DeleteRequest{
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+	}
+
+	if err := ic.serviceLifecycleUc.Delete(ctx, req); err != nil {
+		slog.ErrorContext(ctx, "delete failed", slog.Any("error", err))
+		return &api.DeleteServiceInternalServerError{}, err
+	}
+
+	return &api.DeleteServiceNoContent{}, nil
+}
+
 func (ic *InstallController) InstallService(
 	ctx context.Context,
 	req *api.ServiceInstallRequest,
@@ -35,8 +110,8 @@ func (ic *InstallController) InstallService(
 
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		slog.ErrorContext(ctx, "user not found in context")
-		return &api.InstallServiceForbidden{}, errors.New("user not found")
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.InstallServiceForbidden{}, errUserNotFound
 	}
 
 	if req == nil {
@@ -51,6 +126,8 @@ func (ic *InstallController) InstallService(
 	if req.Options == nil {
 		return &api.InstallServiceBadRequest{}, errors.New("options are required")
 	}
+
+	version := req.PackageVersion.Or(req.Version.Or(""))
 
 	values := make(map[string]interface{}, len(req.Options))
 
@@ -67,15 +144,16 @@ func (ic *InstallController) InstallService(
 	}
 
 	dreq := domain.StartRequest{
-		Username:      u.Username,
-		CatalogID:     req.CatalogId,
-		PackageName:   req.PackageName,
-		Name:          req.Name,
-		Version:       req.Version.Or("latest"),
-		ReleaseID:     params.ReleaseId,
-		OnyxiaProject: params.XOnyxiaProject.Or(""),
-		FriendlyName:  req.FriendlyName.Or(req.PackageName),
-		Values:        values,
+		Username:     u.Username,
+		CatalogID:    req.CatalogId,
+		PackageName:  req.PackageName,
+		Name:         req.Name,
+		Version:      version,
+		ReleaseID:    params.ReleaseId,
+		Namespace:    params.XOnyxiaProject,
+		FriendlyName: req.FriendlyName.Or(req.PackageName),
+		Share:        req.Share.Or(false),
+		Values:       values,
 	}
 
 	// Execute use case.
@@ -95,7 +173,7 @@ func (ic *InstallController) InstallService(
 		}
 	}
 
-	// Success: 202 Accepted + headers/body per ogen schema.@
+	// Success: 202 Accepted + headers/body per ogen schema.
 	return &api.InstallAcceptedHeaders{
 		Location: api.NewOptString(""),
 		Response: api.InstallAccepted{
