@@ -19,35 +19,49 @@ func (g *K8sWorkloadStateGateway) GetControllerReadiness(
 	namespace string,
 	resources []ports.ManifestResource,
 ) (bool, error) {
-	for _, r := range resources {
-		switch r.Kind {
-		case "Deployment":
-			d, err := g.client.AppsV1().Deployments(namespace).Get(ctx, r.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			desired := int32(1)
-			if d.Spec.Replicas != nil {
-				desired = *d.Spec.Replicas
-			}
-			if d.Status.ReadyReplicas < desired {
-				return false, nil
-			}
-		case "StatefulSet":
-			s, err := g.client.AppsV1().StatefulSets(namespace).Get(ctx, r.Name, metav1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-			desired := int32(1)
-			if s.Spec.Replicas != nil {
-				desired = *s.Spec.Replicas
-			}
-			if s.Status.ReadyReplicas < desired {
-				return false, nil
-			}
+	for _, resource := range resources {
+		ready, handled, err := g.controllerReady(ctx, namespace, resource)
+		if err != nil {
+			return false, err
+		}
+		if handled && !ready {
+			return false, nil
 		}
 	}
 	return true, nil
+}
+
+func (g *K8sWorkloadStateGateway) controllerReady(
+	ctx context.Context,
+	namespace string,
+	resource ports.ManifestResource,
+) (ready bool, handled bool, err error) {
+	switch resource.Kind {
+	case "Deployment":
+		deployment, err := g.client.AppsV1().Deployments(namespace).
+			Get(ctx, resource.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, true, err
+		}
+		return replicasReady(deployment.Spec.Replicas, deployment.Status.ReadyReplicas), true, nil
+	case "StatefulSet":
+		statefulSet, err := g.client.AppsV1().StatefulSets(namespace).
+			Get(ctx, resource.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, true, err
+		}
+		return replicasReady(statefulSet.Spec.Replicas, statefulSet.Status.ReadyReplicas), true, nil
+	default:
+		return false, false, nil
+	}
+}
+
+func replicasReady(replicas *int32, readyReplicas int32) bool {
+	desiredReplicas := int32(1)
+	if replicas != nil {
+		desiredReplicas = *replicas
+	}
+	return readyReplicas >= desiredReplicas
 }
 
 var _ ports.WorkloadStateGateway = (*K8sWorkloadStateGateway)(nil)
@@ -96,67 +110,99 @@ func (g *K8sWorkloadStateGateway) GetPodsForRelease(
 func derivePodInfo(pod corev1.Pod) ports.PodInfo {
 	info := ports.PodInfo{Name: pod.Name}
 
-	// Check if pod is unschedulable.
-	for _, cond := range pod.Status.Conditions {
-		if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse &&
-			cond.Reason == "Unschedulable" {
-			info.ErrorReason = ports.PodErrorReasonUnschedulable
-			info.Message = cond.Message
-			return info
-		}
-	}
-
-	// Inspect container statuses for errors.
-	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.State.Waiting != nil {
-			reason := cs.State.Waiting.Reason
-			switch reason {
-			case "CrashLoopBackOff":
-				if info.ErrorReason == "" || errorPriority(ports.PodErrorReasonCrashLoop) > errorPriority(info.ErrorReason) {
-					info.ErrorReason = ports.PodErrorReasonCrashLoop
-					info.RestartCount = cs.RestartCount
-					info.Message = cs.State.Waiting.Message
-				}
-			case "ImagePullBackOff", "ErrImagePull":
-				if info.ErrorReason == "" || errorPriority(ports.PodErrorReasonImagePull) > errorPriority(info.ErrorReason) {
-					info.ErrorReason = ports.PodErrorReasonImagePull
-					info.Image = cs.Image
-					info.Message = cs.State.Waiting.Message
-				}
-			case "CreateContainerConfigError":
-				if info.ErrorReason == "" || errorPriority(ports.PodErrorReasonConfigError) > errorPriority(info.ErrorReason) {
-					info.ErrorReason = ports.PodErrorReasonConfigError
-					info.Message = cs.State.Waiting.Message
-				}
-			}
-		}
-
-		if cs.State.Terminated != nil && cs.State.Terminated.Reason == "OOMKilled" {
-			if info.ErrorReason == "" || errorPriority(ports.PodErrorReasonOOMKilled) > errorPriority(info.ErrorReason) {
-				info.ErrorReason = ports.PodErrorReasonOOMKilled
-				info.ExitCode = cs.State.Terminated.ExitCode
-			}
-		}
+	updatePodError(&info, unschedulableError(pod.Status.Conditions))
+	for _, status := range pod.Status.ContainerStatuses {
+		updatePodError(&info, waitingContainerError(status))
+		updatePodError(&info, terminatedContainerError(status.State.Terminated))
+		updatePodError(&info, terminatedContainerError(status.LastTerminationState.Terminated))
 	}
 
 	if info.ErrorReason != "" {
 		return info
 	}
 
-	// Check readiness: pod running but not all containers ready.
-	allReady := true
-	for _, cs := range pod.Status.ContainerStatuses {
-		if !cs.Ready {
-			allReady = false
-			if cs.State.Running != nil {
-				info.ErrorReason = ports.PodErrorReasonReadinessFailed
-				info.Name = pod.Name
+	applyContainerReadiness(&info, pod.Status.ContainerStatuses)
+
+	return info
+}
+
+func unschedulableError(conditions []corev1.PodCondition) ports.PodInfo {
+	for _, condition := range conditions {
+		if condition.Type == corev1.PodScheduled &&
+			condition.Status == corev1.ConditionFalse &&
+			condition.Reason == "Unschedulable" {
+			return ports.PodInfo{
+				ErrorReason: ports.PodErrorReasonUnschedulable,
+				Message:     condition.Message,
 			}
 		}
 	}
-	info.Ready = allReady
+	return ports.PodInfo{}
+}
 
-	return info
+func waitingContainerError(status corev1.ContainerStatus) ports.PodInfo {
+	if status.State.Waiting == nil {
+		return ports.PodInfo{}
+	}
+
+	waiting := status.State.Waiting
+	switch waiting.Reason {
+	case "CrashLoopBackOff":
+		return ports.PodInfo{
+			ErrorReason:  ports.PodErrorReasonCrashLoop,
+			RestartCount: status.RestartCount,
+			Message:      waiting.Message,
+		}
+	case "ImagePullBackOff", "ErrImagePull":
+		return ports.PodInfo{
+			ErrorReason: ports.PodErrorReasonImagePull,
+			Image:       status.Image,
+			Message:     waiting.Message,
+		}
+	case "CreateContainerConfigError":
+		return ports.PodInfo{
+			ErrorReason: ports.PodErrorReasonConfigError,
+			Message:     waiting.Message,
+		}
+	default:
+		return ports.PodInfo{}
+	}
+}
+
+func terminatedContainerError(terminated *corev1.ContainerStateTerminated) ports.PodInfo {
+	if terminated == nil || terminated.Reason != "OOMKilled" {
+		return ports.PodInfo{}
+	}
+	return ports.PodInfo{
+		ErrorReason: ports.PodErrorReasonOOMKilled,
+		ExitCode:    terminated.ExitCode,
+	}
+}
+
+func updatePodError(info *ports.PodInfo, candidate ports.PodInfo) {
+	if candidate.ErrorReason == "" ||
+		errorPriority(candidate.ErrorReason) <= errorPriority(info.ErrorReason) {
+		return
+	}
+	candidate.Name = info.Name
+	*info = candidate
+}
+
+func applyContainerReadiness(info *ports.PodInfo, statuses []corev1.ContainerStatus) {
+	if len(statuses) == 0 {
+		return
+	}
+
+	info.Ready = true
+	for _, status := range statuses {
+		if status.Ready {
+			continue
+		}
+		info.Ready = false
+		if status.State.Running != nil {
+			info.ErrorReason = ports.PodErrorReasonReadinessFailed
+		}
+	}
 }
 
 // errorPriority returns the severity of a pod error reason (higher = more severe).

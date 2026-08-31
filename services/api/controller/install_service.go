@@ -12,6 +12,13 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
+const (
+	userNotFoundMessage          = "user not found"
+	userNotFoundInContextMessage = userNotFoundMessage + " in context"
+)
+
+var errUserNotFound = errors.New(userNotFoundMessage)
+
 type InstallController struct {
 	serviceLifecycleUc domain.ServiceLifecycle
 	userGetter         usercontext.UserGetter
@@ -34,8 +41,8 @@ func (ic *InstallController) SetServiceSuspended(
 ) (api.SetServiceSuspendedRes, error) {
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		slog.ErrorContext(ctx, "user not found in context")
-		return &api.SetServiceSuspendedForbidden{}, errors.New("user not found")
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.SetServiceSuspendedForbidden{}, errUserNotFound
 	}
 
 	if req.Suspended {
@@ -78,8 +85,8 @@ func (ic *InstallController) DeleteService(
 ) (api.DeleteServiceRes, error) {
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		slog.ErrorContext(ctx, "user not found in context")
-		return &api.DeleteServiceForbidden{}, errors.New("user not found")
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.DeleteServiceForbidden{}, errUserNotFound
 	}
 
 	req := domain.DeleteRequest{
@@ -103,8 +110,8 @@ func (ic *InstallController) InstallService(
 
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		slog.ErrorContext(ctx, "user not found in context")
-		return &api.InstallServiceForbidden{}, errors.New("user not found")
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return &api.InstallServiceForbidden{}, errUserNotFound
 	}
 
 	if req == nil {
@@ -166,7 +173,7 @@ func (ic *InstallController) InstallService(
 		}
 	}
 
-	// Success: 202 Accepted + headers/body per ogen schema.@
+	// Success: 202 Accepted + headers/body per ogen schema.
 	return &api.InstallAcceptedHeaders{
 		Location: api.NewOptString(""),
 		Response: api.InstallAccepted{
