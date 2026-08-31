@@ -74,7 +74,7 @@ func (uc *Lifecycle) Start(
 		},
 	}
 
-	if err := uc.helm.StartInstall(ctx, req.Namespace, req.Name, &pkg, req.Version, req.Values, opts); err != nil {
+	if err := uc.helm.StartInstall(ctx, req.Namespace, req.ReleaseID, &pkg, req.Version, req.Values, opts); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("helm start: %w", err)
 	}
 

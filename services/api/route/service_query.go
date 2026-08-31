@@ -16,11 +16,11 @@ func SetupServiceQueryController(
 	helmClient *helm.Client,
 ) (*controller.ServiceQueryController, error) {
 
-	helmReleaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), helmClient, ports.InstallCallbacks{
-		OnStart:   func(_, _ string) {},
-		OnSuccess: func(_, _ string) {},
-		OnError:   func(_, _ string, _ error) {},
-	})
+	helmReleaseGtw, err := helm.NewReleaseGtw(
+		app.K8sClient.Config(),
+		helmClient,
+		ports.InstallCallbacks{},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("helm adapter (query): %w", err)
 	}

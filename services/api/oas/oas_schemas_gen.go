@@ -1473,6 +1473,10 @@ type SetServiceSuspendedUnauthorized Problem
 
 func (*SetServiceSuspendedUnauthorized) setServiceSuspendedRes() {}
 
+type SetServiceSuspendedUnprocessableEntity Problem
+
+func (*SetServiceSuspendedUnprocessableEntity) setServiceSuspendedRes() {}
+
 type WatchReleaseForbidden Problem
 
 func (*WatchReleaseForbidden) watchReleaseRes() {}

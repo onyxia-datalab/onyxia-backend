@@ -18,14 +18,12 @@ func encodeDeleteServiceResponse(response DeleteServiceRes, w http.ResponseWrite
 	switch response := response.(type) {
 	case *DeleteServiceNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *DeleteServiceUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -38,7 +36,6 @@ func encodeDeleteServiceResponse(response DeleteServiceRes, w http.ResponseWrite
 	case *DeleteServiceForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -51,7 +48,6 @@ func encodeDeleteServiceResponse(response DeleteServiceRes, w http.ResponseWrite
 	case *DeleteServiceNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -204,7 +200,6 @@ func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, spa
 	case *Service:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -217,7 +212,6 @@ func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, spa
 	case *GetServiceUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -230,7 +224,6 @@ func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, spa
 	case *GetServiceForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -243,7 +236,6 @@ func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, spa
 	case *GetServiceNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -376,7 +368,6 @@ func encodeListServicesResponse(response ListServicesRes, w http.ResponseWriter,
 	case *ListServicesOKApplicationJSON:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -389,7 +380,6 @@ func encodeListServicesResponse(response ListServicesRes, w http.ResponseWriter,
 	case *ListServicesUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -402,7 +392,6 @@ func encodeListServicesResponse(response ListServicesRes, w http.ResponseWriter,
 	case *ListServicesForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -434,14 +423,12 @@ func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.R
 	switch response := response.(type) {
 	case *SetServiceSuspendedNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *SetServiceSuspendedUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -454,7 +441,6 @@ func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.R
 	case *SetServiceSuspendedForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -467,7 +453,18 @@ func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.R
 	case *SetServiceSuspendedNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *SetServiceSuspendedUnprocessableEntity:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(422)
 
 		e := new(jx.Encoder)
 		response.Encode(e)

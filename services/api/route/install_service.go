@@ -2,7 +2,6 @@ package route
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/k8s"
@@ -17,28 +16,11 @@ func SetupInstallController(
 	helmClient *helm.Client,
 ) (*controller.InstallController, error) {
 
-	//TODO: pass callbacks properly
-	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), helmClient, ports.InstallCallbacks{
-		OnStart: func(release, chart string) {
-			slog.Info("Helm install started",
-				slog.String("release", release),
-				slog.String("chart", chart),
-			)
-		},
-		OnSuccess: func(release, chart string) {
-			slog.Info("Helm install succeeded",
-				slog.String("release", release),
-				slog.String("chart", chart),
-			)
-		},
-		OnError: func(release, chart string, err error) {
-			slog.Error("Helm install failed",
-				slog.String("release", release),
-				slog.String("chart", chart),
-				slog.Any("error", err),
-			)
-		},
-	})
+	helmRealeaseGtw, err := helm.NewReleaseGtw(
+		app.K8sClient.Config(),
+		helmClient,
+		ports.InstallCallbacks{},
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("helm adapter: %w", err)

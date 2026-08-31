@@ -23,10 +23,11 @@ import (
 )
 
 type Helm struct {
-	settings   *cli.EnvSettings
-	global     ports.InstallCallbacks
-	restConfig *rest.Config
-	helmClient *Client
+	settings           *cli.EnvSettings
+	global             ports.InstallCallbacks
+	restConfig         *rest.Config
+	helmClient         *Client
+	configForNamespace func(string) (*action.Configuration, error)
 }
 
 var _ ports.ReleaseGateway = (*Helm)(nil)
@@ -47,6 +48,10 @@ func NewReleaseGtw(
 
 // cfgForNamespace creates a Helm action.Configuration scoped to the given namespace.
 func (i *Helm) cfgForNamespace(namespace string) (*action.Configuration, error) {
+	if i.configForNamespace != nil {
+		return i.configForNamespace(namespace)
+	}
+
 	cfg := new(action.Configuration)
 	if err := cfg.Init(&StaticRESTClientGetter{config: i.restConfig}, namespace, "secret"); err != nil {
 		return nil, fmt.Errorf("init helm config for namespace %q: %w", namespace, err)
@@ -68,6 +73,9 @@ func (i *Helm) StartInstall(
 
 	if releaseName == "" {
 		return fmt.Errorf("releaseName is required")
+	}
+	if pkg == nil {
+		return fmt.Errorf("package is required")
 	}
 
 	cfg, err := i.cfgForNamespace(namespace)
@@ -107,9 +115,12 @@ func (i *Helm) StartInstall(
 		valMap[k] = v
 	}
 
-	//background operation
+	// The HTTP request ends as soon as this method returns. Preserve its values
+	// without letting request cancellation abort the asynchronous Helm action.
+	installCtx := context.WithoutCancel(ctx)
+
 	go func() {
-		slog.InfoContext(ctx, "helm install started",
+		slog.InfoContext(installCtx, "helm install started",
 			slog.String("release", releaseName),
 			slog.String("chart", chartRef),
 			slog.String("chartPath", chartPath),
@@ -117,28 +128,46 @@ func (i *Helm) StartInstall(
 			slog.Bool("disableHooks", act.DisableHooks),
 			slog.Duration("timeout", act.Timeout),
 		)
-		i.global.OnStart(releaseName, chartRef)
-		opts.Callbacks.OnStart(releaseName, chartRef)
-		_, runErr := act.RunWithContext(ctx, chart, valMap)
+		notifyInstallStart(i.global, releaseName, chartRef)
+		notifyInstallStart(opts.Callbacks, releaseName, chartRef)
+		_, runErr := act.RunWithContext(installCtx, chart, valMap)
 		if runErr != nil {
-			slog.ErrorContext(ctx, "helm install failed",
+			slog.ErrorContext(installCtx, "helm install failed",
 				slog.String("release", releaseName),
 				slog.String("chart", chartRef),
 				slog.Any("error", runErr),
 			)
-			i.global.OnError(releaseName, chartRef, runErr)
-			opts.Callbacks.OnError(releaseName, chartRef, runErr)
+			notifyInstallError(i.global, releaseName, chartRef, runErr)
+			notifyInstallError(opts.Callbacks, releaseName, chartRef, runErr)
 			return
 		}
-		slog.InfoContext(ctx, "helm install completed",
+		slog.InfoContext(installCtx, "helm install completed",
 			slog.String("release", releaseName),
 			slog.String("chart", chartRef),
 		)
-		i.global.OnSuccess(releaseName, chartRef)
-		opts.Callbacks.OnSuccess(releaseName, chartRef)
+		notifyInstallSuccess(i.global, releaseName, chartRef)
+		notifyInstallSuccess(opts.Callbacks, releaseName, chartRef)
 	}()
 
 	return nil
+}
+
+func notifyInstallStart(callbacks ports.InstallCallbacks, release, chart string) {
+	if callbacks.OnStart != nil {
+		callbacks.OnStart(release, chart)
+	}
+}
+
+func notifyInstallSuccess(callbacks ports.InstallCallbacks, release, chart string) {
+	if callbacks.OnSuccess != nil {
+		callbacks.OnSuccess(release, chart)
+	}
+}
+
+func notifyInstallError(callbacks ports.InstallCallbacks, release, chart string, err error) {
+	if callbacks.OnError != nil {
+		callbacks.OnError(release, chart, err)
+	}
 }
 
 // SuspendRelease runs helm upgrade --reuse-values with global.suspend=true.
@@ -153,8 +182,32 @@ func (i *Helm) ResumeRelease(ctx context.Context, namespace, releaseName string)
 	return i.toggleSuspend(ctx, namespace, releaseName, false)
 }
 
-// UninstallRelease is not yet implemented.
-func (i *Helm) UninstallRelease(_ context.Context, _, _ string) error {
+// UninstallRelease removes a Helm release. Missing releases are ignored so a
+// stale Onyxia secret (a Ghost service) can still be cleaned up by the use case.
+func (i *Helm) UninstallRelease(ctx context.Context, namespace, releaseName string) error {
+	if releaseName == "" {
+		return fmt.Errorf("releaseName is required")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	cfg, err := i.cfgForNamespace(namespace)
+	if err != nil {
+		return err
+	}
+
+	act := action.NewUninstall(cfg)
+	if _, err := act.Run(releaseName); errors.Is(err, driver.ErrReleaseNotFound) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("uninstall release %q: %w", releaseName, err)
+	}
+
+	slog.InfoContext(ctx, "helm release uninstalled",
+		slog.String("release", releaseName),
+		slog.String("namespace", namespace),
+	)
 	return nil
 }
 
@@ -166,6 +219,9 @@ func (i *Helm) toggleSuspend(ctx context.Context, namespace, releaseName string,
 
 	rel, err := action.NewGet(cfg).Run(releaseName)
 	if err != nil {
+		if errors.Is(err, driver.ErrReleaseNotFound) {
+			return fmt.Errorf("%w: release %q", domain.ErrNotFound, releaseName)
+		}
 		return fmt.Errorf("get release %q: %w", releaseName, err)
 	}
 
