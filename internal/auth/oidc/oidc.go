@@ -21,7 +21,6 @@ type TokenVerifier interface {
 type OIDCConfig struct {
 	IssuerURI     string
 	SkipTLSVerify bool
-	ClientID      string
 	Audience      string
 	UsernameClaim string
 	GroupsClaim   string
@@ -51,15 +50,14 @@ func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth,
 		return nil, err
 	}
 	verifier := provider.Verifier(&oidc.Config{
-		ClientID:                   cfg.ClientID,
 		InsecureSkipSignatureCheck: cfg.SkipTLSVerify,
+		SkipClientIDCheck:          true, //We skip client ID check because we have accessToken and not ID token.
 	})
 	if cfg.Audience == "" {
 		slog.WarnContext(ctx, "Skipping audience validation because 'audience' is empty")
 	}
 	slog.InfoContext(ctx, "OIDC Initialized",
 		slog.String("issuer", cfg.IssuerURI),
-		slog.String("client_id", cfg.ClientID),
 		slog.String("aud", cfg.Audience),
 	)
 	return &Auth{
@@ -83,7 +81,11 @@ func (a *Auth) VerifyRequest(
 		var ok bool
 		tokenStr, ok = dpop.FindAuthorization(r.Header, "Bearer")
 		if !ok {
-			slog.WarnContext(ctx, "Missing authorization header", slog.String("operation", operation))
+			slog.WarnContext(
+				ctx,
+				"Missing authorization header",
+				slog.String("operation", operation),
+			)
 			return ctx, fmt.Errorf("missing authorization header")
 		}
 	}
