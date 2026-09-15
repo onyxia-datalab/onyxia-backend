@@ -28,7 +28,6 @@ func (a *securityAdapter) HandleOidc(
 type OIDCConfigOnboarding struct {
 	IssuerURI     string
 	SkipTLSVerify bool
-	ClientID      string
 	Audience      string
 	UsernameClaim string
 	GroupsClaim   string
@@ -50,7 +49,6 @@ func BuildSecurityHandler(
 	shared := oidc.OIDCConfig{
 		IssuerURI:     cfg.IssuerURI,
 		SkipTLSVerify: cfg.SkipTLSVerify,
-		ClientID:      cfg.ClientID,
 		Audience:      cfg.Audience,
 		UsernameClaim: cfg.UsernameClaim,
 		GroupsClaim:   cfg.GroupsClaim,

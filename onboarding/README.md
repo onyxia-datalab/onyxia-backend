@@ -57,7 +57,6 @@ The configuration is loaded via [Viper](https://github.com/spf13/viper) from:
 | --------------- | --------------------- | -------------------- |
 | `issuerURI`     | OIDC Issuer URI       | `""`                 |
 | `skipTLSVerify` | Skip TLS verification | `false`              |
-| `clientID`      | OIDC Client ID        | `""`                 |
 | `audience`      | OIDC Audience         | `""`                 |
 | `usernameClaim` | Claim for username    | `preferred_username` |
 | `groupsClaim`   | Claim for groups      | `groups`             |

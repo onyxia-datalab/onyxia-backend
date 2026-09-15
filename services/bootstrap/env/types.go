@@ -7,7 +7,6 @@ type Server struct {
 type OIDC struct {
 	IssuerURI     string `mapstructure:"issuerURI"     json:"issuerURI"`
 	SkipTLSVerify bool   `mapstructure:"skipTLSVerify" json:"skipTLSVerify"`
-	ClientID      string `mapstructure:"clientID"      json:"clientID"`
 	Audience      string `mapstructure:"audience"      json:"audience"`
 	UsernameClaim string `mapstructure:"usernameClaim" json:"usernameClaim"`
 	GroupsClaim   string `mapstructure:"groupsClaim"   json:"groupsClaim"`
