@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.22](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.21...v0.1.22) (2026-09-15)
+
+
+### Bug Fixes
+
+* **auth:** remove client ID requirement from token audience ([#62](https://github.com/onyxia-datalab/onyxia-backend/issues/62)) ([d48db6d](https://github.com/onyxia-datalab/onyxia-backend/commit/d48db6daa02663ae2aff424db8251f6ce06f1ef3))
+* **deps:** update go minor and patch updates ([#52](https://github.com/onyxia-datalab/onyxia-backend/issues/52)) ([bc0b924](https://github.com/onyxia-datalab/onyxia-backend/commit/bc0b924cf0577119e458d57511ebe3005232828d))
+* **deps:** update go minor and patch updates ([#61](https://github.com/onyxia-datalab/onyxia-backend/issues/61)) ([3ac5829](https://github.com/onyxia-datalab/onyxia-backend/commit/3ac582935b84bdc42d3d3af3a2c376297be1cc8a))
+
 ## [0.1.21](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.20...v0.1.21) (2026-07-08)
 
 
