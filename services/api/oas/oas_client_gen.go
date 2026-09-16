@@ -29,6 +29,13 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
+	// DeleteService invokes deleteService operation.
+	//
+	// Runs helm uninstall for the release and removes the associated Onyxia secret. This operation is
+	// irreversible.
+	//
+	// DELETE /api/services/{releaseId}
+	DeleteService(ctx context.Context, params DeleteServiceParams) (DeleteServiceRes, error)
 	// GetMyCatalogs invokes getMyCatalogs operation.
 	//
 	// Returns the list of catalogs and packages available for the user. The list of packages is filtered
@@ -47,15 +54,33 @@ type Invoker interface {
 	// Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 	// and roles.
 	//
-	// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+	// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
+	// GetService invokes getService operation.
+	//
+	// Get the current state of a service.
+	//
+	// GET /api/services/{releaseId}
+	GetService(ctx context.Context, params GetServiceParams) (GetServiceRes, error)
 	// InstallService invokes installService operation.
 	//
 	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
 	// release already exists (returns 202 with the same event URLs).
 	//
-	// PUT /api/services/{releaseId}/install
+	// PUT /api/services/{releaseId}
 	InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
+	// ListServices invokes listServices operation.
+	//
+	// List all services in a project namespace.
+	//
+	// GET /api/services
+	ListServices(ctx context.Context, params ListServicesParams) (ListServicesRes, error)
+	// SetServiceSuspended invokes setServiceSuspended operation.
+	//
+	// Suspend or resume a service.
+	//
+	// PUT /api/services/{releaseId}/suspended
+	SetServiceSuspended(ctx context.Context, request *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error)
 	// WatchRelease invokes watchRelease operation.
 	//
 	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
@@ -111,6 +136,152 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 		return c.serverURL
 	}
 	return u
+}
+
+// DeleteService invokes deleteService operation.
+//
+// Runs helm uninstall for the release and removes the associated Onyxia secret. This operation is
+// irreversible.
+//
+// DELETE /api/services/{releaseId}
+func (c *Client) DeleteService(ctx context.Context, params DeleteServiceParams) (DeleteServiceRes, error) {
+	res, err := c.sendDeleteService(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendDeleteService(ctx context.Context, params DeleteServiceParams) (res DeleteServiceRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deleteService"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, DeleteServiceOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/api/services/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, DeleteServiceOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeDeleteServiceResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
 }
 
 // GetMyCatalogs invokes getMyCatalogs operation.
@@ -383,7 +554,7 @@ func (c *Client) sendGetMyPackage(ctx context.Context, params GetMyPackageParams
 // Returns the values.schema.json of a versioned package. The schema is enhanced by user permissions
 // and roles.
 //
-// GET /api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}
+// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 func (c *Client) GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error) {
 	res, err := c.sendGetPackageSchema(ctx, params)
 	return res, err
@@ -393,7 +564,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getPackageSchema"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/api/services/schemas/{catalogId}/packageName/{packageName}/versions/{version}"),
+		semconv.URLTemplateKey.String("/api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -426,8 +597,8 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [6]string
-	pathParts[0] = "/api/services/schemas/"
+	var pathParts [7]string
+	pathParts[0] = "/api/services/catalogs/"
 	{
 		// Encode "catalogId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -446,7 +617,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/packageName/"
+	pathParts[2] = "/packages/"
 	{
 		// Encode "packageName" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -484,6 +655,7 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 		}
 		pathParts[5] = encoded
 	}
+	pathParts[6] = "/schema"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -548,12 +720,157 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 	return result, nil
 }
 
+// GetService invokes getService operation.
+//
+// Get the current state of a service.
+//
+// GET /api/services/{releaseId}
+func (c *Client) GetService(ctx context.Context, params GetServiceParams) (GetServiceRes, error) {
+	res, err := c.sendGetService(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetService(ctx context.Context, params GetServiceParams) (res GetServiceRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getService"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetServiceOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/api/services/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, GetServiceOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetServiceResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // InstallService invokes installService operation.
 //
 // Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
 // release already exists (returns 202 with the same event URLs).
 //
-// PUT /api/services/{releaseId}/install
+// PUT /api/services/{releaseId}
 func (c *Client) InstallService(ctx context.Context, request *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error) {
 	res, err := c.sendInstallService(ctx, request, params)
 	return res, err
@@ -563,7 +880,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("installService"),
 		semconv.HTTPRequestMethodKey.String("PUT"),
-		semconv.URLTemplateKey.String("/api/services/{releaseId}/install"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -596,7 +913,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [3]string
+	var pathParts [2]string
 	pathParts[0] = "/api/services/"
 	{
 		// Encode "releaseId" parameter.
@@ -616,7 +933,6 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/install"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -636,10 +952,7 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 			Explode: false,
 		}
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.XOnyxiaProject.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
 		}); err != nil {
 			return res, errors.Wrap(err, "encode header")
 		}
@@ -694,6 +1007,282 @@ func (c *Client) sendInstallService(ctx context.Context, request *ServiceInstall
 
 	stage = "DecodeResponse"
 	result, err := decodeInstallServiceResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// ListServices invokes listServices operation.
+//
+// List all services in a project namespace.
+//
+// GET /api/services
+func (c *Client) ListServices(ctx context.Context, params ListServicesParams) (ListServicesRes, error) {
+	res, err := c.sendListServices(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListServices(ctx context.Context, params ListServicesParams) (res ListServicesRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listServices"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/services"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListServicesOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/services"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, ListServicesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListServicesResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// SetServiceSuspended invokes setServiceSuspended operation.
+//
+// Suspend or resume a service.
+//
+// PUT /api/services/{releaseId}/suspended
+func (c *Client) SetServiceSuspended(ctx context.Context, request *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error) {
+	res, err := c.sendSetServiceSuspended(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSetServiceSuspended(ctx context.Context, request *SetServiceSuspendedReq, params SetServiceSuspendedParams) (res SetServiceSuspendedRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("setServiceSuspended"),
+		semconv.HTTPRequestMethodKey.String("PUT"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}/suspended"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SetServiceSuspendedOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/services/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/suspended"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "PUT", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSetServiceSuspendedRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, SetServiceSuspendedOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeSetServiceSuspendedResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

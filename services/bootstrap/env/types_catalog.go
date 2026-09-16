@@ -1,5 +1,7 @@
 package env
 
+import "time"
+
 type CatalogConfig struct {
 	Type CatalogType `json:"type"` // "helm" or "oci"`
 
@@ -17,8 +19,10 @@ type CatalogConfig struct {
 	Restrictions  []Restriction     `mapstructure:"restrictions"      json:"restrictions"`
 	Username      *string           `mapstructure:"username"          json:"username"`
 	Password      *string           `mapstructure:"password"          json:"password"`
-	Location      string            `mapstructure:"location"          json:"location"`
 
+	// Specific to helm repo (index)
+	Location             string               `mapstructure:"location"             json:"location"` // helm repo URL; must not be set on OCI catalogs (use Packages instead)
+	IndexTTL             time.Duration        `mapstructure:"indexTtl"             json:"indexTtl"`
 	MultipleServicesMode MultipleServicesMode `mapstructure:"multipleServicesMode" json:"multipleServicesMode"`
 	MaxNumberOfVersions  *int                 `mapstructure:"maxNumberOfVersions"  json:"maxNumberOfVersions,omitempty"`
 
@@ -57,6 +61,7 @@ type Restriction struct {
 }
 
 type OCIPackage struct {
-	Name     string   `json:"name"`
-	Versions []string `json:"versions"` // if empty we refresh with ttl (same as helm index)
+	Name     string   `mapstructure:"name"     json:"name"`
+	ChartRef string   `mapstructure:"chartRef" json:"chartRef"` // full OCI chart ref, e.g. oci://registry/path/chart (required)
+	Versions []string `mapstructure:"versions" json:"versions"` // if empty we refresh with ttl (same as helm index)
 }

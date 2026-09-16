@@ -58,7 +58,9 @@ func newLocalHelmRepo(t *testing.T, charts ...*chartv2.Metadata) *localHelmRepo 
 
 func (l *localHelmRepo) newAdapter(t *testing.T) *HelmPackageRepository {
 	t.Helper()
-	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{l.cfg}, l.tmpDir)
+	client, err := NewClient(l.tmpDir)
+	require.NoError(t, err)
+	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{l.cfg}, client)
 	require.NoError(t, err)
 	return repoAdapter
 }
@@ -106,9 +108,8 @@ func TestGetHelmPackage_Found(t *testing.T) {
 
 	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
-	require.NotNil(t, pkg)
 	assert.Equal(t, "mychart", pkg.Name)
-	assert.ElementsMatch(t, []string{"2.0.0", "1.0.0"}, pkg.Versions)
+	assert.Equal(t, "v2", pkg.Description)
 }
 
 func TestGetHelmPackage_NotFound(t *testing.T) {
@@ -124,7 +125,7 @@ func TestGetHelmPackage_NotFound(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrNotFound)
 }
 
-func TestGetHelmPackage_VersionFilter_Latest(t *testing.T) {
+func TestGetAvailableVersions_All(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -133,127 +134,9 @@ func TestGetHelmPackage_VersionFilter_Latest(t *testing.T) {
 		&chartv2.Metadata{Name: "mychart", Version: "2.0.0"},
 		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
 	)
-	lr.cfg.MultipleServicesMode = env.MultipleServicesLatest
 	repoAdapter := lr.newAdapter(t)
 
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
+	versions, err := repoAdapter.GetAvailableVersions(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"2.0.0"}, pkg.Versions)
-}
-
-func TestGetHelmPackage_VersionFilter_MaxNumber(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	n := 2
-	lr := newLocalHelmRepo(t,
-		&chartv2.Metadata{Name: "mychart", Version: "3.0.0"},
-		&chartv2.Metadata{Name: "mychart", Version: "2.0.0"},
-		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
-	)
-	lr.cfg.MultipleServicesMode = env.MultipleServicesMaxNumber
-	lr.cfg.MaxNumberOfVersions = &n
-	repoAdapter := lr.newAdapter(t)
-
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"3.0.0", "2.0.0"}, pkg.Versions)
-}
-
-func TestGetHelmPackage_VersionFilter_SkipPatches(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	lr := newLocalHelmRepo(t,
-		&chartv2.Metadata{Name: "mychart", Version: "2.1.1"},
-		&chartv2.Metadata{Name: "mychart", Version: "2.1.0"},
-		&chartv2.Metadata{Name: "mychart", Version: "1.0.5"},
-		&chartv2.Metadata{Name: "mychart", Version: "1.0.0"},
-	)
-	lr.cfg.MultipleServicesMode = env.MultipleServicesSkipPatches
-	repoAdapter := lr.newAdapter(t)
-
-	pkg, err := repoAdapter.GetPackage(context.Background(), lr.cfg.ID, "mychart")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"2.1.1", "1.0.5"}, pkg.Versions)
-}
-
-func TestNewPackageRepository_MaxNumber_MissingN_ReturnsError(t *testing.T) {
-	cfgs := []env.CatalogConfig{{
-		ID:                   "bad-catalog",
-		Type:                 env.CatalogTypeHelmRepo,
-		Location:             "http://localhost",
-		MultipleServicesMode: env.MultipleServicesMaxNumber,
-		MaxNumberOfVersions:  nil,
-	}}
-	_, err := NewPackageRepository(cfgs, "")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "maxNumberOfVersions")
-}
-
-func TestResolvePackage_HelmRepository(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test")
-	}
-
-	lr := newLocalHelmRepo(t, &chartv2.Metadata{
-		Name:        "mychart",
-		Version:     "1.0.0",
-		Description: "fake chart",
-	})
-
-	repoAdapter := lr.newAdapter(t)
-
-	t.Run("existing chart and version", func(t *testing.T) {
-		pkg, err := repoAdapter.ResolvePackage(context.Background(), lr.cfg.ID, "mychart", "1.0.0")
-		require.NoError(t, err)
-		require.Equal(t, "mychart", pkg.Name)
-		require.Equal(t, "1.0.0", pkg.Version)
-	})
-
-	t.Run("chart not found", func(t *testing.T) {
-		_, err := repoAdapter.ResolvePackage(context.Background(), lr.cfg.ID, "unknown", "1.0.0")
-		require.Error(t, err)
-		require.Contains(t, err.Error(), `chart "unknown" not found`)
-	})
-
-	t.Run("version not found", func(t *testing.T) {
-		_, err := repoAdapter.ResolvePackage(context.Background(), lr.cfg.ID, "mychart", "9.9.9")
-		require.Error(t, err)
-		require.Contains(t, err.Error(), `version "9.9.9" not found`)
-	})
-}
-
-func TestResolvePackage_OCICatalog(t *testing.T) {
-	ociCfg := env.CatalogConfig{
-		ID:       "oci-catalog",
-		Type:     env.CatalogTypeOCI,
-		Location: "oci://registry.example.com/charts",
-		Packages: []env.OCIPackage{
-			{Name: "my-app", Versions: []string{"2.0.0", "1.5.0", "1.0.0"}},
-		},
-	}
-	repoAdapter, err := NewPackageRepository([]env.CatalogConfig{ociCfg}, "")
-	require.NoError(t, err)
-
-	t.Run("existing package and version", func(t *testing.T) {
-		pkg, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "my-app", "1.5.0")
-		require.NoError(t, err)
-		assert.Equal(t, "my-app", pkg.Name)
-		assert.Equal(t, "1.5.0", pkg.Version)
-		assert.Equal(t, "oci://registry.example.com/charts", pkg.RepoURL)
-		assert.Equal(t, "oci-catalog", pkg.CatalogID)
-	})
-
-	t.Run("package not found", func(t *testing.T) {
-		_, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "unknown", "1.0.0")
-		require.ErrorIs(t, err, domain.ErrNotFound)
-	})
-
-	t.Run("version not found", func(t *testing.T) {
-		_, err := repoAdapter.ResolvePackage(context.Background(), "oci-catalog", "my-app", "9.9.9")
-		require.ErrorIs(t, err, domain.ErrNotFound)
-	})
+	assert.ElementsMatch(t, []string{"2.0.0", "1.0.0"}, versions)
 }

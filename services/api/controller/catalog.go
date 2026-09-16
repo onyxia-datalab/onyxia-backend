@@ -141,12 +141,22 @@ func (cc *CatalogController) GetMyPackage(
 		return problem, err
 	}
 
+	versions, err := cc.catalogs.GetAvailableVersions(ctx, catalogID, packageName)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get package versions", slog.String("error", err.Error()))
+		problem := &api.GetMyPackageInternalServerError{}
+		problem.Title.SetTo("Unable to get package versions")
+		problem.Status.SetTo(500)
+		problem.Detail.SetTo(err.Error())
+		return problem, err
+	}
+
 	return &api.DetailedPackage{
 		Name:        pkg.Name,
 		Description: api.NewOptString(pkg.Description),
 		Icon:        pkg.IconUrl,
 		Home:        api.NewOptURI(pkg.HomeUrl),
-		Versions:    pkg.Versions,
+		Versions:    versions,
 	}, nil
 }
 
