@@ -3,10 +3,12 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -16,7 +18,7 @@ import (
 type lifecycleMocks struct {
 	helm    *mocks.MockReleaseGateway
 	secrets *mocks.MockOnyxiaSecretGateway
-	pkgRepo *mocks.MockCatalogRepository
+	catalog *mocks.MockCatalogService
 }
 
 func setupLifecycle(t *testing.T) (*Lifecycle, context.Context, lifecycleMocks) {
@@ -24,9 +26,9 @@ func setupLifecycle(t *testing.T) (*Lifecycle, context.Context, lifecycleMocks) 
 	m := lifecycleMocks{
 		helm:    new(mocks.MockReleaseGateway),
 		secrets: new(mocks.MockOnyxiaSecretGateway),
-		pkgRepo: new(mocks.MockCatalogRepository),
+		catalog: new(mocks.MockCatalogService),
 	}
-	uc := NewLifecycle(m.secrets, m.helm, m.pkgRepo)
+	uc := NewLifecycle(m.secrets, m.helm, m.catalog, namespace.NewAuthorizer("user-", "projet-"))
 	return uc, context.Background(), m
 }
 
@@ -53,20 +55,28 @@ func resolvedPkg(req domain.StartRequest) domain.Package {
 	}
 }
 
+// notInstalled stubs GetReleaseState to report the release doesn't exist yet,
+// the common case exercised by most Start tests.
+func notInstalled(m lifecycleMocks, req domain.StartRequest) {
+	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
+		Return(ports.ReleaseState{Exists: false}, nil)
+}
+
 func TestStart_Success(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).Return(nil)
+	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).Return(nil)
 	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
-	m.pkgRepo.AssertExpectations(t)
+	m.catalog.AssertExpectations(t)
 	m.secrets.AssertExpectations(t)
 	m.helm.AssertExpectations(t)
 }
@@ -77,8 +87,10 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 	req.Share = true
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", ctx, req.Namespace, req.ReleaseID,
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("CheckSharingAllowed", mock.Anything, req.CatalogID).Return(nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", ctx, req.Namespace, req.ReleaseID,
 		map[string][]byte{
 			"catalog":      []byte(req.CatalogID),
 			"friendlyName": []byte(req.FriendlyName),
@@ -99,13 +111,13 @@ func TestStart_GetPackageError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, errors.New("index unavailable"))
 
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "index unavailable")
-	m.secrets.AssertNotCalled(t, "EnsureOnyxiaSecret")
+	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -113,13 +125,86 @@ func TestStart_PackageNotFound(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.pkgRepo.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, domain.ErrNotFound)
 
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	m.secrets.AssertNotCalled(t, "EnsureOnyxiaSecret")
+	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.helm.AssertNotCalled(t, "StartInstall")
+}
+
+// A restricted catalog the caller can't access is reported by GetPackage as
+// ErrNotFound, so the install path is naturally covered by the same case as
+// TestStart_PackageNotFound: catalog.GetPackage is where the restriction is
+// enforced, not Start.
+
+func TestStart_SharingNotAllowed(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	req.Share = true
+	pkg := resolvedPkg(req)
+
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("CheckSharingAllowed", mock.Anything, req.CatalogID).Return(domain.ErrForbidden)
+
+	_, err := uc.Start(ctx, req)
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	m.helm.AssertNotCalled(t, "GetReleaseState")
+	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.helm.AssertNotCalled(t, "StartInstall")
+}
+
+func TestStart_ShareFalseSkipsSharingCheck(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	req.Share = false
+	pkg := resolvedPkg(req)
+
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	_, err := uc.Start(ctx, req)
+
+	require.NoError(t, err)
+	m.catalog.AssertNotCalled(t, "CheckSharingAllowed", mock.Anything, mock.Anything)
+}
+
+func TestStart_AlreadyExists(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	pkg := resolvedPkg(req)
+
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
+		Return(ports.ReleaseState{Exists: true}, nil)
+
+	_, err := uc.Start(ctx, req)
+
+	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
+	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.helm.AssertNotCalled(t, "StartInstall")
+}
+
+func TestStart_GetReleaseStateError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	pkg := resolvedPkg(req)
+
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
+		Return(ports.ReleaseState{}, errors.New("helm unavailable"))
+
+	_, err := uc.Start(ctx, req)
+
+	assert.ErrorContains(t, err, "helm unavailable")
+	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -128,8 +213,9 @@ func TestStart_SecretError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("k8s unavailable"))
 
 	_, err := uc.Start(ctx, req)
@@ -138,13 +224,30 @@ func TestStart_SecretError(t *testing.T) {
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
+func TestStart_SecretAlreadyExistsDoesNotOverwriteOrInstall(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	req := baseRequest()
+	pkg := resolvedPkg(req)
+
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", mock.Anything, req.Namespace, req.ReleaseID, mock.Anything).
+		Return(domain.ErrAlreadyExists)
+
+	_, err := uc.Start(ctx, req)
+
+	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
+	m.helm.AssertNotCalled(t, "StartInstall")
+}
+
 func TestStart_HelmError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("invalid release name"))
@@ -159,8 +262,10 @@ func TestStart_InvokesInstallCallbacks(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.pkgRepo.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.secrets.On("EnsureOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	notInstalled(m, req)
+	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			opts := args.Get(6).(ports.InstallOptions)
@@ -175,25 +280,104 @@ func TestStart_InvokesInstallCallbacks(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// --- Suspend / Resume / Delete: ownership ---------------------------------
+
+const (
+	groupNamespace = "projet-data-team"
+	release        = "jupyter-alice"
+)
+
+// ownedBy stubs the onyxia secret of release in ns with the given owner/share.
+func ownedBy(m lifecycleMocks, ns, owner string, share bool) {
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, ns, release).
+		Return(map[string][]byte{
+			"owner": []byte(owner),
+			"share": []byte(strconv.FormatBool(share)),
+		}, nil)
+}
+
+func TestAuthorize_Rules(t *testing.T) {
+	tests := []struct {
+		name    string
+		ns      string
+		owner   string
+		share   bool
+		allowed bool
+	}{
+		{"owner in group namespace", groupNamespace, "alice", false, true},
+		{"owner case-insensitive", groupNamespace, "ALICE", false, true},
+		{"shared by someone else", groupNamespace, "bob", true, true},
+		{"unshared by someone else", groupNamespace, "bob", false, false},
+		{"personal namespace, any owner", "user-alice", "bob", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc, ctx, m := setupLifecycle(t)
+			ownedBy(m, tt.ns, tt.owner, tt.share)
+
+			err := uc.authorize(ctx, "alice", tt.ns, release)
+
+			if tt.allowed {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorIs(t, err, domain.ErrNotFound)
+			}
+		})
+	}
+}
+
+func TestAuthorize_SecretNotFound(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
+		Return(nil, domain.ErrNotFound)
+
+	err := uc.authorize(ctx, "alice", groupNamespace, release)
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestAuthorize_SecretReadError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
+		Return(nil, errors.New("k8s unavailable"))
+
+	err := uc.authorize(ctx, "alice", groupNamespace, release)
+
+	assert.ErrorContains(t, err, "k8s unavailable")
+	assert.NotErrorIs(t, err, domain.ErrNotFound)
+}
+
 // --- Suspend ----------------------------------------------------------------
 
 func TestSuspend_Success(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("SuspendRelease", ctx, groupNamespace, release).Return(nil)
 
-	m.helm.On("SuspendRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
-
-	err := uc.Suspend(ctx, domain.SuspendRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
 }
 
+func TestSuspend_DeniedForUnsharedForeignService(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "bob", false)
+
+	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	m.helm.AssertNotCalled(t, "SuspendRelease")
+}
+
 func TestSuspend_HelmError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("SuspendRelease", ctx, groupNamespace, release).
+		Return(errors.New("helm unavailable"))
 
-	m.helm.On("SuspendRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
-
-	err := uc.Suspend(ctx, domain.SuspendRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 }
@@ -202,21 +386,32 @@ func TestSuspend_HelmError(t *testing.T) {
 
 func TestResume_Success(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "bob", true)
+	m.helm.On("ResumeRelease", ctx, groupNamespace, release).Return(nil)
 
-	m.helm.On("ResumeRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
-
-	err := uc.Resume(ctx, domain.ResumeRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
 }
 
+func TestResume_DeniedForUnsharedForeignService(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "bob", false)
+
+	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	m.helm.AssertNotCalled(t, "ResumeRelease")
+}
+
 func TestResume_HelmError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("ResumeRelease", ctx, groupNamespace, release).
+		Return(errors.New("helm unavailable"))
 
-	m.helm.On("ResumeRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
-
-	err := uc.Resume(ctx, domain.ResumeRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 }
@@ -225,23 +420,35 @@ func TestResume_HelmError(t *testing.T) {
 
 func TestDelete_Success(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("UninstallRelease", ctx, groupNamespace, release).Return(nil)
+	m.secrets.On("DeleteOnyxiaSecret", ctx, groupNamespace, release).Return(nil)
 
-	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
-	m.secrets.On("DeleteOnyxiaSecret", ctx, "user-alice", "jupyter-alice").Return(nil)
-
-	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
 	m.secrets.AssertExpectations(t)
 }
 
+func TestDelete_DeniedForUnsharedForeignService(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "bob", false)
+
+	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	m.helm.AssertNotCalled(t, "UninstallRelease")
+	m.secrets.AssertNotCalled(t, "DeleteOnyxiaSecret")
+}
+
 func TestDelete_HelmError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("UninstallRelease", ctx, groupNamespace, release).
+		Return(errors.New("helm unavailable"))
 
-	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(errors.New("helm unavailable"))
-
-	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 	m.secrets.AssertNotCalled(t, "DeleteOnyxiaSecret")
@@ -249,11 +456,12 @@ func TestDelete_HelmError(t *testing.T) {
 
 func TestDelete_SecretError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
+	ownedBy(m, groupNamespace, "alice", false)
+	m.helm.On("UninstallRelease", ctx, groupNamespace, release).Return(nil)
+	m.secrets.On("DeleteOnyxiaSecret", ctx, groupNamespace, release).
+		Return(errors.New("k8s unavailable"))
 
-	m.helm.On("UninstallRelease", ctx, "user-alice", "jupyter-alice").Return(nil)
-	m.secrets.On("DeleteOnyxiaSecret", ctx, "user-alice", "jupyter-alice").Return(errors.New("k8s unavailable"))
-
-	err := uc.Delete(ctx, domain.DeleteRequest{Namespace: "user-alice", ReleaseName: "jupyter-alice"})
+	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 }

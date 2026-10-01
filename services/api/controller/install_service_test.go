@@ -2,15 +2,17 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var testNamespaceAuthz = namespace.NewAuthorizer("user-", "projet-")
 
 type lifecycleStub struct {
 	start      func(context.Context, domain.StartRequest) (domain.StartResponse, error)
@@ -76,7 +78,7 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 				captured = req
 				return domain.StartResponse{}, nil
 			}}
-			ctrl := NewInstallController(lifecycle, users)
+			ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
 
 			res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
 				CatalogId:      "catalog",
@@ -99,16 +101,65 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 	}
 }
 
-func TestMapSetServiceSuspendedError(t *testing.T) {
-	assert.IsType(t, &api.SetServiceSuspendedNotFound{}, mapSetServiceSuspendedError(domain.ErrNotFound))
-	assert.IsType(
-		t,
-		&api.SetServiceSuspendedUnprocessableEntity{},
-		mapSetServiceSuspendedError(domain.ErrNotSupported),
-	)
-	assert.IsType(
-		t,
-		&api.SetServiceSuspendedInternalServerError{},
-		mapSetServiceSuspendedError(errors.New("unexpected")),
-	)
+func TestInstallServiceDeniesForeignNamespace(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	lifecycle := &lifecycleStub{start: func(
+		_ context.Context,
+		req domain.StartRequest,
+	) (domain.StartResponse, error) {
+		t.Fatal("use case must not run when the namespace is not the caller's")
+		return domain.StartResponse{}, nil
+	}}
+	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+
+	res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
+		CatalogId:   "catalog",
+		PackageName: "jupyter",
+		Options:     api.ServiceInstallRequestOptions{},
+		Name:        "display-name",
+	}, api.InstallServiceParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "user-bob",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestDeleteServiceDeniesForeignNamespace(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	lifecycle := &lifecycleStub{}
+	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+
+	res, err := ctrl.DeleteService(ctx, api.DeleteServiceParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "projet-other-team",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestInstallServiceWrapsUnexpectedNotFoundAsInvalidInput(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	lifecycle := &lifecycleStub{start: func(
+		context.Context,
+		domain.StartRequest,
+	) (domain.StartResponse, error) {
+		return domain.StartResponse{}, domain.ErrNotFound
+	}}
+	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+
+	res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
+		CatalogId:   "catalog",
+		PackageName: "jupyter",
+		Options:     api.ServiceInstallRequestOptions{},
+		Name:        "display-name",
+	}, api.InstallServiceParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "user-alice",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }

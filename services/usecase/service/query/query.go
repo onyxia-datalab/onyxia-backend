@@ -8,6 +8,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 type Reader struct {
@@ -15,6 +16,7 @@ type Reader struct {
 	helm       ports.ReleaseGateway
 	pods       ports.WorkloadStateGateway
 	userReader usercontext.UsernameGetter
+	namespaces namespace.Authorizer
 }
 
 var _ domain.ServiceQuery = (*Reader)(nil)
@@ -24,21 +26,39 @@ func NewReader(
 	helm ports.ReleaseGateway,
 	pods ports.WorkloadStateGateway,
 	userReader usercontext.UsernameGetter,
+	namespaces namespace.Authorizer,
 ) *Reader {
-	return &Reader{secrets: secrets, helm: helm, pods: pods, userReader: userReader}
+	return &Reader{
+		secrets:    secrets,
+		helm:       helm,
+		pods:       pods,
+		userReader: userReader,
+		namespaces: namespaces,
+	}
 }
 
 // GetService returns the full service state including error details.
+// It applies the same visibility rule as ListServices: a service the caller
+// cannot see is reported as ErrNotFound, so a direct GetService call can't
+// be used to bypass the filtering ListServices already applies.
 func (uc *Reader) GetService(
 	ctx context.Context,
 	namespace, releaseID string,
 ) (domain.Service, error) {
+	username, _ := uc.userReader.GetUsername(ctx)
+
 	secretData, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.Service{}, domain.ErrNotFound
 		}
 		return domain.Service{}, fmt.Errorf("read secret: %w", err)
+	}
+
+	owner := string(secretData["owner"])
+	share := string(secretData["share"]) == "true"
+	if !uc.namespaces.CanAccessService(username, namespace, owner, share) {
+		return domain.Service{}, domain.ErrNotFound
 	}
 
 	status, svcErr, err := uc.deriveStatusWithDetail(ctx, namespace, releaseID)
@@ -50,15 +70,16 @@ func (uc *Reader) GetService(
 		ReleaseID:    releaseID,
 		Namespace:    namespace,
 		FriendlyName: string(secretData["friendlyName"]),
-		Owner:        string(secretData["owner"]),
+		Owner:        owner,
 		CatalogID:    string(secretData["catalog"]),
-		Share:        string(secretData["share"]) == "true",
+		Share:        share,
 		Status:       status,
 		Error:        svcErr,
 	}, nil
 }
 
-// ListServices returns services visible to the current user: owned by them or shared.
+// ListServices returns services visible to the current user
+// (see namespace.Authorizer.CanAccessService).
 // Pod queries are skipped — status is derived from the Helm release state only.
 func (uc *Reader) ListServices(
 	ctx context.Context,
@@ -81,7 +102,7 @@ func (uc *Reader) ListServices(
 			}
 			return nil, err
 		}
-		if svc.Owner != username && !svc.Share {
+		if !uc.namespaces.CanAccessService(username, namespace, svc.Owner, svc.Share) {
 			continue
 		}
 		services = append(services, svc)

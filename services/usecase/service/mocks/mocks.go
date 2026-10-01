@@ -59,7 +59,15 @@ type MockOnyxiaSecretGateway struct{ mock.Mock }
 
 var _ ports.OnyxiaSecretGateway = (*MockOnyxiaSecretGateway)(nil)
 
-func (m *MockOnyxiaSecretGateway) EnsureOnyxiaSecret(
+func (m *MockOnyxiaSecretGateway) CreateOnyxiaSecret(
+	ctx context.Context,
+	namespace, name string,
+	data map[string][]byte,
+) error {
+	return m.Called(ctx, namespace, name, data).Error(0)
+}
+
+func (m *MockOnyxiaSecretGateway) UpdateOnyxiaSecret(
 	ctx context.Context,
 	namespace, name string,
 	data map[string][]byte,
@@ -141,6 +149,64 @@ func (m *MockCatalogRepository) GetPackageSchema(
 		return res.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+type MockCatalogService struct{ mock.Mock }
+
+var _ domain.CatalogService = (*MockCatalogService)(nil)
+
+func (m *MockCatalogService) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, error) {
+	args := m.Called(ctx)
+	if v := args.Get(0); v != nil {
+		return v.([]domain.Catalog), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockCatalogService) ListUserCatalogs(ctx context.Context) ([]domain.Catalog, error) {
+	args := m.Called(ctx)
+	if v := args.Get(0); v != nil {
+		return v.([]domain.Catalog), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockCatalogService) GetPackage(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) (domain.Package, error) {
+	args := m.Called(ctx, catalogID, packageName)
+	return args.Get(0).(domain.Package), args.Error(1)
+}
+
+func (m *MockCatalogService) GetAvailableVersions(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) ([]string, error) {
+	args := m.Called(ctx, catalogID, packageName)
+	if v := args.Get(0); v != nil {
+		return v.([]string), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockCatalogService) GetPackageSchema(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+	version string,
+) ([]byte, error) {
+	args := m.Called(ctx, catalogID, packageName, version)
+	if v := args.Get(0); v != nil {
+		return v.([]byte), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockCatalogService) CheckSharingAllowed(ctx context.Context, catalogID string) error {
+	return m.Called(ctx, catalogID).Error(0)
 }
 
 type MockWorkloadStateGateway struct{ mock.Mock }

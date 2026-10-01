@@ -31,12 +31,11 @@ func NewOnyxiaSecretGtw(client kubernetes.Interface) *K8sOnyxiaSecretGateway {
 	return &K8sOnyxiaSecretGateway{client: client}
 }
 
-func (g *K8sOnyxiaSecretGateway) EnsureOnyxiaSecret(
+func (g *K8sOnyxiaSecretGateway) CreateOnyxiaSecret(
 	ctx context.Context,
 	namespace, name string,
 	data map[string][]byte,
 ) error {
-
 	if data == nil {
 		data = map[string][]byte{}
 	}
@@ -53,21 +52,28 @@ func (g *K8sOnyxiaSecretGateway) EnsureOnyxiaSecret(
 	}
 
 	_, err := g.client.CoreV1().Secrets(namespace).Create(ctx, sec, metav1.CreateOptions{})
-	if err == nil {
-		return nil
+	if apierrors.IsAlreadyExists(err) {
+		return domain.ErrAlreadyExists
 	}
-	if !apierrors.IsAlreadyExists(err) {
-		return err
+	return err
+}
+
+func (g *K8sOnyxiaSecretGateway) UpdateOnyxiaSecret(
+	ctx context.Context,
+	namespace, name string,
+	data map[string][]byte,
+) error {
+	if data == nil {
+		data = map[string][]byte{}
 	}
+
+	fullName := buildOnyxiaSecretName(name)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		cur, getErr := g.client.CoreV1().Secrets(namespace).Get(ctx, fullName, metav1.GetOptions{})
 		if getErr != nil {
 			if apierrors.IsNotFound(getErr) {
-				_, cErr := g.client.CoreV1().
-					Secrets(namespace).
-					Create(ctx, sec, metav1.CreateOptions{})
-				return cErr
+				return domain.ErrNotFound
 			}
 			return getErr
 		}

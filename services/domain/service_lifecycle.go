@@ -21,16 +21,19 @@ type StartResponse struct {
 }
 
 type SuspendRequest struct {
+	Username    string
 	ReleaseName string
 	Namespace   string
 }
 
 type ResumeRequest struct {
+	Username    string
 	ReleaseName string
 	Namespace   string
 }
 
 type DeleteRequest struct {
+	Username    string
 	ReleaseName string
 	Namespace   string
 }

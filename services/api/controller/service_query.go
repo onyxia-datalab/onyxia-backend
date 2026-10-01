@@ -8,18 +8,25 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 type ServiceQueryController struct {
-	serviceQuery domain.ServiceQuery
-	userGetter   usercontext.UserGetter
+	serviceQuery   domain.ServiceQuery
+	userGetter     usercontext.UserGetter
+	namespaceAuthz namespace.Authorizer
 }
 
 func NewServiceQueryController(
 	serviceQuery domain.ServiceQuery,
 	userGetter usercontext.UserGetter,
+	namespaceAuthz namespace.Authorizer,
 ) *ServiceQueryController {
-	return &ServiceQueryController{serviceQuery: serviceQuery, userGetter: userGetter}
+	return &ServiceQueryController{
+		serviceQuery:   serviceQuery,
+		userGetter:     userGetter,
+		namespaceAuthz: namespaceAuthz,
+	}
 }
 
 func (c *ServiceQueryController) GetService(
@@ -28,16 +35,23 @@ func (c *ServiceQueryController) GetService(
 ) (api.GetServiceRes, error) {
 	u, ok := c.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		return &api.GetServiceForbidden{}, errors.New("user not found")
+		return nil, domain.ErrForbidden
+	}
+
+	if !c.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
 	}
 
 	svc, err := c.serviceQuery.GetService(ctx, params.XOnyxiaProject, params.ReleaseId)
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return &api.GetServiceNotFound{}, nil
+		if !errors.Is(err, domain.ErrNotFound) {
+			slog.ErrorContext(ctx, "get service failed", slog.Any("error", err))
 		}
-		slog.ErrorContext(ctx, "get service failed", slog.Any("error", err))
-		return &api.GetServiceInternalServerError{}, err
+		return nil, err
 	}
 
 	return toAPIService(svc), nil
@@ -49,13 +63,21 @@ func (c *ServiceQueryController) ListServices(
 ) (api.ListServicesRes, error) {
 	u, ok := c.userGetter.GetUser(ctx)
 	if !ok || u == nil {
-		return &api.ListServicesForbidden{}, errors.New("user not found")
+		return nil, domain.ErrForbidden
+	}
+
+	if !c.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
 	}
 
 	svcs, err := c.serviceQuery.ListServices(ctx, params.XOnyxiaProject)
 	if err != nil {
 		slog.ErrorContext(ctx, "list services failed", slog.Any("error", err))
-		return &api.ListServicesInternalServerError{}, err
+		return nil, err
 	}
 
 	result := make(api.ListServicesOKApplicationJSON, 0, len(svcs))

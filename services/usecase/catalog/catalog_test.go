@@ -260,6 +260,125 @@ func TestGetPackage_RepoError(t *testing.T) {
 	assert.Equal(t, domain.Package{}, result)
 }
 
+// ❌ GetPackage — restricted catalog the caller can't access is hidden as ErrNotFound,
+// same as it would be omitted from ListUserCatalogs. This is what makes
+// restrictions apply to direct access, not just to browsing.
+func TestGetPackage_RestrictedCatalogDenied(t *testing.T) {
+	restrictedUser := &usercontext.User{
+		Username:   "test-user",
+		Attributes: map[string]any{"groups": []string{"other-team"}},
+	}
+	cfgs := []env.CatalogConfig{
+		{
+			ID: "restricted-dev",
+			Restrictions: []env.Restriction{
+				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			},
+		},
+	}
+	uc, ctx, repo := setupCatalogUsecase(t, restrictedUser, cfgs)
+
+	result, err := uc.GetPackage(ctx, "restricted-dev", "my-chart")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Equal(t, domain.Package{}, result)
+	repo.AssertNotCalled(t, "GetPackage", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestGetAvailableVersions_RestrictedCatalogDenied(t *testing.T) {
+	restrictedUser := &usercontext.User{
+		Username:   "test-user",
+		Attributes: map[string]any{"groups": []string{"other-team"}},
+	}
+	cfgs := []env.CatalogConfig{
+		{
+			ID: "restricted-dev",
+			Restrictions: []env.Restriction{
+				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			},
+		},
+	}
+	uc, ctx, repo := setupCatalogUsecase(t, restrictedUser, cfgs)
+
+	result, err := uc.GetAvailableVersions(ctx, "restricted-dev", "my-chart")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Nil(t, result)
+	repo.AssertNotCalled(t, "GetAvailableVersions", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestGetPackageSchema_RestrictedCatalogDenied(t *testing.T) {
+	restrictedUser := &usercontext.User{
+		Username:   "test-user",
+		Attributes: map[string]any{"groups": []string{"other-team"}},
+	}
+	cfgs := []env.CatalogConfig{
+		{
+			ID: "restricted-dev",
+			Restrictions: []env.Restriction{
+				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			},
+		},
+	}
+	uc, ctx, repo := setupCatalogUsecase(t, restrictedUser, cfgs)
+
+	result, err := uc.GetPackageSchema(ctx, "restricted-dev", "my-chart", "1.0.0")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.Nil(t, result)
+	repo.AssertNotCalled(t, "GetPackageSchema", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// --- CheckSharingAllowed -----------------------------------------------------
+
+func TestCheckSharingAllowed_Allowed(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog", AllowSharing: true}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	err := uc.CheckSharingAllowed(ctx, "my-catalog")
+
+	assert.NoError(t, err)
+}
+
+func TestCheckSharingAllowed_Denied(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog", AllowSharing: false}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	err := uc.CheckSharingAllowed(ctx, "my-catalog")
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestCheckSharingAllowed_CatalogNotFound(t *testing.T) {
+	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+
+	err := uc.CheckSharingAllowed(ctx, "unknown-catalog")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestCheckSharingAllowed_RestrictedCatalogDenied(t *testing.T) {
+	restrictedUser := &usercontext.User{
+		Username:   "test-user",
+		Attributes: map[string]any{"groups": []string{"other-team"}},
+	}
+	cfgs := []env.CatalogConfig{
+		{
+			ID:           "restricted-dev",
+			AllowSharing: true,
+			Restrictions: []env.Restriction{
+				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			},
+		},
+	}
+	uc, ctx, _ := setupCatalogUsecase(t, restrictedUser, cfgs)
+
+	err := uc.CheckSharingAllowed(ctx, "restricted-dev")
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+}
+
 // ✅ GetPackageSchema returns the schema bytes when found.
 func TestGetPackageSchema_Found(t *testing.T) {
 	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}

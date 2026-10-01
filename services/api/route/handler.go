@@ -65,7 +65,6 @@ func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, erro
 	return h.catalogs.GetMyCatalogs(ctx)
 }
 
-// Keep stubs explicit until implemented (or embed api.UnimplementedHandler if you prefer 501s)
 func (h *Handler) WatchRelease(
 	ctx context.Context,
 	p api.WatchReleaseParams,

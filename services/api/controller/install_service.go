@@ -10,27 +10,26 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
-const (
-	userNotFoundMessage          = "user not found"
-	userNotFoundInContextMessage = userNotFoundMessage + " in context"
-)
-
-var errUserNotFound = errors.New(userNotFoundMessage)
+const userNotFoundInContextMessage = "user not found in context"
 
 type InstallController struct {
 	serviceLifecycleUc domain.ServiceLifecycle
 	userGetter         usercontext.UserGetter
+	namespaceAuthz     namespace.Authorizer
 }
 
 func NewInstallController(
 	serviceLifecycleUc domain.ServiceLifecycle,
 	userGetter usercontext.UserGetter,
+	namespaceAuthz namespace.Authorizer,
 ) *InstallController {
 	return &InstallController{
 		serviceLifecycleUc: serviceLifecycleUc,
 		userGetter:         userGetter,
+		namespaceAuthz:     namespaceAuthz,
 	}
 }
 
@@ -42,41 +41,40 @@ func (ic *InstallController) SetServiceSuspended(
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
 		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return &api.SetServiceSuspendedForbidden{}, errUserNotFound
+		return nil, domain.ErrForbidden
+	}
+
+	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
 	}
 
 	if req.Suspended {
 		suspendReq := domain.SuspendRequest{
+			Username:    u.Username,
 			ReleaseName: params.ReleaseId,
 			Namespace:   params.XOnyxiaProject,
 		}
 		if err := ic.serviceLifecycleUc.Suspend(ctx, suspendReq); err != nil {
 			slog.ErrorContext(ctx, "suspend failed", slog.Any("error", err))
-			return mapSetServiceSuspendedError(err), err
+			return nil, err
 		}
 	} else {
 		resumeReq := domain.ResumeRequest{
+			Username:    u.Username,
 			ReleaseName: params.ReleaseId,
 			Namespace:   params.XOnyxiaProject,
 		}
 		if err := ic.serviceLifecycleUc.Resume(ctx, resumeReq); err != nil {
 			slog.ErrorContext(ctx, "resume failed", slog.Any("error", err))
-			return mapSetServiceSuspendedError(err), err
+			return nil, err
 		}
 	}
 
 	return &api.SetServiceSuspendedNoContent{}, nil
-}
-
-func mapSetServiceSuspendedError(err error) api.SetServiceSuspendedRes {
-	switch {
-	case errors.Is(err, domain.ErrNotFound):
-		return &api.SetServiceSuspendedNotFound{}
-	case errors.Is(err, domain.ErrNotSupported):
-		return &api.SetServiceSuspendedUnprocessableEntity{}
-	default:
-		return &api.SetServiceSuspendedInternalServerError{}
-	}
 }
 
 func (ic *InstallController) DeleteService(
@@ -86,17 +84,26 @@ func (ic *InstallController) DeleteService(
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
 		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return &api.DeleteServiceForbidden{}, errUserNotFound
+		return nil, domain.ErrForbidden
+	}
+
+	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
 	}
 
 	req := domain.DeleteRequest{
+		Username:    u.Username,
 		ReleaseName: params.ReleaseId,
 		Namespace:   params.XOnyxiaProject,
 	}
 
 	if err := ic.serviceLifecycleUc.Delete(ctx, req); err != nil {
 		slog.ErrorContext(ctx, "delete failed", slog.Any("error", err))
-		return &api.DeleteServiceInternalServerError{}, err
+		return nil, err
 	}
 
 	return &api.DeleteServiceNoContent{}, nil
@@ -111,20 +118,28 @@ func (ic *InstallController) InstallService(
 	u, ok := ic.userGetter.GetUser(ctx)
 	if !ok || u == nil {
 		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return &api.InstallServiceForbidden{}, errUserNotFound
+		return nil, domain.ErrForbidden
+	}
+
+	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
 	}
 
 	if req == nil {
-		return &api.InstallServiceBadRequest{}, errors.New("request body is required")
+		return nil, fmt.Errorf("%w: request body is required", domain.ErrInvalidInput)
 	}
 	if req.PackageName == "" {
-		return &api.InstallServiceBadRequest{}, errors.New("packageName is required")
+		return nil, fmt.Errorf("%w: packageName is required", domain.ErrInvalidInput)
 	}
 	if req.CatalogId == "" {
-		return &api.InstallServiceBadRequest{}, errors.New("catalogId is required")
+		return nil, fmt.Errorf("%w: catalogId is required", domain.ErrInvalidInput)
 	}
 	if req.Options == nil {
-		return &api.InstallServiceBadRequest{}, errors.New("options are required")
+		return nil, fmt.Errorf("%w: options are required", domain.ErrInvalidInput)
 	}
 
 	version := req.PackageVersion.Or(req.Version.Or(""))
@@ -134,11 +149,7 @@ func (ic *InstallController) InstallService(
 	for k, raw := range req.Options {
 		var v interface{}
 		if err := json.Unmarshal(raw, &v); err != nil {
-			return &api.InstallServiceBadRequest{}, fmt.Errorf(
-				"unmarshal values[%q]: %w",
-				k,
-				err,
-			)
+			return nil, fmt.Errorf("%w: unmarshal values[%q]: %s", domain.ErrInvalidInput, k, err)
 		}
 		values[k] = v
 	}
@@ -160,17 +171,14 @@ func (ic *InstallController) InstallService(
 	_, err := ic.serviceLifecycleUc.Start(ctx, dreq)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, domain.ErrInvalidInput):
-			return &api.InstallServiceBadRequest{}, err
-		case errors.Is(err, domain.ErrForbidden):
-			return &api.InstallServiceForbidden{}, err
-		case errors.Is(err, domain.ErrAlreadyExists):
-			return &api.InstallServiceConflict{}, err
-		default:
-			slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
-			return &api.InstallServiceInternalServerError{}, err
+		slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
+		if errors.Is(err, domain.ErrNotFound) {
+			// installService has no 404 response in the spec: a missing or
+			// restricted-but-hidden catalog/package is reported as a bad
+			// request instead.
+			err = fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
 		}
+		return nil, err
 	}
 
 	// Success: 202 Accepted + headers/body per ogen schema.

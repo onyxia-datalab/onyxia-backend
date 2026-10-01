@@ -1,25 +1,11 @@
 package route
 
 import (
-	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
-func SetupCatalogController(app *bootstrap.Application, helmClient *helm.Client) (*controller.CatalogController, error) {
-
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, helmClient)
-	if err != nil {
-		return nil, err
-	}
-
-	catalogUc := catalog.NewCatalogService(
-		app.Env.CatalogsConfig,
-		app.Env.Schemas,
-		pkgRepo,
-		app.UserContextReader,
-	)
-
-	return controller.NewCatalogController(catalogUc, app.UserContextReader), nil
+func SetupCatalogController(catalogUc domain.CatalogService, app *bootstrap.Application) *controller.CatalogController {
+	return controller.NewCatalogController(catalogUc, app.UserContextReader)
 }

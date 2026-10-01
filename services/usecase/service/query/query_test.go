@@ -8,6 +8,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -30,14 +31,16 @@ func setupReader(t *testing.T, username string) (*Reader, context.Context, query
 		pods:    new(mocks.MockWorkloadStateGateway),
 	}
 	ctx, reader, _ := usercontext.NewTestUserContext(&usercontext.User{Username: username})
-	uc := NewReader(m.secrets, m.helm, m.pods, reader)
+	uc := NewReader(m.secrets, m.helm, m.pods, reader, namespace.NewAuthorizer("user-", "projet-"))
 	return uc, ctx, m
 }
 
 const (
-	testNamespace = "user-alice"
-	testRelease   = "jupyter-abc"
-	testUsername  = "alice"
+	// A group namespace: the owner/share filter only applies there.
+	testNamespace     = "projet-data-team"
+	personalNamespace = "user-alice"
+	testRelease       = "jupyter-abc"
+	testUsername      = "alice"
 )
 
 func secretData(owner string, share bool) map[string][]byte {
@@ -152,6 +155,67 @@ func TestGetService_SecretReadError(t *testing.T) {
 	assert.ErrorContains(t, err, "k8s unavailable")
 }
 
+func TestGetService_DeniesUnownedUnshared(t *testing.T) {
+	uc, ctx, m := setupReader(t, testUsername)
+
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
+		Return(secretData("someone-else", false), nil)
+
+	_, err := uc.GetService(ctx, testNamespace, testRelease)
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	m.helm.AssertNotCalled(t, "GetReleaseState")
+}
+
+func TestGetService_AllowsSharedFromOtherOwner(t *testing.T) {
+	uc, ctx, m := setupReader(t, testUsername)
+
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
+		Return(secretData("someone-else", true), nil)
+	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
+		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
+		Return([]ports.PodInfo{}, nil)
+
+	svc, err := uc.GetService(ctx, testNamespace, testRelease)
+
+	require.NoError(t, err)
+	assert.Equal(t, "someone-else", svc.Owner)
+	assert.True(t, svc.Share)
+}
+
+func TestGetService_AllowsOwnerCaseInsensitive(t *testing.T) {
+	uc, ctx, m := setupReader(t, testUsername)
+
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
+		Return(secretData("ALICE", false), nil)
+	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
+		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
+		Return([]ports.PodInfo{}, nil)
+
+	svc, err := uc.GetService(ctx, testNamespace, testRelease)
+
+	require.NoError(t, err)
+	assert.Equal(t, "ALICE", svc.Owner)
+}
+
+func TestGetService_PersonalNamespaceShowsAnyOwner(t *testing.T) {
+	uc, ctx, m := setupReader(t, testUsername)
+
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, personalNamespace, testRelease).
+		Return(secretData("someone-else", false), nil)
+	m.helm.On("GetReleaseState", mock.Anything, personalNamespace, testRelease).
+		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+	m.pods.On("GetPodsForRelease", mock.Anything, personalNamespace, testRelease).
+		Return([]ports.PodInfo{}, nil)
+
+	svc, err := uc.GetService(ctx, personalNamespace, testRelease)
+
+	require.NoError(t, err)
+	assert.Equal(t, "someone-else", svc.Owner)
+}
+
 func TestGetService_FieldsMappedFromSecret(t *testing.T) {
 	uc, ctx, m := setupReader(t, testUsername)
 
@@ -258,6 +322,27 @@ func TestListServices_IncludesSharedServiceFromOtherOwner(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, svcs, 1)
 	assert.Equal(t, "svc-bob-shared", svcs[0].ReleaseID)
+}
+
+func TestListServices_PersonalNamespaceShowsAnyOwner(t *testing.T) {
+	uc, ctx, m := setupReader(t, testUsername)
+
+	m.secrets.On("ListOnyxiaSecretNames", mock.Anything, personalNamespace).
+		Return([]string{"svc-legacy"}, nil)
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, personalNamespace, "svc-legacy").
+		Return(secretData("legacy-owner", false), nil)
+	m.helm.On("GetReleaseState", mock.Anything, personalNamespace, "svc-legacy").
+		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+	m.helm.On("GetReleaseResources", mock.Anything, personalNamespace, "svc-legacy").
+		Return([]ports.ManifestResource{}, nil)
+	m.pods.On("GetControllerReadiness", mock.Anything, personalNamespace, mock.Anything).
+		Return(true, nil)
+
+	svcs, err := uc.ListServices(ctx, personalNamespace)
+
+	require.NoError(t, err)
+	require.Len(t, svcs, 1)
+	assert.Equal(t, "svc-legacy", svcs[0].ReleaseID)
 }
 
 func TestListServices_SkipsSecretDisappearedRace(t *testing.T) {

@@ -48,52 +48,64 @@ func (uc *Catalog) ListUserCatalogs(
 	ctx context.Context,
 ) ([]domain.Catalog, error) {
 	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
-		if len(c.Restrictions) == 0 {
-			return true
+		return uc.isAccessible(ctx, c)
+	})
+}
+
+// isAccessible reports whether the current caller may see or use the given
+// catalog. A catalog with no restrictions is public. A restricted catalog
+// requires at least one restriction to match a user attribute.
+//
+// This must be applied on every path that reaches a catalog or its packages
+// directly (GetPackage, GetAvailableVersions, GetPackageSchema, install), not
+// just on the listing endpoints — otherwise restrictions only hide a
+// catalog from the UI without actually protecting it.
+func (uc *Catalog) isAccessible(ctx context.Context, c env.CatalogConfig) bool {
+	if len(c.Restrictions) == 0 {
+		return true
+	}
+
+	attrs, ok := uc.userReader.GetAttributes(ctx)
+	if !ok {
+		return false
+	}
+
+	for _, r := range c.Restrictions {
+		if r.UserAttributeKey == "" || r.Match == "" {
+			continue
 		}
 
-		attrs, ok := uc.userReader.GetAttributes(ctx)
+		val, ok := attrs[r.UserAttributeKey]
 		if !ok {
-			return false
+			continue
 		}
 
-		for _, r := range c.Restrictions {
-			if r.UserAttributeKey == "" || r.Match == "" {
-				continue
-			}
+		re, err := regexp.Compile(r.Match)
+		if err != nil {
+			continue
+		}
 
-			val, ok := attrs[r.UserAttributeKey]
-			if !ok {
-				continue
+		switch v := val.(type) {
+		case string:
+			if re.MatchString(v) {
+				return true
 			}
-
-			re, err := regexp.Compile(r.Match)
-			if err != nil {
-				continue
-			}
-
-			switch v := val.(type) {
-			case string:
-				if re.MatchString(v) {
+		case []string:
+			for _, s := range v {
+				if re.MatchString(s) {
 					return true
 				}
-			case []string:
-				for _, s := range v {
-					if re.MatchString(s) {
-						return true
-					}
-				}
-			case []any:
-				for _, s := range v {
-					if str, ok := s.(string); ok && re.MatchString(str) {
-						return true
-					}
+			}
+		case []any:
+			for _, s := range v {
+				if str, ok := s.(string); ok && re.MatchString(str) {
+					return true
 				}
 			}
 		}
+	}
 
-		return false
-	})
+	return false
 }
 
 func (uc *Catalog) GetPackageSchema(
@@ -102,7 +114,7 @@ func (uc *Catalog) GetPackageSchema(
 	packageName string,
 	version string,
 ) ([]byte, error) {
-	cfg, err := uc.findCatalog(catalogID)
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
 	if err != nil {
 		return nil, err
 	}
@@ -128,12 +140,28 @@ func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
 	return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
 }
 
+// findAccessibleCatalog resolves catalogID and enforces its restrictions.
+// A restricted catalog the caller doesn't satisfy is reported as ErrNotFound,
+// the same way it is simply omitted from ListUserCatalogs — this must be used
+// on every direct-access path (get package, versions, schema, install), not
+// just on listing, otherwise restrictions are cosmetic.
+func (uc *Catalog) findAccessibleCatalog(ctx context.Context, catalogID string) (*env.CatalogConfig, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if !uc.isAccessible(ctx, *cfg) {
+		return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
+	}
+	return cfg, nil
+}
+
 func (uc *Catalog) GetPackage(
 	ctx context.Context,
 	catalogID string,
 	packageName string,
 ) (domain.Package, error) {
-	cfg, err := uc.findCatalog(catalogID)
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
 	if err != nil {
 		return domain.Package{}, err
 	}
@@ -154,7 +182,7 @@ func (uc *Catalog) GetAvailableVersions(
 	catalogID string,
 	packageName string,
 ) ([]string, error) {
-	cfg, err := uc.findCatalog(catalogID)
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +200,20 @@ func (uc *Catalog) GetAvailableVersions(
 		return nil, err
 	}
 	return filter.apply(versions), nil
+}
+
+// CheckSharingAllowed returns ErrForbidden if catalogID does not allow
+// installed services to be shared. Restricted catalogs the caller cannot
+// access are reported as ErrNotFound, same as GetPackage.
+func (uc *Catalog) CheckSharingAllowed(ctx context.Context, catalogID string) error {
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
+	if err != nil {
+		return err
+	}
+	if !cfg.AllowSharing {
+		return fmt.Errorf("%w: catalog %q does not allow sharing", domain.ErrForbidden, catalogID)
+	}
+	return nil
 }
 
 func (uc *Catalog) buildCatalogs(

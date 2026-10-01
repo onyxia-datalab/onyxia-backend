@@ -2,18 +2,21 @@ package lifecycle
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 type Lifecycle struct {
-	secrets ports.OnyxiaSecretGateway
-	helm    ports.ReleaseGateway
-	pkgRepo ports.PackageRepository
+	secrets    ports.OnyxiaSecretGateway
+	helm       ports.ReleaseGateway
+	catalogSvc domain.CatalogService
+	namespaces namespace.Authorizer
 }
 
 var _ domain.ServiceLifecycle = (*Lifecycle)(nil)
@@ -21,9 +24,10 @@ var _ domain.ServiceLifecycle = (*Lifecycle)(nil)
 func NewLifecycle(
 	secrets ports.OnyxiaSecretGateway,
 	helm ports.ReleaseGateway,
-	pkgRepo ports.PackageRepository,
+	catalogSvc domain.CatalogService,
+	namespaces namespace.Authorizer,
 ) *Lifecycle {
-	return &Lifecycle{secrets: secrets, helm: helm, pkgRepo: pkgRepo}
+	return &Lifecycle{secrets: secrets, helm: helm, catalogSvc: catalogSvc, namespaces: namespaces}
 }
 
 func (uc *Lifecycle) Start(
@@ -31,9 +35,33 @@ func (uc *Lifecycle) Start(
 	req domain.StartRequest,
 ) (domain.StartResponse, error) {
 
-	pkg, err := uc.pkgRepo.GetPackage(ctx, req.CatalogID, req.PackageName)
+	// Go through the catalog use case rather than the raw package repository
+	// so catalog restrictions apply to installs, not just to browsing.
+	pkg, err := uc.catalogSvc.GetPackage(ctx, req.CatalogID, req.PackageName)
 	if err != nil {
 		return domain.StartResponse{}, fmt.Errorf("get package: %w", err)
+	}
+
+	if req.Share {
+		if err := uc.catalogSvc.CheckSharingAllowed(ctx, req.CatalogID); err != nil {
+			return domain.StartResponse{}, fmt.Errorf("check sharing allowed: %w", err)
+		}
+	}
+
+	// The Helm check catches pre-existing releases. CreateOnyxiaSecret below
+	// is the atomic reservation that also protects the interval until Helm
+	// creates its release.
+	state, err := uc.helm.GetReleaseState(ctx, req.Namespace, req.ReleaseID)
+	if err != nil {
+		return domain.StartResponse{}, fmt.Errorf("get release state: %w", err)
+	}
+	if state.Exists {
+		return domain.StartResponse{}, fmt.Errorf(
+			"%w: release %q already exists in namespace %q",
+			domain.ErrAlreadyExists,
+			req.ReleaseID,
+			req.Namespace,
+		)
 	}
 
 	secretData := map[string][]byte{
@@ -43,7 +71,7 @@ func (uc *Lifecycle) Start(
 		"share":        []byte(strconv.FormatBool(req.Share)),
 	}
 
-	if err := uc.secrets.EnsureOnyxiaSecret(ctx, req.Namespace, req.ReleaseID, secretData); err != nil {
+	if err := uc.secrets.CreateOnyxiaSecret(ctx, req.Namespace, req.ReleaseID, secretData); err != nil {
 		return domain.StartResponse{}, fmt.Errorf("create onyxia secret: %w", err)
 	}
 
@@ -81,15 +109,46 @@ func (uc *Lifecycle) Start(
 	return domain.StartResponse{}, nil
 }
 
+// authorize enforces the same owner/share rule as the query side: a caller
+// may only act on a service they can see. A service they can't see is
+// reported as ErrNotFound, exactly as GetService does. The backend talks to
+// Kubernetes with its own service account, so nothing downstream enforces
+// this per user.
+func (uc *Lifecycle) authorize(ctx context.Context, username, namespace, releaseName string) error {
+	data, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseName)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+		}
+		return fmt.Errorf("read onyxia secret: %w", err)
+	}
+
+	owner := string(data["owner"])
+	share := string(data["share"]) == "true"
+	if !uc.namespaces.CanAccessService(username, namespace, owner, share) {
+		return fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+	}
+	return nil
+}
+
 func (uc *Lifecycle) Suspend(ctx context.Context, req domain.SuspendRequest) error {
+	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+		return err
+	}
 	return uc.helm.SuspendRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Resume(ctx context.Context, req domain.ResumeRequest) error {
+	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+		return err
+	}
 	return uc.helm.ResumeRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error {
+	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+		return err
+	}
 	if err := uc.helm.UninstallRelease(ctx, req.Namespace, req.ReleaseName); err != nil {
 		return fmt.Errorf("helm uninstall: %w", err)
 	}
