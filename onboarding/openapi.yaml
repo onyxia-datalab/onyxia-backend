@@ -24,12 +24,30 @@ paths:
         "200":
           description: OK
         "401":
-          description: Unauthorized
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Forbidden
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
       security:
         - oidc: []
 components:
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    InternalError:
+      description: Internal server error
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
   schemas:
     OnboardingRequest:
       type: object
@@ -37,6 +55,15 @@ components:
         group:
           type: string
       description: Specification on which namespace to create
+    Problem:
+      type: object
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+      additionalProperties: true
   securitySchemes:
     oidc:
       type: http

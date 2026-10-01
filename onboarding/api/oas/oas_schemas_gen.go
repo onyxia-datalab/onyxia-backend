@@ -4,6 +4,9 @@ package api
 
 import (
 	"net/http"
+	"net/url"
+
+	"github.com/go-faster/jx"
 )
 
 type Oidc struct {
@@ -31,18 +34,20 @@ func (s *Oidc) SetRoles(val []string) {
 	s.Roles = val
 }
 
-// OnboardForbidden is response for Onboard operation.
-type OnboardForbidden struct{}
+type OnboardForbidden Problem
 
 func (*OnboardForbidden) onboardRes() {}
+
+type OnboardInternalServerError Problem
+
+func (*OnboardInternalServerError) onboardRes() {}
 
 // OnboardOK is response for Onboard operation.
 type OnboardOK struct{}
 
 func (*OnboardOK) onboardRes() {}
 
-// OnboardUnauthorized is response for Onboard operation.
-type OnboardUnauthorized struct{}
+type OnboardUnauthorized Problem
 
 func (*OnboardUnauthorized) onboardRes() {}
 
@@ -60,6 +65,52 @@ func (s *OnboardingRequest) GetGroup() OptString {
 // SetGroup sets the value of Group.
 func (s *OnboardingRequest) SetGroup(val OptString) {
 	s.Group = val
+}
+
+// NewOptInt returns new OptInt with value set to v.
+func NewOptInt(v int) OptInt {
+	return OptInt{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInt is optional int.
+type OptInt struct {
+	Value int
+	Set   bool
+}
+
+// IsSet returns true if OptInt was set.
+func (o OptInt) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInt) Reset() {
+	var v int
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInt) SetTo(v int) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInt) Get() (v int, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInt) Or(d int) int {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
 }
 
 // NewOptString returns new OptString with value set to v.
@@ -106,4 +157,131 @@ func (o OptString) Or(d string) string {
 		return v
 	}
 	return d
+}
+
+// NewOptURI returns new OptURI with value set to v.
+func NewOptURI(v url.URL) OptURI {
+	return OptURI{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptURI is optional url.URL.
+type OptURI struct {
+	Value url.URL
+	Set   bool
+}
+
+// IsSet returns true if OptURI was set.
+func (o OptURI) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptURI) Reset() {
+	var v url.URL
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptURI) SetTo(v url.URL) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptURI) Get() (v url.URL, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptURI) Or(d url.URL) url.URL {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// Ref: #/components/schemas/Problem
+type Problem struct {
+	Type            OptURI    `json:"type"`
+	Title           OptString `json:"title"`
+	Status          OptInt    `json:"status"`
+	Detail          OptString `json:"detail"`
+	Instance        OptString `json:"instance"`
+	AdditionalProps ProblemAdditional
+}
+
+// GetType returns the value of Type.
+func (s *Problem) GetType() OptURI {
+	return s.Type
+}
+
+// GetTitle returns the value of Title.
+func (s *Problem) GetTitle() OptString {
+	return s.Title
+}
+
+// GetStatus returns the value of Status.
+func (s *Problem) GetStatus() OptInt {
+	return s.Status
+}
+
+// GetDetail returns the value of Detail.
+func (s *Problem) GetDetail() OptString {
+	return s.Detail
+}
+
+// GetInstance returns the value of Instance.
+func (s *Problem) GetInstance() OptString {
+	return s.Instance
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *Problem) GetAdditionalProps() ProblemAdditional {
+	return s.AdditionalProps
+}
+
+// SetType sets the value of Type.
+func (s *Problem) SetType(val OptURI) {
+	s.Type = val
+}
+
+// SetTitle sets the value of Title.
+func (s *Problem) SetTitle(val OptString) {
+	s.Title = val
+}
+
+// SetStatus sets the value of Status.
+func (s *Problem) SetStatus(val OptInt) {
+	s.Status = val
+}
+
+// SetDetail sets the value of Detail.
+func (s *Problem) SetDetail(val OptString) {
+	s.Detail = val
+}
+
+// SetInstance sets the value of Instance.
+func (s *Problem) SetInstance(val OptString) {
+	s.Instance = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *Problem) SetAdditionalProps(val ProblemAdditional) {
+	s.AdditionalProps = val
+}
+
+type ProblemAdditional map[string]jx.Raw
+
+func (s *ProblemAdditional) init() ProblemAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }

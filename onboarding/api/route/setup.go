@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/apperror"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/middleware"
 	oas "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 
@@ -30,6 +31,7 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 	srv, err := oas.NewServer(
 		handler,
 		auth,
+		oas.WithErrorHandler(apperror.OgenHandler),
 	)
 
 	if err != nil {

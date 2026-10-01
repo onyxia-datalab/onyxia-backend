@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -17,12 +19,39 @@ func encodeOnboardResponse(response OnboardRes, w http.ResponseWriter, span trac
 		return nil
 
 	case *OnboardUnauthorized:
+		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
 
 		return nil
 
 	case *OnboardForbidden:
+		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *OnboardInternalServerError:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(500)
+		span.SetStatus(codes.Error, http.StatusText(500))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
 
 		return nil
 
