@@ -93,7 +93,8 @@ func TestUpdateRetryOnConflict(t *testing.T) {
 
 	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, newData, got.Data)
+	// Update merges: keys not passed in are kept.
+	assert.Equal(t, map[string][]byte{"x": []byte("y"), "owner": []byte("ddecrulle")}, got.Data)
 }
 
 func TestUpdateReturnsNotFoundIfDeletedDuringUpdate(t *testing.T) {

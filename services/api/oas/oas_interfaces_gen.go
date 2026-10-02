@@ -29,6 +29,10 @@ type ListServicesRes interface {
 	listServicesRes()
 }
 
+type SetServiceSharedRes interface {
+	setServiceSharedRes()
+}
+
 type SetServiceSuspendedRes interface {
 	setServiceSuspendedRes()
 }

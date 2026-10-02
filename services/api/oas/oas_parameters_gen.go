@@ -754,6 +754,136 @@ func decodeListServicesParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
+// SetServiceSharedParams is parameters of setServiceShared operation.
+type SetServiceSharedParams struct {
+	// Logical release identifier.
+	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
+}
+
+func unpackSetServiceSharedParams(packed middleware.Parameters) (params SetServiceSharedParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "releaseId",
+			In:   "path",
+		}
+		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
+	}
+	return params
+}
+
+func decodeSetServiceSharedParams(args [1]string, argsEscaped bool, r *http.Request) (params SetServiceSharedParams, _ error) {
+	h := uri.NewHeaderDecoder(r.Header)
+	// Decode path: releaseId.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "releaseId",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.ReleaseId = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+			if err := func() error {
+				if err := (validate.String{
+					MinLength:     1,
+					MinLengthSet:  true,
+					MaxLength:     0,
+					MaxLengthSet:  false,
+					Email:         false,
+					Hostname:      false,
+					Regex:         regexMap["^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"],
+					MinNumeric:    0,
+					MinNumericSet: false,
+					MaxNumeric:    0,
+					MaxNumericSet: false,
+				}).Validate(string(params.ReleaseId)); err != nil {
+					return errors.Wrap(err, "string")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "releaseId",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // SetServiceSuspendedParams is parameters of setServiceSuspended operation.
 type SetServiceSuspendedParams struct {
 	// Logical release identifier.
@@ -888,6 +1018,8 @@ func decodeSetServiceSuspendedParams(args [1]string, argsEscaped bool, r *http.R
 type WatchReleaseParams struct {
 	// Logical release identifier.
 	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
 	// Resume SSE from a specific event id (client reconnection).
 	LastEventID OptString `json:",omitempty,omitzero"`
 }
@@ -899,6 +1031,13 @@ func unpackWatchReleaseParams(packed middleware.Parameters) (params WatchRelease
 			In:   "path",
 		}
 		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -979,6 +1118,40 @@ func decodeWatchReleaseParams(args [1]string, argsEscaped bool, r *http.Request)
 			Err:  err,
 		}
 	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+			Err:  err,
+		}
+	}
 	// Decode header: Last-Event-Id.
 	if err := func() error {
 		cfg := uri.HeaderParameterDecodingConfig{
@@ -1025,6 +1198,8 @@ func decodeWatchReleaseParams(args [1]string, argsEscaped bool, r *http.Request)
 type WatchResourcesParams struct {
 	// Logical release identifier.
 	ReleaseId string
+	// Project identifier in Onyxia (user or group namespace).
+	XOnyxiaProject string
 	// Resume SSE from a specific event id (client reconnection).
 	LastEventID OptString `json:",omitempty,omitzero"`
 }
@@ -1036,6 +1211,13 @@ func unpackWatchResourcesParams(packed middleware.Parameters) (params WatchResou
 			In:   "path",
 		}
 		params.ReleaseId = packed[key].(string)
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "X-Onyxia-Project",
+			In:   "header",
+		}
+		params.XOnyxiaProject = packed[key].(string)
 	}
 	{
 		key := middleware.ParameterKey{
@@ -1113,6 +1295,40 @@ func decodeWatchResourcesParams(args [1]string, argsEscaped bool, r *http.Reques
 		return params, &ogenerrors.DecodeParamError{
 			Name: "releaseId",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	// Decode header: X-Onyxia-Project.
+	if err := func() error {
+		cfg := uri.HeaderParameterDecodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.HasParam(cfg); err == nil {
+			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.XOnyxiaProject = c
+				return nil
+			}); err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "X-Onyxia-Project",
+			In:   "header",
 			Err:  err,
 		}
 	}

@@ -19,6 +19,8 @@ type lifecycleStub struct {
 	suspendErr error
 	resumeErr  error
 	deleteErr  error
+	sharedReq  *domain.SetSharedRequest
+	sharedErr  error
 }
 
 func (s *lifecycleStub) Start(
@@ -41,6 +43,11 @@ func (s *lifecycleStub) Resume(context.Context, domain.ResumeRequest) error {
 
 func (s *lifecycleStub) Delete(context.Context, domain.DeleteRequest) error {
 	return s.deleteErr
+}
+
+func (s *lifecycleStub) SetShared(_ context.Context, req domain.SetSharedRequest) error {
+	s.sharedReq = &req
+	return s.sharedErr
 }
 
 func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) {
@@ -134,6 +141,68 @@ func TestDeleteServiceDeniesForeignNamespace(t *testing.T) {
 	res, err := ctrl.DeleteService(ctx, api.DeleteServiceParams{
 		ReleaseId:      "release-id",
 		XOnyxiaProject: "projet-other-team",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestSetServiceSharedPassesCallerAndFlag(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	lifecycle := &lifecycleStub{}
+	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+
+	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "user-alice",
+	})
+
+	require.NoError(t, err)
+	assert.IsType(t, &api.SetServiceSharedNoContent{}, res)
+	require.NotNil(t, lifecycle.sharedReq)
+	assert.Equal(t, domain.SetSharedRequest{
+		Username:    "alice",
+		ReleaseName: "release-id",
+		Namespace:   "user-alice",
+		Shared:      true,
+	}, *lifecycle.sharedReq)
+}
+
+func TestSetServiceSharedDeniesForeignNamespace(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	lifecycle := &lifecycleStub{}
+	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+
+	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "projet-other-team",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	assert.Nil(t, lifecycle.sharedReq)
+}
+
+func TestSetServiceSharedWithoutUserIsForbidden(t *testing.T) {
+	users, _ := usercontext.NewUserContext()
+	ctrl := NewInstallController(&lifecycleStub{}, users, testNamespaceAuthz)
+
+	res, err := ctrl.SetServiceShared(context.Background(), &api.SetServiceSharedReq{}, api.SetServiceSharedParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "user-alice",
+	})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestSetServiceSharedPropagatesUsecaseError(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	ctrl := NewInstallController(&lifecycleStub{sharedErr: domain.ErrForbidden}, users, testNamespaceAuthz)
+
+	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
+		ReleaseId:      "release-id",
+		XOnyxiaProject: "user-alice",
 	})
 
 	assert.Nil(t, res)

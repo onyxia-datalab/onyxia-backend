@@ -316,7 +316,7 @@ func TestAuthorize_Rules(t *testing.T) {
 			uc, ctx, m := setupLifecycle(t)
 			ownedBy(m, tt.ns, tt.owner, tt.share)
 
-			err := uc.authorize(ctx, "alice", tt.ns, release)
+			_, err := uc.authorize(ctx, "alice", tt.ns, release)
 
 			if tt.allowed {
 				assert.NoError(t, err)
@@ -332,7 +332,7 @@ func TestAuthorize_SecretNotFound(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
 		Return(nil, domain.ErrNotFound)
 
-	err := uc.authorize(ctx, "alice", groupNamespace, release)
+	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
@@ -342,7 +342,7 @@ func TestAuthorize_SecretReadError(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
 		Return(nil, errors.New("k8s unavailable"))
 
-	err := uc.authorize(ctx, "alice", groupNamespace, release)
+	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 	assert.NotErrorIs(t, err, domain.ErrNotFound)
@@ -462,6 +462,96 @@ func TestDelete_SecretError(t *testing.T) {
 		Return(errors.New("k8s unavailable"))
 
 	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+
+	assert.ErrorContains(t, err, "k8s unavailable")
+}
+
+// --- SetShared --------------------------------------------------------------
+
+func sharedReq(shared bool) domain.SetSharedRequest {
+	return domain.SetSharedRequest{
+		Username:    "alice",
+		Namespace:   groupNamespace,
+		ReleaseName: release,
+		Shared:      shared,
+	}
+}
+
+// ownedWithCatalog stubs the onyxia secret including its catalog.
+func ownedWithCatalog(m lifecycleMocks, owner string, share bool) {
+	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
+		Return(map[string][]byte{
+			"owner":   []byte(owner),
+			"share":   []byte(strconv.FormatBool(share)),
+			"catalog": []byte("my-catalog"),
+		}, nil)
+}
+
+func TestSetShared_OwnerShares(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "alice", false)
+	m.catalog.On("CheckSharingAllowed", ctx, "my-catalog").Return(nil)
+	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release,
+		map[string][]byte{"share": []byte("true")}).Return(nil)
+
+	err := uc.SetShared(ctx, sharedReq(true))
+
+	require.NoError(t, err)
+	m.catalog.AssertExpectations(t)
+	m.secrets.AssertExpectations(t)
+}
+
+func TestSetShared_OwnerUnsharesWithoutCatalogCheck(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "ALICE", true)
+	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release,
+		map[string][]byte{"share": []byte("false")}).Return(nil)
+
+	err := uc.SetShared(ctx, sharedReq(false))
+
+	require.NoError(t, err)
+	m.catalog.AssertNotCalled(t, "CheckSharingAllowed")
+}
+
+func TestSetShared_NonOwnerOfSharedServiceForbidden(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "bob", true)
+
+	err := uc.SetShared(ctx, sharedReq(false))
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+}
+
+func TestSetShared_InvisibleServiceNotFound(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "bob", false)
+
+	err := uc.SetShared(ctx, sharedReq(true))
+
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+}
+
+func TestSetShared_CatalogDisallowsSharing(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "alice", false)
+	m.catalog.On("CheckSharingAllowed", ctx, "my-catalog").
+		Return(domain.ErrForbidden)
+
+	err := uc.SetShared(ctx, sharedReq(true))
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+}
+
+func TestSetShared_UpdateError(t *testing.T) {
+	uc, ctx, m := setupLifecycle(t)
+	ownedWithCatalog(m, "alice", true)
+	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release, mock.Anything).
+		Return(errors.New("k8s unavailable"))
+
+	err := uc.SetShared(ctx, sharedReq(false))
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 }

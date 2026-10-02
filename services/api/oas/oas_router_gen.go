@@ -23,11 +23,11 @@ var (
 	rn10AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn15AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id",
-	}
 	rn17AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id",
+		"GET": "Authorization,Last-Event-Id,X-Onyxia-Project",
+	}
+	rn19AllowedHeaders = map[string]string{
+		"GET": "Authorization,Last-Event-Id,X-Onyxia-Project",
 	}
 	rn2AllowedHeaders = map[string]string{
 		"DELETE": "Authorization,X-Onyxia-Project",
@@ -35,6 +35,9 @@ var (
 		"PUT":    "Authorization,Content-Type,X-Onyxia-Project",
 	}
 	rn12AllowedHeaders = map[string]string{
+		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
+	}
+	rn14AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
 	}
 )
@@ -305,7 +308,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "GET",
-										allowedHeaders: rn15AllowedHeaders,
+										allowedHeaders: rn17AllowedHeaders,
 										acceptPost:     "",
 										acceptPatch:    "",
 									})
@@ -332,7 +335,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "GET",
-										allowedHeaders: rn17AllowedHeaders,
+										allowedHeaders: rn19AllowedHeaders,
 										acceptPost:     "",
 										acceptPatch:    "",
 									})
@@ -382,31 +385,72 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/suspended"
+				case '/': // Prefix: "/s"
 
-					if l := len("/suspended"); len(elem) >= l && elem[0:l] == "/suspended" {
+					if l := len("/s"); len(elem) >= l && elem[0:l] == "/s" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
-						switch r.Method {
-						case "PUT":
-							s.handleSetServiceSuspendedRequest([1]string{
-								args[0],
-							}, elemIsEscaped, w, r)
-						default:
-							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "PUT",
-								allowedHeaders: rn12AllowedHeaders,
-								acceptPost:     "",
-								acceptPatch:    "",
-							})
+						break
+					}
+					switch elem[0] {
+					case 'h': // Prefix: "hared"
+
+						if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+							elem = elem[l:]
+						} else {
+							break
 						}
 
-						return
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "PUT":
+								s.handleSetServiceSharedRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "PUT",
+									allowedHeaders: rn12AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
+					case 'u': // Prefix: "uspended"
+
+						if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch r.Method {
+							case "PUT":
+								s.handleSetServiceSuspendedRequest([1]string{
+									args[0],
+								}, elemIsEscaped, w, r)
+							default:
+								s.notAllowed(w, r, notAllowedParams{
+									allowedMethods: "PUT",
+									allowedHeaders: rn14AllowedHeaders,
+									acceptPost:     "",
+									acceptPatch:    "",
+								})
+							}
+
+							return
+						}
+
 					}
 
 				}
@@ -800,29 +844,68 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/suspended"
+				case '/': // Prefix: "/s"
 
-					if l := len("/suspended"); len(elem) >= l && elem[0:l] == "/suspended" {
+					if l := len("/s"); len(elem) >= l && elem[0:l] == "/s" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
 					if len(elem) == 0 {
-						// Leaf node.
-						switch method {
-						case "PUT":
-							r.name = SetServiceSuspendedOperation
-							r.summary = "Suspend or resume a service"
-							r.operationID = "setServiceSuspended"
-							r.operationGroup = ""
-							r.pathPattern = "/api/services/{releaseId}/suspended"
-							r.args = args
-							r.count = 1
-							return r, true
-						default:
-							return
+						break
+					}
+					switch elem[0] {
+					case 'h': // Prefix: "hared"
+
+						if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+							elem = elem[l:]
+						} else {
+							break
 						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "PUT":
+								r.name = SetServiceSharedOperation
+								r.summary = "Share or unshare a service with the project members"
+								r.operationID = "setServiceShared"
+								r.operationGroup = ""
+								r.pathPattern = "/api/services/{releaseId}/shared"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
+					case 'u': // Prefix: "uspended"
+
+						if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+							elem = elem[l:]
+						} else {
+							break
+						}
+
+						if len(elem) == 0 {
+							// Leaf node.
+							switch method {
+							case "PUT":
+								r.name = SetServiceSuspendedOperation
+								r.summary = "Suspend or resume a service"
+								r.operationID = "setServiceSuspended"
+								r.operationGroup = ""
+								r.pathPattern = "/api/services/{releaseId}/suspended"
+								r.args = args
+								r.count = 1
+								return r, true
+							default:
+								return
+							}
+						}
+
 					}
 
 				}

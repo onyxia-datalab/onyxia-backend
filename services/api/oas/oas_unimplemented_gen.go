@@ -80,6 +80,16 @@ func (UnimplementedHandler) ListServices(ctx context.Context, params ListService
 	return r, ht.ErrNotImplemented
 }
 
+// SetServiceShared implements setServiceShared operation.
+//
+// Only the owner of the service may change this flag. Sharing requires the service's catalog to allow
+// it.
+//
+// PUT /api/services/{releaseId}/shared
+func (UnimplementedHandler) SetServiceShared(ctx context.Context, req *SetServiceSharedReq, params SetServiceSharedParams) (r SetServiceSharedRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // SetServiceSuspended implements setServiceSuspended operation.
 //
 // Suspend or resume a service.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
@@ -114,39 +115,43 @@ func (uc *Lifecycle) Start(
 // reported as ErrNotFound, exactly as GetService does. The backend talks to
 // Kubernetes with its own service account, so nothing downstream enforces
 // this per user.
-func (uc *Lifecycle) authorize(ctx context.Context, username, namespace, releaseName string) error {
+// It returns the service's onyxia secret data on success.
+func (uc *Lifecycle) authorize(
+	ctx context.Context,
+	username, namespace, releaseName string,
+) (map[string][]byte, error) {
 	data, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseName)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+			return nil, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
 		}
-		return fmt.Errorf("read onyxia secret: %w", err)
+		return nil, fmt.Errorf("read onyxia secret: %w", err)
 	}
 
 	owner := string(data["owner"])
 	share := string(data["share"]) == "true"
 	if !uc.namespaces.CanAccessService(username, namespace, owner, share) {
-		return fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+		return nil, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
 	}
-	return nil
+	return data, nil
 }
 
 func (uc *Lifecycle) Suspend(ctx context.Context, req domain.SuspendRequest) error {
-	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	return uc.helm.SuspendRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Resume(ctx context.Context, req domain.ResumeRequest) error {
-	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	return uc.helm.ResumeRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error {
-	if err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	if err := uc.helm.UninstallRelease(ctx, req.Namespace, req.ReleaseName); err != nil {
@@ -154,6 +159,38 @@ func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error
 	}
 	if err := uc.secrets.DeleteOnyxiaSecret(ctx, req.Namespace, req.ReleaseName); err != nil {
 		return fmt.Errorf("delete onyxia secret: %w", err)
+	}
+	return nil
+}
+
+// SetShared lets the owner of a service share it with the members of its
+// project namespace, or make it private again. Other callers who can see the
+// service (because it is shared) get ErrForbidden; callers who can't see it
+// get ErrNotFound, as for every other operation.
+func (uc *Lifecycle) SetShared(ctx context.Context, req domain.SetSharedRequest) error {
+	data, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName)
+	if err != nil {
+		return err
+	}
+
+	if !strings.EqualFold(string(data["owner"]), req.Username) {
+		return fmt.Errorf(
+			"%w: only the owner of service %q can change its sharing",
+			domain.ErrForbidden,
+			req.ReleaseName,
+		)
+	}
+
+	if req.Shared {
+		if err := uc.catalogSvc.CheckSharingAllowed(ctx, string(data["catalog"])); err != nil {
+			return fmt.Errorf("check sharing allowed: %w", err)
+		}
+	}
+
+	if err := uc.secrets.UpdateOnyxiaSecret(ctx, req.Namespace, req.ReleaseName, map[string][]byte{
+		"share": []byte(strconv.FormatBool(req.Shared)),
+	}); err != nil {
+		return fmt.Errorf("update onyxia secret: %w", err)
 	}
 	return nil
 }

@@ -59,6 +59,7 @@ type stubLifecycle struct {
 	suspendErr error
 	resumeErr  error
 	deleteErr  error
+	sharedErr  error
 }
 
 func (s *stubLifecycle) Start(context.Context, domain.StartRequest) (domain.StartResponse, error) {
@@ -67,6 +68,9 @@ func (s *stubLifecycle) Start(context.Context, domain.StartRequest) (domain.Star
 func (s *stubLifecycle) Suspend(context.Context, domain.SuspendRequest) error { return s.suspendErr }
 func (s *stubLifecycle) Resume(context.Context, domain.ResumeRequest) error   { return s.resumeErr }
 func (s *stubLifecycle) Delete(context.Context, domain.DeleteRequest) error   { return s.deleteErr }
+func (s *stubLifecycle) SetShared(context.Context, domain.SetSharedRequest) error {
+	return s.sharedErr
+}
 
 type stubQuery struct {
 	getResp  domain.Service
@@ -255,6 +259,30 @@ func TestHTTP_DeleteService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ts := newTestServer(t, &stubLifecycle{deleteErr: tt.deleteErr}, &stubQuery{})
 			resp := doRequest(t, ts, http.MethodDelete, "/api/services/my-release", "alice", nil)
+			require.Equal(t, tt.wantStatus, resp.StatusCode)
+		})
+	}
+}
+
+// --- SetServiceShared (PUT /api/services/{releaseId}/shared) -----------------
+
+func TestHTTP_SetServiceShared(t *testing.T) {
+	tests := []struct {
+		name       string
+		sharedErr  error
+		wantStatus int
+	}{
+		{"success", nil, http.StatusNoContent},
+		{"not owner maps to 403", domain.ErrForbidden, http.StatusForbidden},
+		{"not found maps to 404", domain.ErrNotFound, http.StatusNotFound},
+		{"unexpected error maps to 500", errors.New("boom"), http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(t, &stubLifecycle{sharedErr: tt.sharedErr}, &stubQuery{})
+			resp := doRequest(t, ts, http.MethodPut, "/api/services/my-release/shared", "alice",
+				map[string]any{"shared": true})
 			require.Equal(t, tt.wantStatus, resp.StatusCode)
 		})
 	}

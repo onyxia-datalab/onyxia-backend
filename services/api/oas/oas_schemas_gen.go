@@ -1437,6 +1437,42 @@ func (s *ServiceStatus) UnmarshalText(data []byte) error {
 	}
 }
 
+type SetServiceSharedForbidden Problem
+
+func (*SetServiceSharedForbidden) setServiceSharedRes() {}
+
+type SetServiceSharedInternalServerError Problem
+
+func (*SetServiceSharedInternalServerError) setServiceSharedRes() {}
+
+// SetServiceSharedNoContent is response for SetServiceShared operation.
+type SetServiceSharedNoContent struct{}
+
+func (*SetServiceSharedNoContent) setServiceSharedRes() {}
+
+type SetServiceSharedNotFound Problem
+
+func (*SetServiceSharedNotFound) setServiceSharedRes() {}
+
+type SetServiceSharedReq struct {
+	// True to share with the project members, false to make private.
+	Shared bool `json:"shared"`
+}
+
+// GetShared returns the value of Shared.
+func (s *SetServiceSharedReq) GetShared() bool {
+	return s.Shared
+}
+
+// SetShared sets the value of Shared.
+func (s *SetServiceSharedReq) SetShared(val bool) {
+	s.Shared = val
+}
+
+type SetServiceSharedUnauthorized Problem
+
+func (*SetServiceSharedUnauthorized) setServiceSharedRes() {}
+
 type SetServiceSuspendedForbidden Problem
 
 func (*SetServiceSuspendedForbidden) setServiceSuspendedRes() {}

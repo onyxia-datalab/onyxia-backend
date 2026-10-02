@@ -54,6 +54,13 @@ type Handler interface {
 	//
 	// GET /api/services
 	ListServices(ctx context.Context, params ListServicesParams) (ListServicesRes, error)
+	// SetServiceShared implements setServiceShared operation.
+	//
+	// Only the owner of the service may change this flag. Sharing requires the service's catalog to allow
+	// it.
+	//
+	// PUT /api/services/{releaseId}/shared
+	SetServiceShared(ctx context.Context, req *SetServiceSharedReq, params SetServiceSharedParams) (SetServiceSharedRes, error)
 	// SetServiceSuspended implements setServiceSuspended operation.
 	//
 	// Suspend or resume a service.

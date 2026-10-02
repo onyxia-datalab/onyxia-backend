@@ -13,6 +13,7 @@ const (
 	GetServiceOperation          OperationName = "GetService"
 	InstallServiceOperation      OperationName = "InstallService"
 	ListServicesOperation        OperationName = "ListServices"
+	SetServiceSharedOperation    OperationName = "SetServiceShared"
 	SetServiceSuspendedOperation OperationName = "SetServiceSuspended"
 	WatchReleaseOperation        OperationName = "WatchRelease"
 	WatchResourcesOperation      OperationName = "WatchResources"

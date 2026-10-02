@@ -63,10 +63,6 @@ func (g *K8sOnyxiaSecretGateway) UpdateOnyxiaSecret(
 	namespace, name string,
 	data map[string][]byte,
 ) error {
-	if data == nil {
-		data = map[string][]byte{}
-	}
-
 	fullName := buildOnyxiaSecretName(name)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -78,7 +74,12 @@ func (g *K8sOnyxiaSecretGateway) UpdateOnyxiaSecret(
 			return getErr
 		}
 		cur.Type = onyxiaSecretType
-		cur.Data = data
+		if cur.Data == nil {
+			cur.Data = map[string][]byte{}
+		}
+		for k, v := range data {
+			cur.Data[k] = v
+		}
 
 		_, updErr := g.client.CoreV1().Secrets(namespace).Update(ctx, cur, metav1.UpdateOptions{})
 		return updErr

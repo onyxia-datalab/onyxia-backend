@@ -77,6 +77,38 @@ func (ic *InstallController) SetServiceSuspended(
 	return &api.SetServiceSuspendedNoContent{}, nil
 }
 
+func (ic *InstallController) SetServiceShared(
+	ctx context.Context,
+	req *api.SetServiceSharedReq,
+	params api.SetServiceSharedParams,
+) (api.SetServiceSharedRes, error) {
+	u, ok := ic.userGetter.GetUser(ctx)
+	if !ok || u == nil {
+		slog.ErrorContext(ctx, userNotFoundInContextMessage)
+		return nil, domain.ErrForbidden
+	}
+
+	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
+		slog.ErrorContext(ctx, "namespace access denied",
+			slog.String("namespace", params.XOnyxiaProject),
+			slog.String("username", u.Username),
+		)
+		return nil, domain.ErrForbidden
+	}
+
+	if err := ic.serviceLifecycleUc.SetShared(ctx, domain.SetSharedRequest{
+		Username:    u.Username,
+		ReleaseName: params.ReleaseId,
+		Namespace:   params.XOnyxiaProject,
+		Shared:      req.Shared,
+	}); err != nil {
+		slog.ErrorContext(ctx, "set shared failed", slog.Any("error", err))
+		return nil, err
+	}
+
+	return &api.SetServiceSharedNoContent{}, nil
+}
+
 func (ic *InstallController) DeleteService(
 	ctx context.Context,
 	params api.DeleteServiceParams,

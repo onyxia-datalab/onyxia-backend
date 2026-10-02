@@ -419,6 +419,67 @@ func encodeListServicesResponse(response ListServicesRes, w http.ResponseWriter,
 	}
 }
 
+func encodeSetServiceSharedResponse(response SetServiceSharedRes, w http.ResponseWriter, span trace.Span) error {
+	switch response := response.(type) {
+	case *SetServiceSharedNoContent:
+		w.WriteHeader(204)
+
+		return nil
+
+	case *SetServiceSharedUnauthorized:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(401)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *SetServiceSharedForbidden:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(403)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *SetServiceSharedNotFound:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(404)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *SetServiceSharedInternalServerError:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(500)
+		span.SetStatus(codes.Error, http.StatusText(500))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	default:
+		return errors.Errorf("unexpected response type: %T", response)
+	}
+}
+
 func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *SetServiceSuspendedNoContent:

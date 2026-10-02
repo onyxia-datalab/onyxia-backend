@@ -75,6 +75,13 @@ type Invoker interface {
 	//
 	// GET /api/services
 	ListServices(ctx context.Context, params ListServicesParams) (ListServicesRes, error)
+	// SetServiceShared invokes setServiceShared operation.
+	//
+	// Only the owner of the service may change this flag. Sharing requires the service's catalog to allow
+	// it.
+	//
+	// PUT /api/services/{releaseId}/shared
+	SetServiceShared(ctx context.Context, request *SetServiceSharedReq, params SetServiceSharedParams) (SetServiceSharedRes, error)
 	// SetServiceSuspended invokes setServiceSuspended operation.
 	//
 	// Suspend or resume a service.
@@ -1141,6 +1148,156 @@ func (c *Client) sendListServices(ctx context.Context, params ListServicesParams
 	return result, nil
 }
 
+// SetServiceShared invokes setServiceShared operation.
+//
+// Only the owner of the service may change this flag. Sharing requires the service's catalog to allow
+// it.
+//
+// PUT /api/services/{releaseId}/shared
+func (c *Client) SetServiceShared(ctx context.Context, request *SetServiceSharedReq, params SetServiceSharedParams) (SetServiceSharedRes, error) {
+	res, err := c.sendSetServiceShared(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendSetServiceShared(ctx context.Context, request *SetServiceSharedReq, params SetServiceSharedParams) (res SetServiceSharedRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("setServiceShared"),
+		semconv.HTTPRequestMethodKey.String("PUT"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}/shared"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, SetServiceSharedOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/api/services/"
+	{
+		// Encode "releaseId" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "releaseId",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ReleaseId))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/shared"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "PUT", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeSetServiceSharedRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, SetServiceSharedOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeSetServiceSharedResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // SetServiceSuspended invokes setServiceSuspended operation.
 //
 // Suspend or resume a service.
@@ -1370,6 +1527,17 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	h := uri.NewHeaderEncoder(r.Header)
 	{
 		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
 			Name:    "Last-Event-Id",
 			Explode: false,
 		}
@@ -1519,6 +1687,17 @@ func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesPa
 
 	stage = "EncodeHeaderParams"
 	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
 	{
 		cfg := uri.HeaderParameterEncodingConfig{
 			Name:    "Last-Event-Id",

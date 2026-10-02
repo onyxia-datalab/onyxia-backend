@@ -43,6 +43,7 @@ var operationRolesOidc = map[string][]string{
 	GetServiceOperation:          {},
 	InstallServiceOperation:      {},
 	ListServicesOperation:        {},
+	SetServiceSharedOperation:    {},
 	SetServiceSuspendedOperation: {},
 	WatchReleaseOperation:        {},
 	WatchResourcesOperation:      {},

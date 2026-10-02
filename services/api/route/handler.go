@@ -32,6 +32,14 @@ func (h *Handler) SetServiceSuspended(
 	return h.install.SetServiceSuspended(ctx, req, p)
 }
 
+func (h *Handler) SetServiceShared(
+	ctx context.Context,
+	req *api.SetServiceSharedReq,
+	p api.SetServiceSharedParams,
+) (api.SetServiceSharedRes, error) {
+	return h.install.SetServiceShared(ctx, req, p)
+}
+
 func (h *Handler) DeleteService(
 	ctx context.Context,
 	p api.DeleteServiceParams,
