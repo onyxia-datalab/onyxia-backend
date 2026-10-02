@@ -34,9 +34,8 @@ func (c *OnboardingController) Onboard(
 
 	user, ok := c.users.GetUser(ctx)
 	if !ok || user == nil {
-		err := fmt.Errorf("user not found in context")
-		slog.ErrorContext(ctx, "Failed to retrieve user from context", slog.Any("error", err))
-		return &api.OnboardForbidden{}, err
+		slog.ErrorContext(ctx, "Failed to retrieve user from context")
+		return nil, domain.ErrForbidden
 	}
 
 	// Extract optional value from OptString
@@ -46,26 +45,21 @@ func (c *OnboardingController) Onboard(
 
 		// Check if the requested group is in user's groups
 		if !slices.Contains(user.Groups, *groupPtr) {
-			err := fmt.Errorf("user does not have access to group: %s", *groupPtr)
 			slog.ErrorContext(ctx, "Unauthorized group access",
 				slog.String("group", *groupPtr),
 				slog.Any("userGroups", user.Groups),
-				slog.Any("error", err),
 			)
-			return &api.OnboardUnauthorized{}, err
+			return nil, fmt.Errorf("%w: user does not have access to group: %s", domain.ErrUnauthorized, *groupPtr)
 		}
 	}
 
-	err := c.OnboardingUsecase.Onboard(ctx, domain.OnboardingRequest{
+	if err := c.OnboardingUsecase.Onboard(ctx, domain.OnboardingRequest{
 		Group:     groupPtr,
 		UserName:  user.Username,
 		UserRoles: user.Roles,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "Onboarding failed",
-			slog.Any("error", err),
-		)
-		return &api.OnboardForbidden{}, err
+	}); err != nil {
+		slog.ErrorContext(ctx, "Onboarding failed", slog.Any("error", err))
+		return nil, err
 	}
 
 	slog.InfoContext(ctx, "Onboarding successful")

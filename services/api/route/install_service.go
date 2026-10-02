@@ -2,59 +2,42 @@ package route
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/k8s"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/lifecycle"
 )
 
 func SetupInstallController(
 	app *bootstrap.Application,
+	helmClient *helm.Client,
+	catalogUc domain.CatalogService,
+	namespaceAuthz namespace.Authorizer,
 ) (*controller.InstallController, error) {
 
-	//TODO: pass callbacks properly
-	helmRealeaseGtw, err := helm.NewReleaseGtw(app.K8sClient.Config(), ports.HelmStartCallbacks{
-		OnStart: func(release, chart string) {
-			slog.Info("Helm install started",
-				slog.String("release", release),
-				slog.String("chart", chart),
-			)
-		},
-		OnSuccess: func(release, chart string) {
-			slog.Info("Helm install succeeded",
-				slog.String("release", release),
-				slog.String("chart", chart),
-			)
-		},
-		OnError: func(release, chart string, err error) {
-			slog.Error("Helm install failed",
-				slog.String("release", release),
-				slog.String("chart", chart),
-				slog.Any("error", err),
-			)
-		},
-	})
+	helmRealeaseGtw, err := helm.NewReleaseGtw(
+		app.K8sClient.Config(),
+		helmClient,
+		ports.InstallCallbacks{},
+	)
 
 	if err != nil {
 		return nil, fmt.Errorf("helm adapter: %w", err)
 	}
 
-	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, "")
-	if err != nil {
-		return nil, err
-	}
-
-	serviceLifecycleUc := usecase.NewServiceLifecycle(
+	serviceLifecycleUc := lifecycle.NewLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
 		helmRealeaseGtw,
-		pkgRepo,
+		catalogUc,
+		namespaceAuthz,
 	)
 
-	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader)
+	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader, namespaceAuthz)
 
 	return ctrl, nil
 

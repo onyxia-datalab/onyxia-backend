@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +18,7 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-func TestEnsureCreate(t *testing.T) {
+func TestCreate(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -25,7 +26,7 @@ func TestEnsureCreate(t *testing.T) {
 	ns, name := "user-ddecrulle", "jupyter-python-721817"
 	data := map[string][]byte{"owner": []byte("ddecrulle")}
 
-	err := gw.EnsureOnyxiaSecret(ctx, ns, name, data)
+	err := gw.CreateOnyxiaSecret(ctx, ns, name, data)
 	require.NoError(t, err)
 
 	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
@@ -35,7 +36,7 @@ func TestEnsureCreate(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(data, got.Data))
 }
 
-func TestEnsureUpdateOnExists(t *testing.T) {
+func TestCreateReturnsAlreadyExists(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -49,18 +50,17 @@ func TestEnsureUpdateOnExists(t *testing.T) {
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	newData := map[string][]byte{"owner": []byte("ddecrulle")}
-	err = gw.EnsureOnyxiaSecret(ctx, ns, name, newData)
-	require.NoError(t, err)
+	err = gw.CreateOnyxiaSecret(ctx, ns, name, map[string][]byte{"owner": []byte("ddecrulle")})
+	require.ErrorIs(t, err, domain.ErrAlreadyExists)
 
 	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
 	require.NoError(t, err)
 
-	assert.Equal(t, onyxiaSecretType, got.Type)
-	assert.Equal(t, newData, got.Data)
+	assert.Equal(t, corev1.SecretType("other"), got.Type)
+	assert.Equal(t, map[string][]byte{"owner": []byte("old")}, got.Data)
 }
 
-func TestEnsureRetryOnConflict(t *testing.T) {
+func TestUpdateRetryOnConflict(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -88,15 +88,16 @@ func TestEnsureRetryOnConflict(t *testing.T) {
 	)
 
 	newData := map[string][]byte{"owner": []byte("ddecrulle")}
-	err = gw.EnsureOnyxiaSecret(ctx, ns, name, newData)
+	err = gw.UpdateOnyxiaSecret(ctx, ns, name, newData)
 	require.NoError(t, err)
 
 	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, newData, got.Data)
+	// Update merges: keys not passed in are kept.
+	assert.Equal(t, map[string][]byte{"x": []byte("y"), "owner": []byte("ddecrulle")}, got.Data)
 }
 
-func TestEnsureRecreateIfDeletedDuringUpdate(t *testing.T) {
+func TestUpdateReturnsNotFoundIfDeletedDuringUpdate(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
@@ -134,12 +135,8 @@ func TestEnsureRecreateIfDeletedDuringUpdate(t *testing.T) {
 	)
 
 	newData := map[string][]byte{"owner": []byte("ddecrulle")}
-	err = gw.EnsureOnyxiaSecret(ctx, ns, name, newData)
-	require.NoError(t, err)
-
-	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
-	require.NoError(t, err)
-	assert.Equal(t, newData, got.Data)
+	err = gw.UpdateOnyxiaSecret(ctx, ns, name, newData)
+	require.ErrorIs(t, err, domain.ErrNotFound)
 }
 
 func TestDeleteIgnoresNotFound(t *testing.T) {

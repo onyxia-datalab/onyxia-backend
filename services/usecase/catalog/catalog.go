@@ -1,0 +1,262 @@
+package catalog
+
+import (
+	"context"
+	"fmt"
+	"regexp"
+	"slices"
+
+	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
+)
+
+// Catalog implements domain.CatalogService
+type Catalog struct {
+	envCatalogConfig []env.CatalogConfig
+	pkgRepo          ports.PackageRepository
+	userReader       usercontext.Reader
+	schemaResolver   *schemaResolver
+}
+
+var _ domain.CatalogService = (*Catalog)(nil)
+
+// Constructor
+func NewCatalogService(
+	envCatalogConfig []env.CatalogConfig,
+	schemasConfig env.SchemasConfig,
+	pkgRepo ports.PackageRepository,
+	userReader usercontext.Reader,
+) *Catalog {
+	return &Catalog{
+		envCatalogConfig: envCatalogConfig,
+		pkgRepo:          pkgRepo,
+		userReader:       userReader,
+		schemaResolver:   newSchemaResolver(schemasConfig),
+	}
+}
+
+func (uc *Catalog) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, error) {
+	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
+		return len(c.Restrictions) == 0
+	})
+}
+
+func (uc *Catalog) ListUserCatalogs(
+	ctx context.Context,
+) ([]domain.Catalog, error) {
+	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
+		return uc.isAccessible(ctx, c)
+	})
+}
+
+// isAccessible reports whether the current caller may see or use the given
+// catalog. A catalog with no restrictions is public. A restricted catalog
+// requires at least one restriction to match a user attribute.
+//
+// This must be applied on every path that reaches a catalog or its packages
+// directly (GetPackage, GetAvailableVersions, GetPackageSchema, install), not
+// just on the listing endpoints — otherwise restrictions only hide a
+// catalog from the UI without actually protecting it.
+func (uc *Catalog) isAccessible(ctx context.Context, c env.CatalogConfig) bool {
+	if len(c.Restrictions) == 0 {
+		return true
+	}
+
+	attrs, ok := uc.userReader.GetAttributes(ctx)
+	if !ok {
+		return false
+	}
+
+	for _, r := range c.Restrictions {
+		if r.UserAttributeKey == "" || r.Match == "" {
+			continue
+		}
+
+		val, ok := attrs[r.UserAttributeKey]
+		if !ok {
+			continue
+		}
+
+		re, err := regexp.Compile(r.Match)
+		if err != nil {
+			continue
+		}
+
+		switch v := val.(type) {
+		case string:
+			if re.MatchString(v) {
+				return true
+			}
+		case []string:
+			for _, s := range v {
+				if re.MatchString(s) {
+					return true
+				}
+			}
+		case []any:
+			for _, s := range v {
+				if str, ok := s.(string); ok && re.MatchString(str) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func (uc *Catalog) GetPackageSchema(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+	version string,
+) ([]byte, error) {
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return nil, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
+	}
+
+	raw, err := uc.pkgRepo.GetPackageSchema(ctx, catalogID, packageName, version)
+	if err != nil {
+		return nil, err
+	}
+
+	roles, _ := uc.userReader.GetRoles(ctx)
+	return applyOverwrites(raw, uc.schemaResolver, roles)
+}
+
+func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
+	for i := range uc.envCatalogConfig {
+		if uc.envCatalogConfig[i].ID == catalogID {
+			return &uc.envCatalogConfig[i], nil
+		}
+	}
+	return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
+}
+
+// findAccessibleCatalog resolves catalogID and enforces its restrictions.
+// A restricted catalog the caller doesn't satisfy is reported as ErrNotFound,
+// the same way it is simply omitted from ListUserCatalogs — this must be used
+// on every direct-access path (get package, versions, schema, install), not
+// just on listing, otherwise restrictions are cosmetic.
+func (uc *Catalog) findAccessibleCatalog(ctx context.Context, catalogID string) (*env.CatalogConfig, error) {
+	cfg, err := uc.findCatalog(catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if !uc.isAccessible(ctx, *cfg) {
+		return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
+	}
+	return cfg, nil
+}
+
+func (uc *Catalog) GetPackage(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) (domain.Package, error) {
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
+	if err != nil {
+		return domain.Package{}, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return domain.Package{}, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
+	}
+
+	pkg, err := uc.pkgRepo.GetPackage(ctx, catalogID, packageName)
+	if err != nil {
+		return domain.Package{}, fmt.Errorf("catalog %q package %q: %w", catalogID, packageName, err)
+	}
+
+	return pkg, nil
+}
+
+func (uc *Catalog) GetAvailableVersions(
+	ctx context.Context,
+	catalogID string,
+	packageName string,
+) ([]string, error) {
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
+	if err != nil {
+		return nil, err
+	}
+	if slices.Contains(cfg.Excluded, packageName) {
+		return nil, fmt.Errorf("%w: package %q in catalog %q", domain.ErrNotFound, packageName, catalogID)
+	}
+
+	versions, err := uc.pkgRepo.GetAvailableVersions(ctx, catalogID, packageName)
+	if err != nil {
+		return nil, fmt.Errorf("catalog %q package %q versions: %w", catalogID, packageName, err)
+	}
+
+	filter, err := versionFilterFrom(*cfg)
+	if err != nil {
+		return nil, err
+	}
+	return filter.apply(versions), nil
+}
+
+// CheckSharingAllowed returns ErrForbidden if catalogID does not allow
+// installed services to be shared. Restricted catalogs the caller cannot
+// access are reported as ErrNotFound, same as GetPackage.
+func (uc *Catalog) CheckSharingAllowed(ctx context.Context, catalogID string) error {
+	cfg, err := uc.findAccessibleCatalog(ctx, catalogID)
+	if err != nil {
+		return err
+	}
+	if !cfg.AllowSharing {
+		return fmt.Errorf("%w: catalog %q does not allow sharing", domain.ErrForbidden, catalogID)
+	}
+	return nil
+}
+
+func (uc *Catalog) buildCatalogs(
+	ctx context.Context,
+	include func(env.CatalogConfig) bool,
+) ([]domain.Catalog, error) {
+	out := make([]domain.Catalog, 0)
+
+	for _, cfg := range uc.envCatalogConfig {
+		if !include(cfg) {
+			continue
+		}
+
+		allPkgs, err := uc.pkgRepo.ListPackages(ctx, cfg.ID)
+		if err != nil {
+			return nil, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err)
+		}
+		pkgs := make([]domain.Package, 0, len(allPkgs))
+		for _, p := range allPkgs {
+			if !slices.Contains(cfg.Excluded, p.Name) {
+				pkgs = append(pkgs, p)
+			}
+		}
+
+		name, err := tools.NewLocalizedString(cfg.Name)
+		if err != nil {
+			name = tools.LocalizedString{} // or log it / ignore gracefully
+		}
+
+		desc, err := tools.NewLocalizedString(cfg.Description)
+		if err != nil {
+			desc = tools.LocalizedString{}
+		}
+
+		out = append(out, domain.Catalog{
+			ID:                  cfg.ID,
+			Name:                name,
+			Description:         desc,
+			Status:              domain.CatalogStatus(cfg.Status),
+			HighlightedPackages: append([]string(nil), cfg.Highlighted...),
+			Packages:            pkgs,
+		})
+	}
+
+	return out, nil
+}

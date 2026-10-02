@@ -50,8 +50,8 @@ func TestOnboardGetUserFails(t *testing.T) {
 	req := api.OnboardingRequest{Group: api.OptString{Value: "g", Set: true}}
 
 	res, err := ctrl.Onboard(ctx, &req)
-	assert.Error(t, err)
-	assert.IsType(t, &api.OnboardForbidden{}, res)
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 
@@ -67,11 +67,16 @@ func TestOnboardGroupValidationFails(t *testing.T) {
 	req := api.OnboardingRequest{Group: api.OptString{Value: "test-group", Set: true}}
 
 	res, err := ctrl.Onboard(ctx, &req)
-	assert.Error(t, err)
-	assert.IsType(t, &api.OnboardUnauthorized{}, res)
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrUnauthorized)
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 
+// A plain usecase failure isn't one of the shared sentinels: it should pass
+// through untouched and default to 500 in the central error handler, not be
+// folded into a 4xx the way it silently was before (the old typed response
+// was never actually reachable — ogen discards it whenever the handler also
+// returns a non-nil error, which every branch here did).
 func TestOnboardOnboardingFails(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
 	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
@@ -80,13 +85,14 @@ func TestOnboardOnboardingFails(t *testing.T) {
 		Roles:    []string{"r"},
 	})
 
-	mockUC.On("Onboard", mock.Anything, mock.Anything).Return(errors.New("boom"))
+	usecaseErr := errors.New("boom")
+	mockUC.On("Onboard", mock.Anything, mock.Anything).Return(usecaseErr)
 
 	ctrl := NewOnboardingController(mockUC, userCtxReader)
 	req := api.OnboardingRequest{Group: api.OptString{Value: "test-group", Set: true}}
 
 	res, err := ctrl.Onboard(ctx, &req)
-	assert.Error(t, err)
-	assert.IsType(t, &api.OnboardForbidden{}, res)
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, usecaseErr)
 	mockUC.AssertCalled(t, "Onboard", mock.Anything, mock.Anything)
 }

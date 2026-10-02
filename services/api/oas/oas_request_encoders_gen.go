@@ -23,3 +23,31 @@ func encodeInstallServiceRequest(
 	ht.SetBody(r, bytes.NewReader(encoded), contentType)
 	return nil
 }
+
+func encodeSetServiceSharedRequest(
+	req *SetServiceSharedReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeSetServiceSuspendedRequest(
+	req *SetServiceSuspendedReq,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}

@@ -1,0 +1,4 @@
+generator:
+  # On dit à ogen de traiter problem+json comme du json
+  content_type_aliases:
+    application/problem+json: application/json

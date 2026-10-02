@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/apperror"
+	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	middleware "github.com/onyxia-datalab/onyxia-backend/services/api/middleware"
 	oas "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
+	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error) {
@@ -23,23 +27,51 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to initialize OIDC middleware: %w", err)
 	}
 
-	installCtrl, err := SetupInstallController(app)
+	helmClient, err := helm.NewClient("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize helm client: %w", err)
+	}
+
+	// A single package repository (and its underlying caches) is shared
+	// between the catalog and install paths — building one per controller
+	// duplicated the OCI/index cache for no reason.
+	pkgRepo, err := helm.NewPackageRepository(app.Env.CatalogsConfig, helmClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup package repository: %w", err)
+	}
+
+	catalogUc := catalog.NewCatalogService(
+		app.Env.CatalogsConfig,
+		app.Env.Schemas,
+		pkgRepo,
+		app.UserContextReader,
+	)
+
+	namespaceAuthz := namespace.NewAuthorizer(
+		app.Env.Kubernetes.NamespacePrefix,
+		app.Env.Kubernetes.GroupNamespacePrefix,
+	)
+
+	installCtrl, err := SetupInstallController(app, helmClient, catalogUc, namespaceAuthz)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup install controller: %w", err)
 	}
 
-	catalogCtrl, err := SetupCatalogController(app)
+	catalogCtrl := SetupCatalogController(catalogUc, app)
+
+	serviceQueryCtrl, err := SetupServiceQueryController(app, helmClient, namespaceAuthz)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to setup catalog controller: %w", err)
+		return nil, fmt.Errorf("failed to setup service query controller: %w", err)
 	}
 
-	h := NewHandler(installCtrl, catalogCtrl)
+	h := NewHandler(installCtrl, catalogCtrl, serviceQueryCtrl)
 
 	srv, err := oas.NewServer(
 		h,
 		auth,
+		oas.WithErrorHandler(apperror.OgenHandler),
 	)
 
 	if err != nil {
