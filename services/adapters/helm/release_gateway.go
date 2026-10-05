@@ -26,7 +26,7 @@ import (
 type Helm struct {
 	settings           *cli.EnvSettings
 	catalogs           map[string]env.CatalogConfig
-	restConfig         *rest.Config
+	restGetter         *StaticRESTClientGetter
 	helmClient         *Client
 	configForNamespace func(string) (*action.Configuration, error)
 	// installs tracks the background installs started by StartInstall so a
@@ -49,7 +49,7 @@ func NewReleaseGtw(
 	return &Helm{
 		settings:   client.Settings,
 		catalogs:   catalogMap,
-		restConfig: k8sConfig,
+		restGetter: NewStaticRESTClientGetter(k8sConfig),
 		helmClient: client,
 	}
 }
@@ -61,7 +61,7 @@ func (i *Helm) cfgForNamespace(namespace string) (*action.Configuration, error) 
 	}
 
 	cfg := new(action.Configuration)
-	if err := cfg.Init(&StaticRESTClientGetter{config: i.restConfig}, namespace, "secret"); err != nil {
+	if err := cfg.Init(i.restGetter, namespace, "secret"); err != nil {
 		return nil, fmt.Errorf("init helm config for namespace %q: %w", namespace, err)
 	}
 	cfg.RegistryClient = i.helmClient.RegistryClient
