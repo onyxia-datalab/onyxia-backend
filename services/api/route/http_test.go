@@ -163,7 +163,6 @@ func TestHTTP_InstallService(t *testing.T) {
 	validBody := map[string]any{
 		"catalogId":   "my-catalog",
 		"packageName": "jupyter",
-		"name":        "my-jupyter",
 		"options":     map[string]any{},
 	}
 
@@ -174,6 +173,7 @@ func TestHTTP_InstallService(t *testing.T) {
 	}{
 		{"success", nil, http.StatusAccepted},
 		{"invalid input maps to 400", domain.ErrInvalidInput, http.StatusBadRequest},
+		{"missing catalog or package maps to 404", domain.ErrNotFound, http.StatusNotFound},
 		{"forbidden maps to 403", domain.ErrForbidden, http.StatusForbidden},
 		{"already exists maps to 409", domain.ErrAlreadyExists, http.StatusConflict},
 		{"unexpected error maps to 500", errors.New("boom"), http.StatusInternalServerError},

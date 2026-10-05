@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/go-faster/jx"
@@ -153,13 +152,9 @@ func (cc *CatalogController) GetPackageSchema(
 	user, _ := cc.userReader.GetUser(ctx)
 	raw, err := cc.catalogs.GetPackageSchema(ctx, user, catalogID, packageName, version)
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			// getPackageSchema has no 404 response in the spec: a missing or
-			// restricted-but-hidden catalog/package is reported as a bad
-			// request instead.
-			return nil, fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
+		if !errors.Is(err, domain.ErrNotFound) {
+			slog.ErrorContext(ctx, "Failed to get package schema", slog.String("error", err.Error()))
 		}
-		slog.ErrorContext(ctx, "Failed to get package schema", slog.String("error", err.Error()))
 		return nil, err
 	}
 

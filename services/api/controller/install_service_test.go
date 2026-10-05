@@ -51,19 +51,12 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 	tests := []struct {
 		name           string
 		packageVersion api.OptString
-		legacyVersion  api.OptString
 		wantVersion    string
 	}{
 		{
-			name:           "packageVersion takes precedence",
+			name:           "packageVersion is passed on",
 			packageVersion: api.NewOptString("2.0.0"),
-			legacyVersion:  api.NewOptString("1.0.0"),
 			wantVersion:    "2.0.0",
-		},
-		{
-			name:          "legacy version remains supported",
-			legacyVersion: api.NewOptString("1.0.0"),
-			wantVersion:   "1.0.0",
 		},
 		{
 			name:        "empty version selects latest",
@@ -88,9 +81,7 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 				CatalogId:      "catalog",
 				PackageName:    "jupyter",
 				PackageVersion: tt.packageVersion,
-				Version:        tt.legacyVersion,
 				Options:        api.ServiceInstallRequestOptions{},
-				Name:           "display-name",
 			}, api.InstallServiceParams{
 				ReleaseId:      "release-id",
 				XOnyxiaProject: "user-alice",
@@ -155,7 +146,8 @@ func TestSetServiceSharedPropagatesUsecaseError(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
 
-func TestInstallServiceWrapsUnexpectedNotFoundAsInvalidInput(t *testing.T) {
+// A missing (or hidden) catalog or package is a 404, as the spec declares.
+func TestInstallServicePropagatesNotFound(t *testing.T) {
 	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
 	lifecycle := &lifecycleStub{start: func(
 		context.Context,
@@ -169,12 +161,12 @@ func TestInstallServiceWrapsUnexpectedNotFoundAsInvalidInput(t *testing.T) {
 		CatalogId:   "catalog",
 		PackageName: "jupyter",
 		Options:     api.ServiceInstallRequestOptions{},
-		Name:        "display-name",
 	}, api.InstallServiceParams{
 		ReleaseId:      "release-id",
 		XOnyxiaProject: "user-alice",
 	})
 
 	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+	assert.NotErrorIs(t, err, domain.ErrInvalidInput)
 }

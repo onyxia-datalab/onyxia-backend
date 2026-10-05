@@ -45,6 +45,8 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DetailedPackage" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -54,6 +56,7 @@ paths:
     get:
       security:
         - oidc: []
+      tags: [catalogs]
       operationId: getPackageSchema
       summary: Get the values.schema.json of a versioned package
       description: >
@@ -85,6 +88,10 @@ paths:
               schema: { type: object, additionalProperties: true }
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -181,9 +188,10 @@ paths:
       operationId: installService
       summary: Trigger service installation (async)
       description: >
-        Starts an install for the given releaseId. Returns 202 with URLs for SSE
-        streams. Idempotent if the release already exists (returns 202 with the
-        same event URLs).
+        Starts an install for the given releaseId and returns 202 with the URLs
+        of its SSE streams. The releaseId is reserved by the first install: a
+        second install with the same releaseId gets 409, whether the first one
+        is still running or done.
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - $ref: "#/components/parameters/onyxiaProject"
@@ -195,10 +203,12 @@ paths:
             examples:
               jupyter:
                 value:
-                  chart: jupyter-python
-                  repoUrl: https://inseefrlab.github.io/helm-charts-interactive-services
-                  version: ""
-                  values:
+                  catalogId: ide
+                  packageName: jupyter-python
+                  packageVersion: 2.3.4
+                  friendlyName: My Jupyter
+                  share: false
+                  options:
                     ingress:
                       enabled: true
                       hostname: user-xxxx.user.lab.sspcloud.fr
@@ -216,14 +226,16 @@ paths:
                 default:
                   value:
                     eventsUrl:
-                      release: /events/jupyter-python-626146/watch-release
-                      resources: /events/jupyter-python-626146/watch-resources
+                      release: /api/services/events/jupyter-python-626146/watch-release
+                      resources: /api/services/events/jupyter-python-626146/watch-resources
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "409":
           $ref: "#/components/responses/Conflict"
         "500":
@@ -440,17 +452,6 @@ components:
           type: array
           description: Names of important packages of the catalog to highlight in the UI
           items: { type: string }
-        visible:
-          type: object
-          required: [user, project]
-          description: Describes if the catalog is visible in user or project context
-          properties:
-            user:
-              type: boolean
-              description: Should this catalog be visible in user context?
-            project:
-              type: boolean
-              description: Should this catalog be visible in project context?
         packages:
           type: array
           description: List of packages available in the catalog
@@ -479,45 +480,31 @@ components:
                 type: string
                 format: semver
 
-    # I want to add each key of the values that has been explicitly set by the user in the request to be able to upgrade with --reuse-values and override only the values that as been computed (such as s3 key) without overriding the user values set during the installation.
     ServiceInstallRequest:
       type: object
-      required: [packageName, options, catalogId, name]
+      required: [catalogId, packageName, options]
       properties:
         catalogId:
-          {
-            type: string,
-            description: Catalog where the package is taken from.,
-          }
+          type: string
+          description: Catalog where the package is taken from.
         packageName:
-          {
-            type: string,
-            description: Package name used to create the service.,
-          }
+          type: string
+          description: Package name used to create the service.
         packageVersion:
-          {
-            type: string,
-            format: semver,
-            description: Version of the Helm package.,
-          }
-        version:
-          { type: string, description: Chart version (empty for latest). }
+          type: string
+          format: semver
+          description: Version of the Helm package. The latest version when absent.
         options:
-          {
-            type: object,
-            additionalProperties: true,
-            description: Options of package (values.yaml for Helm).,
-          }
+          type: object
+          additionalProperties: true
+          description: Options of the package (values.yaml for Helm).
         share:
-          {
-            type: boolean,
-            default: false,
-            description: When true,
-            visible to all users of the namespace.,
-          }
+          type: boolean
+          default: false
+          description: When true, the service is visible to all users of the namespace.
         friendlyName:
-          { type: string, description: Friendly name for the service. }
-        name: { type: string, description: A chosen name for the service. }
+          type: string
+          description: Display name of the service. The package name when absent.
 
     InstallAccepted:
       type: object

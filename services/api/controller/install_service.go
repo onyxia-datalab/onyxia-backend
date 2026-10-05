@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -133,8 +132,6 @@ func (ic *InstallController) InstallService(
 		return nil, fmt.Errorf("%w: options are required", domain.ErrInvalidInput)
 	}
 
-	version := req.PackageVersion.Or(req.Version.Or(""))
-
 	values := make(map[string]interface{}, len(req.Options))
 
 	for k, raw := range req.Options {
@@ -149,8 +146,7 @@ func (ic *InstallController) InstallService(
 		User:         user,
 		CatalogID:    req.CatalogId,
 		PackageName:  req.PackageName,
-		Name:         req.Name,
-		Version:      version,
+		Version:      req.PackageVersion.Or(""),
 		ReleaseID:    params.ReleaseId,
 		Namespace:    params.XOnyxiaProject,
 		FriendlyName: req.FriendlyName.Or(req.PackageName),
@@ -161,12 +157,6 @@ func (ic *InstallController) InstallService(
 	// Execute use case.
 	if err := ic.serviceLifecycleUc.Start(ctx, dreq); err != nil {
 		slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
-		if errors.Is(err, domain.ErrNotFound) {
-			// installService has no 404 response in the spec: a missing or
-			// restricted-but-hidden catalog/package is reported as a bad
-			// request instead.
-			err = fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
-		}
 		return nil, err
 	}
 

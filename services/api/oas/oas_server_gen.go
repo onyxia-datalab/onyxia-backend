@@ -43,8 +43,9 @@ type Handler interface {
 	GetService(ctx context.Context, params GetServiceParams) (GetServiceRes, error)
 	// InstallService implements installService operation.
 	//
-	// Starts an install for the given releaseId. Returns 202 with URLs for SSE streams. Idempotent if the
-	// release already exists (returns 202 with the same event URLs).
+	// Starts an install for the given releaseId and returns 202 with the URLs of its SSE streams. The
+	// releaseId is reserved by the first install: a second install with the same releaseId gets 409,
+	// whether the first one is still running or done.
 	//
 	// PUT /api/services/{releaseId}
 	InstallService(ctx context.Context, req *ServiceInstallRequest, params InstallServiceParams) (InstallServiceRes, error)
