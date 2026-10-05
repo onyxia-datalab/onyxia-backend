@@ -39,7 +39,7 @@ func jktOf(t *testing.T, key *ecdsa.PrivateKey) string {
 }
 
 // buildToken creates a signed JWT whose payload contains the given claims.
-// With InsecureSkipSignatureCheck the verifier only base64-decodes the payload,
+// Tests using a verifier with InsecureSkipSignatureCheck only base64-decode the payload,
 // so any signing key is acceptable.
 func buildToken(t *testing.T, key *ecdsa.PrivateKey, claims map[string]any) string {
 	t.Helper()

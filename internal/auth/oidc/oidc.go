@@ -2,10 +2,15 @@ package oidc
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -21,6 +26,9 @@ type TokenVerifier interface {
 type OIDCConfig struct {
 	IssuerURI     string
 	SkipTLSVerify bool
+	// PublicKey, when set, is a base64-encoded X.509 SubjectPublicKeyInfo
+	// RSA key used to validate tokens instead of the issuer's JWKS.
+	PublicKey     string
 	Audience      string
 	UsernameClaim string
 	GroupsClaim   string
@@ -40,19 +48,11 @@ type Auth struct {
 var _ auth.RequestVerifier = (*Auth)(nil)
 
 func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth, error) {
-	provider, err := oidc.NewProvider(ctx, cfg.IssuerURI)
+	verifier, err := newVerifier(ctx, cfg)
 	if err != nil {
-		slog.ErrorContext(ctx,
-			"Failed to init OIDC provider",
-			slog.String("issuer", cfg.IssuerURI),
-			slog.Any("error", err),
-		)
 		return nil, err
 	}
-	verifier := provider.Verifier(&oidc.Config{
-		InsecureSkipSignatureCheck: cfg.SkipTLSVerify,
-		SkipClientIDCheck:          true, //We skip client ID check because we have accessToken and not ID token.
-	})
+
 	if cfg.Audience == "" {
 		slog.WarnContext(ctx, "Skipping audience validation because 'audience' is empty")
 	}
@@ -69,6 +69,70 @@ func New(ctx context.Context, cfg OIDCConfig, writer usercontext.Writer) (*Auth,
 		Writer:        writer,
 		JTICache:      dpop.NewJTICache(),
 	}, nil
+}
+
+// newVerifier mirrors onyxia-api's token decoder: with oidc.publicKey the
+// tokens are validated against that key only, without contacting the issuer;
+// otherwise the keys are discovered from the issuer.
+func newVerifier(ctx context.Context, cfg OIDCConfig) (*oidc.IDTokenVerifier, error) {
+	verifierConfig := &oidc.Config{
+		SkipClientIDCheck: true, //We skip client ID check because we have accessToken and not ID token.
+	}
+
+	if cfg.PublicKey != "" {
+		key, err := parseRSAPublicKey(cfg.PublicKey)
+		if err != nil {
+			slog.ErrorContext(ctx, "Could not parse or use provided public key, please double check",
+				slog.Any("error", err),
+			)
+			return nil, fmt.Errorf("oidc publicKey: %w", err)
+		}
+		slog.InfoContext(ctx, "OIDC: using the configured public key to validate tokens")
+		// Like onyxia-api, the issuer is not validated in this mode: only the
+		// signature, the expiration and the audience are.
+		verifierConfig.SkipIssuerCheck = true
+		keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{key}}
+		return oidc.NewVerifier(cfg.IssuerURI, keySet, verifierConfig), nil
+	}
+
+	if cfg.SkipTLSVerify {
+		// Same behavior as onyxia-api's oidc.skip-tls-verify: TLS verification
+		// is disabled only for the HTTP calls to the IdP (discovery, JWKS).
+		// Token signatures are always verified. Not intended for production:
+		// prefer trusting the IdP's CA (see SSL_CERT_DIR in the Dockerfile).
+		slog.WarnContext(ctx, "TLS verification disabled for OIDC issuer requests (oidc.skipTLSVerify)")
+		ctx = oidc.ClientContext(ctx, insecureHTTPClient())
+	}
+
+	slog.InfoContext(ctx, "OIDC: using the issuer to validate tokens", slog.String("issuer", cfg.IssuerURI))
+	provider, err := oidc.NewProvider(ctx, cfg.IssuerURI)
+	if err != nil {
+		slog.ErrorContext(ctx,
+			"Failed to init OIDC provider",
+			slog.String("issuer", cfg.IssuerURI),
+			slog.Any("error", err),
+		)
+		return nil, err
+	}
+	return provider.Verifier(verifierConfig), nil
+}
+
+// parseRSAPublicKey decodes a base64 (standard alphabet) DER-encoded X.509
+// SubjectPublicKeyInfo RSA key — the format onyxia-api's oidc.public-key takes.
+func parseRSAPublicKey(encoded string) (*rsa.PublicKey, error) {
+	der, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("decode base64: %w", err)
+	}
+	pub, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return nil, fmt.Errorf("parse X.509 public key: %w", err)
+	}
+	rsaKey, ok := pub.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("unsupported public key type %T, an RSA key is expected", pub)
+	}
+	return rsaKey, nil
 }
 
 func (a *Auth) VerifyRequest(
