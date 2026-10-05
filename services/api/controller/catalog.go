@@ -30,17 +30,9 @@ func NewCatalogController(
 func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, error) {
 	slog.InfoContext(ctx, "GetMyCatalogs")
 
-	var (
-		catalogs []domain.Catalog
-		err      error
-	)
-
-	if _, authenticated := cc.userReader.GetUser(ctx); authenticated {
-		catalogs, err = cc.catalogs.ListUserCatalogs(ctx)
-	} else {
-		catalogs, err = cc.catalogs.ListPublicCatalogs(ctx)
-	}
-
+	// This operation is also open to anonymous callers (user is then nil).
+	user, _ := cc.userReader.GetUser(ctx)
+	catalogs, err := cc.catalogs.ListCatalogs(ctx, user)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to list catalogs", slog.String("error", err.Error()))
 		return nil, err
@@ -122,7 +114,8 @@ func (cc *CatalogController) GetMyPackage(
 		slog.String("package_name", packageName),
 	)
 
-	pkg, err := cc.catalogs.GetPackage(ctx, catalogID, packageName)
+	user, _ := cc.userReader.GetUser(ctx)
+	pkg, err := cc.catalogs.GetPackage(ctx, user, catalogID, packageName)
 	if err != nil {
 		if !errors.Is(err, domain.ErrNotFound) {
 			slog.ErrorContext(ctx, "Failed to get package", slog.String("error", err.Error()))
@@ -130,7 +123,7 @@ func (cc *CatalogController) GetMyPackage(
 		return nil, err
 	}
 
-	versions, err := cc.catalogs.GetAvailableVersions(ctx, catalogID, packageName)
+	versions, err := cc.catalogs.GetAvailableVersions(ctx, user, catalogID, packageName)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to get package versions", slog.String("error", err.Error()))
 		return nil, err
@@ -157,7 +150,8 @@ func (cc *CatalogController) GetPackageSchema(
 		slog.String("version", version),
 	)
 
-	raw, err := cc.catalogs.GetPackageSchema(ctx, catalogID, packageName, version)
+	user, _ := cc.userReader.GetUser(ctx)
+	raw, err := cc.catalogs.GetPackageSchema(ctx, user, catalogID, packageName, version)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			// getPackageSchema has no 404 response in the spec: a missing or

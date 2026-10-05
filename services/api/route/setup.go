@@ -54,7 +54,6 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, serve
 		catalogSettings,
 		app.Env.Schemas.Overrides(),
 		pkgRepo,
-		app.UserContextReader,
 	)
 
 	namespaceAuthz := namespace.NewAuthorizer(

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
@@ -34,16 +35,19 @@ func (uc *Lifecycle) Start(
 	ctx context.Context,
 	req domain.StartRequest,
 ) (domain.StartResponse, error) {
+	if err := uc.namespaces.Check(req.User, req.Namespace); err != nil {
+		return domain.StartResponse{}, err
+	}
 
 	// Go through the catalog use case rather than the raw package repository
 	// so catalog restrictions apply to installs, not just to browsing.
-	pkg, err := uc.catalogSvc.GetPackage(ctx, req.CatalogID, req.PackageName)
+	pkg, err := uc.catalogSvc.GetPackage(ctx, &req.User, req.CatalogID, req.PackageName)
 	if err != nil {
 		return domain.StartResponse{}, fmt.Errorf("get package: %w", err)
 	}
 
 	if req.Share {
-		if err := uc.catalogSvc.CheckSharingAllowed(ctx, req.CatalogID); err != nil {
+		if err := uc.catalogSvc.CheckSharingAllowed(ctx, &req.User, req.CatalogID); err != nil {
 			return domain.StartResponse{}, fmt.Errorf("check sharing allowed: %w", err)
 		}
 	}
@@ -68,7 +72,7 @@ func (uc *Lifecycle) Start(
 		ReleaseID:    req.ReleaseID,
 		CatalogID:    req.CatalogID,
 		FriendlyName: req.FriendlyName,
-		Owner:        req.Username,
+		Owner:        req.User.Username,
 		Share:        req.Share,
 	}
 	if err := uc.records.CreateServiceRecord(ctx, req.Namespace, record); err != nil {
@@ -109,16 +113,22 @@ func (uc *Lifecycle) Start(
 	return domain.StartResponse{}, nil
 }
 
-// authorize enforces the same owner/share rule as the query side: a caller
-// may only act on a service they can see. A service they can't see is
+// authorize enforces that user may act in namespace, then the same
+// owner/share rule as the query side: a caller may only act on a service
+// they can see. A service they can't see is
 // reported as ErrNotFound, exactly as GetService does. The backend talks to
 // Kubernetes with its own service account, so nothing downstream enforces
 // this per user.
 // It returns the service's record on success.
 func (uc *Lifecycle) authorize(
 	ctx context.Context,
-	username, namespace, releaseName string,
+	user usercontext.User,
+	namespace, releaseName string,
 ) (ports.ServiceRecord, error) {
+	if err := uc.namespaces.Check(user, namespace); err != nil {
+		return ports.ServiceRecord{}, err
+	}
+
 	rec, err := uc.records.GetServiceRecord(ctx, namespace, releaseName)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -127,28 +137,28 @@ func (uc *Lifecycle) authorize(
 		return ports.ServiceRecord{}, fmt.Errorf("read service record: %w", err)
 	}
 
-	if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
+	if !uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
 		return ports.ServiceRecord{}, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
 	}
 	return rec, nil
 }
 
 func (uc *Lifecycle) Suspend(ctx context.Context, req domain.SuspendRequest) error {
-	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.User, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	return uc.helm.SuspendRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Resume(ctx context.Context, req domain.ResumeRequest) error {
-	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.User, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	return uc.helm.ResumeRelease(ctx, req.Namespace, req.ReleaseName)
 }
 
 func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error {
-	if _, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName); err != nil {
+	if _, err := uc.authorize(ctx, req.User, req.Namespace, req.ReleaseName); err != nil {
 		return err
 	}
 	if err := uc.helm.UninstallRelease(ctx, req.Namespace, req.ReleaseName); err != nil {
@@ -165,12 +175,12 @@ func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error
 // service (because it is shared) get ErrForbidden; callers who can't see it
 // get ErrNotFound, as for every other operation.
 func (uc *Lifecycle) SetShared(ctx context.Context, req domain.SetSharedRequest) error {
-	rec, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName)
+	rec, err := uc.authorize(ctx, req.User, req.Namespace, req.ReleaseName)
 	if err != nil {
 		return err
 	}
 
-	if !strings.EqualFold(rec.Owner, req.Username) {
+	if !strings.EqualFold(rec.Owner, req.User.Username) {
 		return fmt.Errorf(
 			"%w: only the owner of service %q can change its sharing",
 			domain.ErrForbidden,
@@ -179,7 +189,7 @@ func (uc *Lifecycle) SetShared(ctx context.Context, req domain.SetSharedRequest)
 	}
 
 	if req.Shared {
-		if err := uc.catalogSvc.CheckSharingAllowed(ctx, rec.CatalogID); err != nil {
+		if err := uc.catalogSvc.CheckSharingAllowed(ctx, &req.User, rec.CatalogID); err != nil {
 			return fmt.Errorf("check sharing allowed: %w", err)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
@@ -31,9 +32,12 @@ func setupLifecycle(t *testing.T) (*Lifecycle, context.Context, lifecycleMocks) 
 	return uc, context.Background(), m
 }
 
+// alice may act in her personal namespace and in groupNamespace.
+var alice = usercontext.User{Username: "alice", Groups: []string{"data-team"}}
+
 func baseRequest() domain.StartRequest {
 	return domain.StartRequest{
-		Username:     "alice",
+		User:         alice,
 		CatalogID:    "my-catalog",
 		PackageName:  "jupyter-python",
 		Version:      "1.0.0",
@@ -66,7 +70,7 @@ func TestStart_Success(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
+	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", ctx, req.Namespace, mock.Anything).Return(nil)
 	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values, mock.Anything).
@@ -86,14 +90,14 @@ func TestStart_ServiceRecordIsCorrect(t *testing.T) {
 	req.Share = true
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.catalog.On("CheckSharingAllowed", mock.Anything, req.CatalogID).Return(nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("CheckSharingAllowed", mock.Anything, mock.Anything, req.CatalogID).Return(nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", ctx, req.Namespace, ports.ServiceRecord{
 		ReleaseID:    req.ReleaseID,
 		CatalogID:    req.CatalogID,
 		FriendlyName: req.FriendlyName,
-		Owner:        req.Username,
+		Owner:        req.User.Username,
 		Share:        true,
 	}).Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
@@ -109,7 +113,7 @@ func TestStart_GetPackageError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, errors.New("index unavailable"))
 
 	_, err := uc.Start(ctx, req)
@@ -123,7 +127,7 @@ func TestStart_PackageNotFound(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 
-	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).
+	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, domain.ErrNotFound)
 
 	_, err := uc.Start(ctx, req)
@@ -144,8 +148,8 @@ func TestStart_SharingNotAllowed(t *testing.T) {
 	req.Share = true
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	m.catalog.On("CheckSharingAllowed", mock.Anything, req.CatalogID).Return(domain.ErrForbidden)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("CheckSharingAllowed", mock.Anything, mock.Anything, req.CatalogID).Return(domain.ErrForbidden)
 
 	_, err := uc.Start(ctx, req)
 
@@ -161,7 +165,7 @@ func TestStart_ShareFalseSkipsSharingCheck(t *testing.T) {
 	req.Share = false
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
@@ -171,7 +175,7 @@ func TestStart_ShareFalseSkipsSharingCheck(t *testing.T) {
 	_, err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
-	m.catalog.AssertNotCalled(t, "CheckSharingAllowed", mock.Anything, mock.Anything)
+	m.catalog.AssertNotCalled(t, "CheckSharingAllowed", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestStart_AlreadyExists(t *testing.T) {
@@ -179,7 +183,7 @@ func TestStart_AlreadyExists(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
 		Return(ports.ReleaseState{Exists: true}, nil)
 
@@ -195,7 +199,7 @@ func TestStart_GetReleaseStateError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
 		Return(ports.ReleaseState{}, errors.New("helm unavailable"))
 
@@ -211,7 +215,7 @@ func TestStart_RecordError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("k8s unavailable"))
@@ -227,7 +231,7 @@ func TestStart_RecordAlreadyExistsDoesNotOverwriteOrInstall(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, req.Namespace, mock.Anything).
 		Return(domain.ErrAlreadyExists)
@@ -243,7 +247,7 @@ func TestStart_HelmError(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
@@ -260,7 +264,7 @@ func TestStart_InvokesInstallCallbacks(t *testing.T) {
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
+	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
@@ -311,7 +315,7 @@ func TestAuthorize_Rules(t *testing.T) {
 			uc, ctx, m := setupLifecycle(t)
 			ownedBy(m, tt.ns, tt.owner, tt.share)
 
-			_, err := uc.authorize(ctx, "alice", tt.ns, release)
+			_, err := uc.authorize(ctx, alice, tt.ns, release)
 
 			if tt.allowed {
 				assert.NoError(t, err)
@@ -327,7 +331,7 @@ func TestAuthorize_RecordNotFound(t *testing.T) {
 	m.records.On("GetServiceRecord", mock.Anything, groupNamespace, release).
 		Return(ports.ServiceRecord{}, domain.ErrNotFound)
 
-	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
+	_, err := uc.authorize(ctx, alice, groupNamespace, release)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
@@ -337,7 +341,7 @@ func TestAuthorize_RecordReadError(t *testing.T) {
 	m.records.On("GetServiceRecord", mock.Anything, groupNamespace, release).
 		Return(ports.ServiceRecord{}, errors.New("k8s unavailable"))
 
-	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
+	_, err := uc.authorize(ctx, alice, groupNamespace, release)
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 	assert.NotErrorIs(t, err, domain.ErrNotFound)
@@ -350,7 +354,7 @@ func TestSuspend_Success(t *testing.T) {
 	ownedBy(m, groupNamespace, "alice", false)
 	m.helm.On("SuspendRelease", ctx, groupNamespace, release).Return(nil)
 
-	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Suspend(ctx, domain.SuspendRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
@@ -360,7 +364,7 @@ func TestSuspend_DeniedForUnsharedForeignService(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedBy(m, groupNamespace, "bob", false)
 
-	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Suspend(ctx, domain.SuspendRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	m.helm.AssertNotCalled(t, "SuspendRelease")
@@ -372,7 +376,7 @@ func TestSuspend_HelmError(t *testing.T) {
 	m.helm.On("SuspendRelease", ctx, groupNamespace, release).
 		Return(errors.New("helm unavailable"))
 
-	err := uc.Suspend(ctx, domain.SuspendRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Suspend(ctx, domain.SuspendRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 }
@@ -384,7 +388,7 @@ func TestResume_Success(t *testing.T) {
 	ownedBy(m, groupNamespace, "bob", true)
 	m.helm.On("ResumeRelease", ctx, groupNamespace, release).Return(nil)
 
-	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Resume(ctx, domain.ResumeRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
@@ -394,7 +398,7 @@ func TestResume_DeniedForUnsharedForeignService(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedBy(m, groupNamespace, "bob", false)
 
-	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Resume(ctx, domain.ResumeRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	m.helm.AssertNotCalled(t, "ResumeRelease")
@@ -406,7 +410,7 @@ func TestResume_HelmError(t *testing.T) {
 	m.helm.On("ResumeRelease", ctx, groupNamespace, release).
 		Return(errors.New("helm unavailable"))
 
-	err := uc.Resume(ctx, domain.ResumeRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Resume(ctx, domain.ResumeRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 }
@@ -419,7 +423,7 @@ func TestDelete_Success(t *testing.T) {
 	m.helm.On("UninstallRelease", ctx, groupNamespace, release).Return(nil)
 	m.records.On("DeleteServiceRecord", ctx, groupNamespace, release).Return(nil)
 
-	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Delete(ctx, domain.DeleteRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
@@ -430,7 +434,7 @@ func TestDelete_DeniedForUnsharedForeignService(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedBy(m, groupNamespace, "bob", false)
 
-	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Delete(ctx, domain.DeleteRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	m.helm.AssertNotCalled(t, "UninstallRelease")
@@ -443,7 +447,7 @@ func TestDelete_HelmError(t *testing.T) {
 	m.helm.On("UninstallRelease", ctx, groupNamespace, release).
 		Return(errors.New("helm unavailable"))
 
-	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Delete(ctx, domain.DeleteRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
 	m.records.AssertNotCalled(t, "DeleteServiceRecord")
@@ -456,7 +460,7 @@ func TestDelete_RecordError(t *testing.T) {
 	m.records.On("DeleteServiceRecord", ctx, groupNamespace, release).
 		Return(errors.New("k8s unavailable"))
 
-	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
+	err := uc.Delete(ctx, domain.DeleteRequest{User: alice, Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 }
@@ -465,7 +469,7 @@ func TestDelete_RecordError(t *testing.T) {
 
 func sharedReq(shared bool) domain.SetSharedRequest {
 	return domain.SetSharedRequest{
-		Username:    "alice",
+		User:        alice,
 		Namespace:   groupNamespace,
 		ReleaseName: release,
 		Shared:      shared,
@@ -481,7 +485,7 @@ func ownedWithCatalog(m lifecycleMocks, owner string, share bool) {
 func TestSetShared_OwnerShares(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedWithCatalog(m, "alice", false)
-	m.catalog.On("CheckSharingAllowed", ctx, "my-catalog").Return(nil)
+	m.catalog.On("CheckSharingAllowed", ctx, mock.Anything, "my-catalog").Return(nil)
 	m.records.On("SetServiceShared", ctx, groupNamespace, release, true).Return(nil)
 
 	err := uc.SetShared(ctx, sharedReq(true))
@@ -525,7 +529,7 @@ func TestSetShared_InvisibleServiceNotFound(t *testing.T) {
 func TestSetShared_CatalogDisallowsSharing(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedWithCatalog(m, "alice", false)
-	m.catalog.On("CheckSharingAllowed", ctx, "my-catalog").
+	m.catalog.On("CheckSharingAllowed", ctx, mock.Anything, "my-catalog").
 		Return(domain.ErrForbidden)
 
 	err := uc.SetShared(ctx, sharedReq(true))
@@ -543,4 +547,39 @@ func TestSetShared_UpdateError(t *testing.T) {
 	err := uc.SetShared(ctx, sharedReq(false))
 
 	assert.ErrorContains(t, err, "k8s unavailable")
+}
+
+// --- namespace authorization ------------------------------------------------
+
+func TestLifecycle_ForeignNamespaceForbidden(t *testing.T) {
+	const foreign = "projet-other-team"
+	tests := map[string]func(*Lifecycle, context.Context) error{
+		"start": func(uc *Lifecycle, ctx context.Context) error {
+			req := baseRequest()
+			req.Namespace = foreign
+			_, err := uc.Start(ctx, req)
+			return err
+		},
+		"suspend": func(uc *Lifecycle, ctx context.Context) error {
+			return uc.Suspend(ctx, domain.SuspendRequest{User: alice, Namespace: foreign, ReleaseName: release})
+		},
+		"resume": func(uc *Lifecycle, ctx context.Context) error {
+			return uc.Resume(ctx, domain.ResumeRequest{User: alice, Namespace: foreign, ReleaseName: release})
+		},
+		"delete": func(uc *Lifecycle, ctx context.Context) error {
+			return uc.Delete(ctx, domain.DeleteRequest{User: alice, Namespace: foreign, ReleaseName: release})
+		},
+		"set shared": func(uc *Lifecycle, ctx context.Context) error {
+			return uc.SetShared(ctx, domain.SetSharedRequest{User: alice, Namespace: foreign, ReleaseName: release})
+		},
+	}
+
+	for name, call := range tests {
+		t.Run(name, func(t *testing.T) {
+			// No expectation is set on the mocks: any gateway call fails the test.
+			uc, ctx, _ := setupLifecycle(t)
+
+			assert.ErrorIs(t, call(uc, ctx), domain.ErrForbidden)
+		})
+	}
 }

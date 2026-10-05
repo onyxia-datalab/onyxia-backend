@@ -5,7 +5,13 @@
 // between an authenticated user and any namespace on the cluster.
 package namespace
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+)
 
 // Authorizer verifies that a namespace belongs to the caller: either their
 // personal namespace (derived from their username) or the namespace of one
@@ -39,6 +45,14 @@ func (a Authorizer) Allowed(username string, groups []string, namespace string) 
 	}
 
 	return false
+}
+
+// Check returns domain.ErrForbidden unless user may act within namespace.
+func (a Authorizer) Check(user usercontext.User, namespace string) error {
+	if !a.Allowed(user.Username, user.Groups, namespace) {
+		return fmt.Errorf("%w: user %q may not act in namespace %q", domain.ErrForbidden, user.Username, namespace)
+	}
+	return nil
 }
 
 // IsPersonal reports whether namespace is the given user's personal

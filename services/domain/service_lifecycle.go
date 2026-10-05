@@ -1,7 +1,11 @@
 package domain
 
+import "github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
+
+// The requests carry the caller: the use cases decide what they may do.
+
 type StartRequest struct {
-	Username     string
+	User         usercontext.User
 	CatalogID    string
 	PackageName  string
 	Version      string
@@ -17,25 +21,25 @@ type StartResponse struct {
 }
 
 type SuspendRequest struct {
-	Username    string
+	User        usercontext.User
 	ReleaseName string
 	Namespace   string
 }
 
 type ResumeRequest struct {
-	Username    string
+	User        usercontext.User
 	ReleaseName string
 	Namespace   string
 }
 
 type DeleteRequest struct {
-	Username    string
+	User        usercontext.User
 	ReleaseName string
 	Namespace   string
 }
 
 type SetSharedRequest struct {
-	Username    string
+	User        usercontext.User
 	ReleaseName string
 	Namespace   string
 	Shared      bool

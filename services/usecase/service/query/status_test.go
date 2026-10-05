@@ -65,13 +65,13 @@ func TestGetService_ReleaseDecidedStatuses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.releaseStatus), func(t *testing.T) {
-			uc, ctx, m := setupReader(t, testUsername)
+			uc, ctx, m := setupReader(t)
 			m.records.On("GetServiceRecord", mock.Anything, testNamespace, testRelease).
 				Return(record(testRelease, testUsername, false), nil)
 			m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
 				Return(ports.ReleaseState{Exists: true, Status: tt.releaseStatus}, nil)
 
-			svc, err := uc.GetService(ctx, testNamespace, testRelease)
+			svc, err := uc.GetService(ctx, testCaller, testNamespace, testRelease)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, svc.Status)

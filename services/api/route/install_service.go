@@ -22,5 +22,5 @@ func SetupInstallController(
 		namespaceAuthz,
 	)
 
-	return controller.NewInstallController(serviceLifecycleUc, app.UserContextReader, namespaceAuthz)
+	return controller.NewInstallController(serviceLifecycleUc, app.UserContextReader)
 }

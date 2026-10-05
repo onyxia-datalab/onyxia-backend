@@ -15,7 +15,6 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,9 +28,8 @@ import (
 // place.
 
 // testSecurityHandler stands in for OIDC verification: it trusts two plain
-// headers instead of validating a token, so tests can drive the namespace
-// authorizer with an arbitrary username/groups without standing up a real
-// IdP.
+// headers instead of validating a token, so tests can authenticate an
+// arbitrary username/groups without standing up a real IdP.
 type testSecurityHandler struct {
 	writer usercontext.Writer
 }
@@ -79,10 +77,10 @@ type stubQuery struct {
 	listErr  error
 }
 
-func (s *stubQuery) GetService(context.Context, string, string) (domain.Service, error) {
+func (s *stubQuery) GetService(context.Context, usercontext.User, string, string) (domain.Service, error) {
 	return s.getResp, s.getErr
 }
-func (s *stubQuery) ListServices(context.Context, string) ([]domain.Service, error) {
+func (s *stubQuery) ListServices(context.Context, usercontext.User, string) ([]domain.Service, error) {
 	return s.listResp, s.listErr
 }
 
@@ -90,18 +88,19 @@ func (s *stubQuery) ListServices(context.Context, string) ([]domain.Service, err
 // in this file don't exercise the catalog routes.
 type stubCatalog struct{}
 
-func (stubCatalog) ListPublicCatalogs(context.Context) ([]domain.Catalog, error) { return nil, nil }
-func (stubCatalog) ListUserCatalogs(context.Context) ([]domain.Catalog, error)   { return nil, nil }
-func (stubCatalog) GetPackage(context.Context, string, string) (domain.Package, error) {
+func (stubCatalog) ListCatalogs(context.Context, *usercontext.User) ([]domain.Catalog, error) {
+	return nil, nil
+}
+func (stubCatalog) GetPackage(context.Context, *usercontext.User, string, string) (domain.Package, error) {
 	return domain.Package{}, nil
 }
-func (stubCatalog) GetAvailableVersions(context.Context, string, string) ([]string, error) {
+func (stubCatalog) GetAvailableVersions(context.Context, *usercontext.User, string, string) ([]string, error) {
 	return nil, nil
 }
-func (stubCatalog) GetPackageSchema(context.Context, string, string, string) ([]byte, error) {
+func (stubCatalog) GetPackageSchema(context.Context, *usercontext.User, string, string, string) ([]byte, error) {
 	return nil, nil
 }
-func (stubCatalog) CheckSharingAllowed(context.Context, string) error { return nil }
+func (stubCatalog) CheckSharingAllowed(context.Context, *usercontext.User, string) error { return nil }
 
 // --- test server ---------------------------------------------------------
 
@@ -111,12 +110,11 @@ func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *ht
 	t.Helper()
 
 	userReader, userWriter := usercontext.NewUserContext()
-	namespaceAuthz := namespace.NewAuthorizer("user-", "projet-")
 
 	h := NewHandler(
-		controller.NewInstallController(lifecycle, userReader, namespaceAuthz),
+		controller.NewInstallController(lifecycle, userReader),
 		controller.NewCatalogController(stubCatalog{}, userReader),
-		controller.NewServiceQueryController(query, userReader, namespaceAuthz),
+		controller.NewServiceQueryController(query, userReader),
 	)
 
 	srv, err := api.NewServer(
@@ -188,32 +186,6 @@ func TestHTTP_InstallService(t *testing.T) {
 			require.Equal(t, tt.wantStatus, resp.StatusCode)
 		})
 	}
-}
-
-func TestHTTP_InstallService_ForeignNamespaceIs403(t *testing.T) {
-	ts := newTestServer(t, &stubLifecycle{}, &stubQuery{})
-
-	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/services/my-release", bytes.NewReader(
-		mustJSON(t, map[string]any{
-			"catalogId": "my-catalog", "packageName": "jupyter", "name": "n", "options": map[string]any{},
-		}),
-	))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Test-User", "alice")
-	req.Header.Set("X-Onyxia-Project", "user-bob")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	require.Equal(t, http.StatusForbidden, resp.StatusCode)
-}
-
-func mustJSON(t *testing.T, v any) []byte {
-	t.Helper()
-	b, err := json.Marshal(v)
-	require.NoError(t, err)
-	return b
 }
 
 // --- SetServiceSuspended (PUT /api/services/{releaseId}/suspended) -----------
@@ -314,20 +286,6 @@ func TestHTTP_GetService(t *testing.T) {
 			require.Equal(t, tt.wantStatus, resp.StatusCode)
 		})
 	}
-}
-
-func TestHTTP_GetService_ForeignNamespaceIs403(t *testing.T) {
-	ts := newTestServer(t, &stubLifecycle{}, &stubQuery{})
-
-	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api/services/my-release", nil)
-	require.NoError(t, err)
-	req.Header.Set("X-Test-User", "alice")
-	req.Header.Set("X-Onyxia-Project", "user-bob")
-
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 }
 
 // --- ListServices (GET /api/services) -----------------------------------------

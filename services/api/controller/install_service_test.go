@@ -7,12 +7,9 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-var testNamespaceAuthz = namespace.NewAuthorizer("user-", "projet-")
 
 type lifecycleStub struct {
 	start      func(context.Context, domain.StartRequest) (domain.StartResponse, error)
@@ -85,7 +82,7 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 				captured = req
 				return domain.StartResponse{}, nil
 			}}
-			ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+			ctrl := NewInstallController(lifecycle, users)
 
 			res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
 				CatalogId:      "catalog",
@@ -108,49 +105,13 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 	}
 }
 
-func TestInstallServiceDeniesForeignNamespace(t *testing.T) {
-	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
-	lifecycle := &lifecycleStub{start: func(
-		_ context.Context,
-		req domain.StartRequest,
-	) (domain.StartResponse, error) {
-		t.Fatal("use case must not run when the namespace is not the caller's")
-		return domain.StartResponse{}, nil
-	}}
-	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
-
-	res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
-		CatalogId:   "catalog",
-		PackageName: "jupyter",
-		Options:     api.ServiceInstallRequestOptions{},
-		Name:        "display-name",
-	}, api.InstallServiceParams{
-		ReleaseId:      "release-id",
-		XOnyxiaProject: "user-bob",
-	})
-
-	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrForbidden)
-}
-
-func TestDeleteServiceDeniesForeignNamespace(t *testing.T) {
-	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
-	lifecycle := &lifecycleStub{}
-	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
-
-	res, err := ctrl.DeleteService(ctx, api.DeleteServiceParams{
-		ReleaseId:      "release-id",
-		XOnyxiaProject: "projet-other-team",
-	})
-
-	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrForbidden)
-}
-
+// The controller passes the whole caller on: the use case decides, from the
+// username and the groups, whether the namespace is theirs.
 func TestSetServiceSharedPassesCallerAndFlag(t *testing.T) {
-	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	caller := usercontext.User{Username: "alice", Groups: []string{"data-team"}}
+	ctx, users, _ := usercontext.NewTestUserContext(&caller)
 	lifecycle := &lifecycleStub{}
-	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+	ctrl := NewInstallController(lifecycle, users)
 
 	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
 		ReleaseId:      "release-id",
@@ -161,31 +122,16 @@ func TestSetServiceSharedPassesCallerAndFlag(t *testing.T) {
 	assert.IsType(t, &api.SetServiceSharedNoContent{}, res)
 	require.NotNil(t, lifecycle.sharedReq)
 	assert.Equal(t, domain.SetSharedRequest{
-		Username:    "alice",
+		User:        caller,
 		ReleaseName: "release-id",
 		Namespace:   "user-alice",
 		Shared:      true,
 	}, *lifecycle.sharedReq)
 }
 
-func TestSetServiceSharedDeniesForeignNamespace(t *testing.T) {
-	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
-	lifecycle := &lifecycleStub{}
-	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
-
-	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
-		ReleaseId:      "release-id",
-		XOnyxiaProject: "projet-other-team",
-	})
-
-	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrForbidden)
-	assert.Nil(t, lifecycle.sharedReq)
-}
-
 func TestSetServiceSharedWithoutUserIsForbidden(t *testing.T) {
 	users, _ := usercontext.NewUserContext()
-	ctrl := NewInstallController(&lifecycleStub{}, users, testNamespaceAuthz)
+	ctrl := NewInstallController(&lifecycleStub{}, users)
 
 	res, err := ctrl.SetServiceShared(context.Background(), &api.SetServiceSharedReq{}, api.SetServiceSharedParams{
 		ReleaseId:      "release-id",
@@ -198,7 +144,7 @@ func TestSetServiceSharedWithoutUserIsForbidden(t *testing.T) {
 
 func TestSetServiceSharedPropagatesUsecaseError(t *testing.T) {
 	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
-	ctrl := NewInstallController(&lifecycleStub{sharedErr: domain.ErrForbidden}, users, testNamespaceAuthz)
+	ctrl := NewInstallController(&lifecycleStub{sharedErr: domain.ErrForbidden}, users)
 
 	res, err := ctrl.SetServiceShared(ctx, &api.SetServiceSharedReq{Shared: true}, api.SetServiceSharedParams{
 		ReleaseId:      "release-id",
@@ -217,7 +163,7 @@ func TestInstallServiceWrapsUnexpectedNotFoundAsInvalidInput(t *testing.T) {
 	) (domain.StartResponse, error) {
 		return domain.StartResponse{}, domain.ErrNotFound
 	}}
-	ctrl := NewInstallController(lifecycle, users, testNamespaceAuthz)
+	ctrl := NewInstallController(lifecycle, users)
 
 	res, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
 		CatalogId:   "catalog",

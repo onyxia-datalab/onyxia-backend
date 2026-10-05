@@ -17,7 +17,7 @@ func SetupServiceQueryController(
 	secretGtw := k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset())
 	podGtw := k8s.NewWorkloadStateGtw(app.K8sClient.Clientset())
 
-	serviceQueryUc := query.NewReader(secretGtw, releaseGtw, podGtw, app.UserContextReader, namespaceAuthz)
+	serviceQueryUc := query.NewReader(secretGtw, releaseGtw, podGtw, namespaceAuthz)
 
-	return controller.NewServiceQueryController(serviceQueryUc, app.UserContextReader, namespaceAuthz)
+	return controller.NewServiceQueryController(serviceQueryUc, app.UserContextReader)
 }

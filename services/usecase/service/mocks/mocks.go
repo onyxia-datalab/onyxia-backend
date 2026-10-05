@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
@@ -153,16 +154,8 @@ type MockCatalogService struct{ mock.Mock }
 
 var _ ports.CatalogService = (*MockCatalogService)(nil)
 
-func (m *MockCatalogService) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, error) {
-	args := m.Called(ctx)
-	if v := args.Get(0); v != nil {
-		return v.([]domain.Catalog), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-func (m *MockCatalogService) ListUserCatalogs(ctx context.Context) ([]domain.Catalog, error) {
-	args := m.Called(ctx)
+func (m *MockCatalogService) ListCatalogs(ctx context.Context, user *usercontext.User) ([]domain.Catalog, error) {
+	args := m.Called(ctx, user)
 	if v := args.Get(0); v != nil {
 		return v.([]domain.Catalog), args.Error(1)
 	}
@@ -171,19 +164,19 @@ func (m *MockCatalogService) ListUserCatalogs(ctx context.Context) ([]domain.Cat
 
 func (m *MockCatalogService) GetPackage(
 	ctx context.Context,
-	catalogID string,
-	packageName string,
+	user *usercontext.User,
+	catalogID, packageName string,
 ) (domain.Package, error) {
-	args := m.Called(ctx, catalogID, packageName)
+	args := m.Called(ctx, user, catalogID, packageName)
 	return args.Get(0).(domain.Package), args.Error(1)
 }
 
 func (m *MockCatalogService) GetAvailableVersions(
 	ctx context.Context,
-	catalogID string,
-	packageName string,
+	user *usercontext.User,
+	catalogID, packageName string,
 ) ([]string, error) {
-	args := m.Called(ctx, catalogID, packageName)
+	args := m.Called(ctx, user, catalogID, packageName)
 	if v := args.Get(0); v != nil {
 		return v.([]string), args.Error(1)
 	}
@@ -192,19 +185,18 @@ func (m *MockCatalogService) GetAvailableVersions(
 
 func (m *MockCatalogService) GetPackageSchema(
 	ctx context.Context,
-	catalogID string,
-	packageName string,
-	version string,
+	user *usercontext.User,
+	catalogID, packageName, version string,
 ) ([]byte, error) {
-	args := m.Called(ctx, catalogID, packageName, version)
+	args := m.Called(ctx, user, catalogID, packageName, version)
 	if v := args.Get(0); v != nil {
 		return v.([]byte), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
 
-func (m *MockCatalogService) CheckSharingAllowed(ctx context.Context, catalogID string) error {
-	return m.Called(ctx, catalogID).Error(0)
+func (m *MockCatalogService) CheckSharingAllowed(ctx context.Context, user *usercontext.User, catalogID string) error {
+	return m.Called(ctx, user, catalogID).Error(0)
 }
 
 type MockWorkloadStateGateway struct{ mock.Mock }

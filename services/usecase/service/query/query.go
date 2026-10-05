@@ -15,7 +15,6 @@ type Reader struct {
 	records    ports.ServiceRecordGateway
 	helm       ports.ReleaseGateway
 	pods       ports.WorkloadStateGateway
-	userReader usercontext.UsernameGetter
 	namespaces namespace.Authorizer
 }
 
@@ -25,14 +24,12 @@ func NewReader(
 	records ports.ServiceRecordGateway,
 	helm ports.ReleaseGateway,
 	pods ports.WorkloadStateGateway,
-	userReader usercontext.UsernameGetter,
 	namespaces namespace.Authorizer,
 ) *Reader {
 	return &Reader{
 		records:    records,
 		helm:       helm,
 		pods:       pods,
-		userReader: userReader,
 		namespaces: namespaces,
 	}
 }
@@ -43,9 +40,12 @@ func NewReader(
 // be used to bypass the filtering ListServices already applies.
 func (uc *Reader) GetService(
 	ctx context.Context,
+	user usercontext.User,
 	namespace, releaseID string,
 ) (domain.Service, error) {
-	username, _ := uc.userReader.GetUsername(ctx)
+	if err := uc.namespaces.Check(user, namespace); err != nil {
+		return domain.Service{}, err
+	}
 
 	rec, err := uc.records.GetServiceRecord(ctx, namespace, releaseID)
 	if err != nil {
@@ -55,7 +55,7 @@ func (uc *Reader) GetService(
 		return domain.Service{}, fmt.Errorf("read service record: %w", err)
 	}
 
-	if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
+	if !uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
 		return domain.Service{}, domain.ErrNotFound
 	}
 
@@ -75,9 +75,12 @@ func (uc *Reader) GetService(
 // workload controllers only.
 func (uc *Reader) ListServices(
 	ctx context.Context,
+	user usercontext.User,
 	namespace string,
 ) ([]domain.Service, error) {
-	username, _ := uc.userReader.GetUsername(ctx)
+	if err := uc.namespaces.Check(user, namespace); err != nil {
+		return nil, err
+	}
 
 	records, err := uc.records.ListServiceRecords(ctx, namespace)
 	if err != nil {
@@ -86,7 +89,7 @@ func (uc *Reader) ListServices(
 
 	services := make([]domain.Service, 0, len(records))
 	for _, rec := range records {
-		if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
+		if !uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
 			continue
 		}
 		releaseState, err := uc.helm.GetReleaseState(ctx, namespace, rec.ReleaseID)

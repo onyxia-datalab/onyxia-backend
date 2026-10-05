@@ -11,26 +11,20 @@ import (
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
-
-const userNotFoundInContextMessage = "user not found in context"
 
 type InstallController struct {
 	serviceLifecycleUc ports.ServiceLifecycle
 	userGetter         usercontext.UserGetter
-	namespaceAuthz     namespace.Authorizer
 }
 
 func NewInstallController(
 	serviceLifecycleUc ports.ServiceLifecycle,
 	userGetter usercontext.UserGetter,
-	namespaceAuthz namespace.Authorizer,
 ) *InstallController {
 	return &InstallController{
 		serviceLifecycleUc: serviceLifecycleUc,
 		userGetter:         userGetter,
-		namespaceAuthz:     namespaceAuthz,
 	}
 }
 
@@ -39,23 +33,14 @@ func (ic *InstallController) SetServiceSuspended(
 	req *api.SetServiceSuspendedReq,
 	params api.SetServiceSuspendedParams,
 ) (api.SetServiceSuspendedRes, error) {
-	u, ok := ic.userGetter.GetUser(ctx)
-	if !ok || u == nil {
-		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return nil, domain.ErrForbidden
-	}
-
-	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
-		slog.ErrorContext(ctx, "namespace access denied",
-			slog.String("namespace", params.XOnyxiaProject),
-			slog.String("username", u.Username),
-		)
-		return nil, domain.ErrForbidden
+	user, err := callerFrom(ctx, ic.userGetter)
+	if err != nil {
+		return nil, err
 	}
 
 	if req.Suspended {
 		suspendReq := domain.SuspendRequest{
-			Username:    u.Username,
+			User:        user,
 			ReleaseName: params.ReleaseId,
 			Namespace:   params.XOnyxiaProject,
 		}
@@ -65,7 +50,7 @@ func (ic *InstallController) SetServiceSuspended(
 		}
 	} else {
 		resumeReq := domain.ResumeRequest{
-			Username:    u.Username,
+			User:        user,
 			ReleaseName: params.ReleaseId,
 			Namespace:   params.XOnyxiaProject,
 		}
@@ -83,22 +68,13 @@ func (ic *InstallController) SetServiceShared(
 	req *api.SetServiceSharedReq,
 	params api.SetServiceSharedParams,
 ) (api.SetServiceSharedRes, error) {
-	u, ok := ic.userGetter.GetUser(ctx)
-	if !ok || u == nil {
-		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return nil, domain.ErrForbidden
-	}
-
-	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
-		slog.ErrorContext(ctx, "namespace access denied",
-			slog.String("namespace", params.XOnyxiaProject),
-			slog.String("username", u.Username),
-		)
-		return nil, domain.ErrForbidden
+	user, err := callerFrom(ctx, ic.userGetter)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := ic.serviceLifecycleUc.SetShared(ctx, domain.SetSharedRequest{
-		Username:    u.Username,
+		User:        user,
 		ReleaseName: params.ReleaseId,
 		Namespace:   params.XOnyxiaProject,
 		Shared:      req.Shared,
@@ -114,22 +90,13 @@ func (ic *InstallController) DeleteService(
 	ctx context.Context,
 	params api.DeleteServiceParams,
 ) (api.DeleteServiceRes, error) {
-	u, ok := ic.userGetter.GetUser(ctx)
-	if !ok || u == nil {
-		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return nil, domain.ErrForbidden
-	}
-
-	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
-		slog.ErrorContext(ctx, "namespace access denied",
-			slog.String("namespace", params.XOnyxiaProject),
-			slog.String("username", u.Username),
-		)
-		return nil, domain.ErrForbidden
+	user, err := callerFrom(ctx, ic.userGetter)
+	if err != nil {
+		return nil, err
 	}
 
 	req := domain.DeleteRequest{
-		Username:    u.Username,
+		User:        user,
 		ReleaseName: params.ReleaseId,
 		Namespace:   params.XOnyxiaProject,
 	}
@@ -148,18 +115,9 @@ func (ic *InstallController) InstallService(
 	params api.InstallServiceParams,
 ) (api.InstallServiceRes, error) {
 
-	u, ok := ic.userGetter.GetUser(ctx)
-	if !ok || u == nil {
-		slog.ErrorContext(ctx, userNotFoundInContextMessage)
-		return nil, domain.ErrForbidden
-	}
-
-	if !ic.namespaceAuthz.Allowed(u.Username, u.Groups, params.XOnyxiaProject) {
-		slog.ErrorContext(ctx, "namespace access denied",
-			slog.String("namespace", params.XOnyxiaProject),
-			slog.String("username", u.Username),
-		)
-		return nil, domain.ErrForbidden
+	user, err := callerFrom(ctx, ic.userGetter)
+	if err != nil {
+		return nil, err
 	}
 
 	if req == nil {
@@ -188,7 +146,7 @@ func (ic *InstallController) InstallService(
 	}
 
 	dreq := domain.StartRequest{
-		Username:     u.Username,
+		User:         user,
 		CatalogID:    req.CatalogId,
 		PackageName:  req.PackageName,
 		Name:         req.Name,
@@ -201,9 +159,7 @@ func (ic *InstallController) InstallService(
 	}
 
 	// Execute use case.
-	_, err := ic.serviceLifecycleUc.Start(ctx, dreq)
-
-	if err != nil {
+	if _, err := ic.serviceLifecycleUc.Start(ctx, dreq); err != nil {
 		slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
 		if errors.Is(err, domain.ErrNotFound) {
 			// installService has no 404 response in the spec: a missing or
