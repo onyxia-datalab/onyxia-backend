@@ -15,7 +15,7 @@ Each API is intentionally decoupled so they can be deployed and scaled independe
 
 - **Go** (latest, see `go.mod`)
 - **HTTP**: `chi/v5` (router), `ogen` (type-safe OpenAPI code generation)
-- **Kubernetes / Helm**: `k8s.io/client-go`, `helm.sh/helm/v3`
+- **Kubernetes / Helm**: `k8s.io/client-go`, `helm.sh/helm/v4`
 - **Auth**: `go-oidc/v3`, `go-jose/v4` (OIDC + DPoP)
 - **Config**: `spf13/viper`
 - **Logging**: `log/slog` + `go.uber.org/zap` (as backend)
@@ -58,8 +58,9 @@ internal/
   auth/                 # OIDC + no-auth implementations
   kube/                 # Kubernetes client wrapper
   usercontext/          # user info storage/retrieval in context
-  logging/              # slog contextAttrHandler
-  httputil/             # CORS, proxy headers middleware
+  logging/              # slog contextAttrHandler, default logger setup
+  server/               # shared middleware stack (CORS, healthz...) and graceful shutdown
+  httputil/             # proxy headers middleware
   tools/                # misc utilities
 ```
 
@@ -72,11 +73,11 @@ api/controller → usecase → domain ← ports ← adapters
 ```
 
 - **`api/`** — HTTP layer: chi router, ogen-generated OpenAPI handlers (`api/oas/`), controllers, middleware
-- **`usecase/`** — Business logic, depends only on port interfaces
-- **`domain/`** — Core models and domain error types
-- **`ports/`** — Interfaces for external dependencies (e.g., `HelmReleasesGateway`, `PackageRepository`)
-- **`adapters/`** — Concrete implementations of ports (Helm, Kubernetes)
-- **`bootstrap/`** — Dependency injection: wires adapters → usecases → controllers, loads config via Viper
+- **`usecase/`** — Business logic, depends only on port interfaces and domain types
+- **`domain/`** — Core models, request types and domain error types
+- **`ports/`** — Interfaces: the driving ports the API layer calls (`usecases.go`, implemented in `usecase/`) and the driven ports the use cases call (e.g. `ReleaseGateway`, `ServiceRecordGateway`, `PackageRepository`, implemented in `adapters/`). Port types use neutral vocabulary: adapters translate Helm/Kubernetes specifics (statuses, secret layout) into it.
+- **`adapters/`** — Concrete implementations of driven ports (Helm, Kubernetes)
+- **`bootstrap/`** — Loads and validates config via Viper, and converts it into the domain types the use cases take (e.g. `env.CatalogSettings`). Use cases never import `bootstrap/`; adapters may read their own technical config from it.
 
 ### OpenAPI Code Generation
 
@@ -90,9 +91,13 @@ Manual DI in `api/route/setup.go` — adapters are instantiated, injected into u
 
 Two modes selectable via config: OIDC (with DPoP support) or no-auth (for development). Auth middleware extracts user info into `context.Context`; controllers read it via `internal/usercontext`.
 
+### Authorization
+
+Use cases receive the caller explicitly (a `usercontext.User` in the request or as a parameter) and enforce every authorization rule themselves: namespace ownership (`services/usecase/namespace`), service owner/share visibility, catalog restrictions, group membership. Controllers only extract the caller and translate HTTP — they must not make authorization decisions. The backend talks to Kubernetes with its own service account, so these checks are the only barrier between users.
+
 ### Logging
 
-Uses `log/slog` with a custom `contextAttrHandler` (`internal/logging/context_handler.go`) that enriches log records via an `AttrFunc`. In both APIs (`bootstrap/logger.go`), this function reads `username`, `groups`, and `roles` from the usercontext and appends them as fields. This is why the lint rule enforces `slog.*Context` variants — calling `slog.Info` instead of `slog.InfoContext` silently drops those fields from the log record.
+Uses `log/slog` with a custom `contextAttrHandler` (`internal/logging/context_handler.go`) that enriches log records via an `AttrFunc`. `internal/logging.SetupDefault` installs it in both APIs; its `AttrFunc` reads `username`, `groups`, and `roles` from the usercontext and appends them as fields. This is why the lint rule enforces `slog.*Context` variants — calling `slog.Info` instead of `slog.InfoContext` silently drops those fields from the log record.
 
 ### Configuration
 
