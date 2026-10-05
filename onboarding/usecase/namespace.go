@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
@@ -46,10 +47,10 @@ func (s *onboardingUsecase) getNamespaceAnnotations(
 		return nil
 	}
 
-	annotations := s.namespace.Annotation.Static
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
+	// Copy: the static map is shared configuration, and this function runs
+	// concurrently for every request.
+	annotations := make(map[string]string, len(s.namespace.Annotation.Static))
+	maps.Copy(annotations, s.namespace.Annotation.Static)
 
 	if s.namespace.Annotation.Dynamic.LastLoginTimestamp {
 		annotations["onyxia_last_login_timestamp"] = fmt.Sprint(time.Now().UnixMilli())

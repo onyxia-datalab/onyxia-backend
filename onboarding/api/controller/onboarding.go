@@ -49,7 +49,7 @@ func (c *OnboardingController) Onboard(
 				slog.String("group", *groupPtr),
 				slog.Any("userGroups", user.Groups),
 			)
-			return nil, fmt.Errorf("%w: user does not have access to group: %s", domain.ErrUnauthorized, *groupPtr)
+			return nil, fmt.Errorf("%w: user does not have access to group: %s", domain.ErrForbidden, *groupPtr)
 		}
 	}
 

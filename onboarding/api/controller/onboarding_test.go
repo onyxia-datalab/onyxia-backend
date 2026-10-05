@@ -68,7 +68,7 @@ func TestOnboardGroupValidationFails(t *testing.T) {
 
 	res, err := ctrl.Onboard(ctx, &req)
 	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrUnauthorized)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 

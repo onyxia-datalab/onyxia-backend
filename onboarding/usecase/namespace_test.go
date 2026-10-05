@@ -166,3 +166,18 @@ func TestGetNamespaceAnnotationsAllAnnotations(t *testing.T) {
 	assert.Contains(t, annotations, "onyxia_last_login_timestamp")
 	assert.Equal(t, "value1", annotations["user-attr1"])
 }
+
+// The static annotations are shared configuration: building a namespace's
+// annotations must not write into them (concurrent requests would race, and
+// one user's dynamic annotations would leak into the next request).
+func TestGetNamespaceAnnotationsDoesNotMutateStaticConfig(t *testing.T) {
+	usecase := setupPrivateUsecase(new(MockNamespaceService), domain.Quotas{})
+	usecase.namespace.Annotation.Enabled = true
+	usecase.namespace.Annotation.Static = map[string]string{"static-key": "static-value"}
+	usecase.namespace.Annotation.Dynamic.LastLoginTimestamp = true
+
+	annotations := usecase.getNamespaceAnnotations(context.Background())
+
+	assert.Contains(t, annotations, "onyxia_last_login_timestamp")
+	assert.Equal(t, map[string]string{"static-key": "static-value"}, usecase.namespace.Annotation.Static)
+}
