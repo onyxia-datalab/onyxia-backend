@@ -16,16 +16,16 @@ import (
 type Lifecycle struct {
 	secrets    ports.OnyxiaSecretGateway
 	helm       ports.ReleaseGateway
-	catalogSvc domain.CatalogService
+	catalogSvc ports.CatalogService
 	namespaces namespace.Authorizer
 }
 
-var _ domain.ServiceLifecycle = (*Lifecycle)(nil)
+var _ ports.ServiceLifecycle = (*Lifecycle)(nil)
 
 func NewLifecycle(
 	secrets ports.OnyxiaSecretGateway,
 	helm ports.ReleaseGateway,
-	catalogSvc domain.CatalogService,
+	catalogSvc ports.CatalogService,
 	namespaces namespace.Authorizer,
 ) *Lifecycle {
 	return &Lifecycle{secrets: secrets, helm: helm, catalogSvc: catalogSvc, namespaces: namespaces}

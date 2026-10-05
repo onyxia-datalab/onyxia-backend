@@ -5,18 +5,18 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 type onboardingUsecase struct {
-	namespaceService  port.NamespaceService
+	namespaceService  ports.NamespaceService
 	namespace         domain.Namespace
 	quotas            domain.Quotas
 	userContextReader usercontext.Reader
 }
 
 func NewOnboardingUsecase(
-	namespaceService port.NamespaceService,
+	namespaceService ports.NamespaceService,
 	namespace domain.Namespace,
 	quotas domain.Quotas,
 	userContextReader usercontext.Reader,

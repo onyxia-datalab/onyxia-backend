@@ -1,7 +1,5 @@
 package domain
 
-import "context"
-
 // ServiceStatus is the observed lifecycle state of a service.
 type ServiceStatus string
 
@@ -47,10 +45,4 @@ type Service struct {
 	Share        bool
 	Status       ServiceStatus
 	Error        *ServiceError
-}
-
-// ServiceQuery is the read side of the service lifecycle.
-type ServiceQuery interface {
-	GetService(ctx context.Context, namespace, releaseID string) (Service, error)
-	ListServices(ctx context.Context, namespace string) ([]Service, error)
 }

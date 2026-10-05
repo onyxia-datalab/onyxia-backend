@@ -4,7 +4,6 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/k8s"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
-	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/lifecycle"
@@ -13,7 +12,7 @@ import (
 func SetupInstallController(
 	app *bootstrap.Application,
 	releaseGtw ports.ReleaseGateway,
-	catalogUc domain.CatalogService,
+	catalogUc ports.CatalogService,
 	namespaceAuthz namespace.Authorizer,
 ) *controller.InstallController {
 	serviceLifecycleUc := lifecycle.NewLifecycle(

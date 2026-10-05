@@ -8,17 +8,18 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 type ServiceQueryController struct {
-	serviceQuery   domain.ServiceQuery
+	serviceQuery   ports.ServiceQuery
 	userGetter     usercontext.UserGetter
 	namespaceAuthz namespace.Authorizer
 }
 
 func NewServiceQueryController(
-	serviceQuery domain.ServiceQuery,
+	serviceQuery ports.ServiceQuery,
 	userGetter usercontext.UserGetter,
 	namespaceAuthz namespace.Authorizer,
 ) *ServiceQueryController {

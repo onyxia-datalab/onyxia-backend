@@ -5,11 +5,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 // ✅ Mock `OnboardingUsecase`
@@ -17,7 +19,7 @@ type MockOnboardingUsecase struct {
 	mock.Mock
 }
 
-var _ domain.OnboardingUsecase = (*MockOnboardingUsecase)(nil)
+var _ ports.OnboardingUsecase = (*MockOnboardingUsecase)(nil)
 
 func (m *MockOnboardingUsecase) Onboard(ctx context.Context, req domain.OnboardingRequest) error {
 	args := m.Called(ctx, req)

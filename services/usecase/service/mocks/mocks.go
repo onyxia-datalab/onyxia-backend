@@ -3,9 +3,10 @@ package mocks
 import (
 	"context"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
-	"github.com/stretchr/testify/mock"
 )
 
 type MockReleaseGateway struct{ mock.Mock }
@@ -153,7 +154,7 @@ func (m *MockCatalogRepository) GetPackageSchema(
 
 type MockCatalogService struct{ mock.Mock }
 
-var _ domain.CatalogService = (*MockCatalogService)(nil)
+var _ ports.CatalogService = (*MockCatalogService)(nil)
 
 func (m *MockCatalogService) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, error) {
 	args := m.Called(ctx)

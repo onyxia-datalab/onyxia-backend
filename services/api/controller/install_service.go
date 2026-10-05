@@ -10,19 +10,20 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
 
 const userNotFoundInContextMessage = "user not found in context"
 
 type InstallController struct {
-	serviceLifecycleUc domain.ServiceLifecycle
+	serviceLifecycleUc ports.ServiceLifecycle
 	userGetter         usercontext.UserGetter
 	namespaceAuthz     namespace.Authorizer
 }
 
 func NewInstallController(
-	serviceLifecycleUc domain.ServiceLifecycle,
+	serviceLifecycleUc ports.ServiceLifecycle,
 	userGetter usercontext.UserGetter,
 	namespaceAuthz namespace.Authorizer,
 ) *InstallController {

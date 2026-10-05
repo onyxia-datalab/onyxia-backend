@@ -19,7 +19,7 @@ type Reader struct {
 	namespaces namespace.Authorizer
 }
 
-var _ domain.ServiceQuery = (*Reader)(nil)
+var _ ports.ServiceQuery = (*Reader)(nil)
 
 func NewReader(
 	secrets ports.OnyxiaSecretGateway,

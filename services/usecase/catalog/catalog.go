@@ -13,7 +13,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-// Catalog implements domain.CatalogService
+// Catalog implements ports.CatalogService
 type Catalog struct {
 	envCatalogConfig []env.CatalogConfig
 	pkgRepo          ports.PackageRepository
@@ -21,7 +21,7 @@ type Catalog struct {
 	schemaResolver   *schemaResolver
 }
 
-var _ domain.CatalogService = (*Catalog)(nil)
+var _ ports.CatalogService = (*Catalog)(nil)
 
 // Constructor
 func NewCatalogService(

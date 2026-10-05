@@ -8,18 +8,20 @@ import (
 	"log/slog"
 
 	"github.com/go-faster/jx"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
 type CatalogController struct {
-	catalogs   domain.CatalogService
+	catalogs   ports.CatalogService
 	userReader usercontext.Reader
 }
 
 func NewCatalogController(
-	catalogs domain.CatalogService,
+	catalogs ports.CatalogService,
 	userReader usercontext.Reader,
 ) *CatalogController {
 	return &CatalogController{catalogs: catalogs, userReader: userReader}

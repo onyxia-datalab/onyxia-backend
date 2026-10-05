@@ -9,15 +9,16 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 type OnboardingController struct {
-	OnboardingUsecase domain.OnboardingUsecase
+	OnboardingUsecase ports.OnboardingUsecase
 	users             usercontext.UserGetter
 }
 
 func NewOnboardingController(
-	onboardingUsecase domain.OnboardingUsecase,
+	onboardingUsecase ports.OnboardingUsecase,
 	users usercontext.UserGetter,
 ) *OnboardingController {
 	return &OnboardingController{

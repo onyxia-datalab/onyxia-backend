@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,7 +20,7 @@ func TestApplyQuotasSuccess(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaCreated, nil)
+		Return(ports.QuotaCreated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -47,7 +47,7 @@ func TestApplyQuotasAlreadyUpToDate(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaUnchanged, nil)
+		Return(ports.QuotaUnchanged, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -89,7 +89,7 @@ func TestApplyQuotasQuotaUpdated(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaUpdated, nil)
+		Return(ports.QuotaUpdated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -116,7 +116,7 @@ func TestApplyQuotasQuotaIgnored(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaIgnored, nil)
+		Return(ports.QuotaIgnored, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
@@ -142,7 +142,7 @@ func TestApplyQuotasFailure(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
+		Return(ports.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
