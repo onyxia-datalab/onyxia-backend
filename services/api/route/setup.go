@@ -12,6 +12,7 @@ import (
 	oas "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
@@ -44,9 +45,14 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, serve
 		return nil, nil, fmt.Errorf("failed to setup package repository: %w", err)
 	}
 
+	catalogSettings, err := env.CatalogSettings(app.Env.CatalogsConfig)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid catalogs configuration: %w", err)
+	}
+
 	catalogUc := catalog.NewCatalogService(
-		app.Env.CatalogsConfig,
-		app.Env.Schemas,
+		catalogSettings,
+		app.Env.Schemas.Overrides(),
 		pkgRepo,
 		app.UserContextReader,
 	)

@@ -3,12 +3,10 @@ package catalog
 import (
 	"testing"
 
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func ptr(n int) *int { return &n }
 
 // ---------- allVersions ----------
 
@@ -71,44 +69,37 @@ func TestMaxNumber_Zero_ReturnsEmpty(t *testing.T) {
 // ---------- versionFilterFrom ----------
 
 func TestVersionFilterFrom_All(t *testing.T) {
-	f, err := versionFilterFrom(env.CatalogConfig{MultipleServicesMode: env.MultipleServicesAll})
+	f, err := versionFilterFrom("c", domain.VersionPolicy{Mode: domain.VersionModeAll})
 	require.NoError(t, err)
 	assert.IsType(t, allVersions{}, f)
 }
 
 func TestVersionFilterFrom_Default(t *testing.T) {
-	f, err := versionFilterFrom(env.CatalogConfig{})
+	f, err := versionFilterFrom("c", domain.VersionPolicy{})
 	require.NoError(t, err)
 	assert.IsType(t, allVersions{}, f)
 }
 
 func TestVersionFilterFrom_Latest(t *testing.T) {
-	f, err := versionFilterFrom(env.CatalogConfig{MultipleServicesMode: env.MultipleServicesLatest})
+	f, err := versionFilterFrom("c", domain.VersionPolicy{Mode: domain.VersionModeLatest})
 	require.NoError(t, err)
 	assert.IsType(t, latestOnly{}, f)
 }
 
 func TestVersionFilterFrom_SkipPatches(t *testing.T) {
-	f, err := versionFilterFrom(env.CatalogConfig{MultipleServicesMode: env.MultipleServicesSkipPatches})
+	f, err := versionFilterFrom("c", domain.VersionPolicy{Mode: domain.VersionModeSkipPatches})
 	require.NoError(t, err)
 	assert.IsType(t, skipPatches{}, f)
 }
 
 func TestVersionFilterFrom_MaxNumber(t *testing.T) {
-	f, err := versionFilterFrom(env.CatalogConfig{
-		MultipleServicesMode: env.MultipleServicesMaxNumber,
-		MaxNumberOfVersions:  ptr(3),
-	})
+	f, err := versionFilterFrom("c", domain.VersionPolicy{Mode: domain.VersionModeMaxNumber, MaxNumber: 3})
 	require.NoError(t, err)
 	assert.Equal(t, maxNumber{n: 3}, f)
 }
 
 func TestVersionFilterFrom_MaxNumber_MissingN_ReturnsError(t *testing.T) {
-	_, err := versionFilterFrom(env.CatalogConfig{
-		ID:                   "my-catalog",
-		MultipleServicesMode: env.MultipleServicesMaxNumber,
-		MaxNumberOfVersions:  nil,
-	})
+	_, err := versionFilterFrom("my-catalog", domain.VersionPolicy{Mode: domain.VersionModeMaxNumber})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "my-catalog")
 	assert.Contains(t, err.Error(), "maxNumberOfVersions")

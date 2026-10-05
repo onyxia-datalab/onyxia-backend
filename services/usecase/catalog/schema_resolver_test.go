@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,42 +224,4 @@ func TestApplyOverwrites_InvalidJSONPassthrough(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, invalid, result)
-}
-
-// ---------- newSchemaResolver ----------
-
-// ✅ When Enabled=false, configured files and roles are ignored.
-func TestNewSchemaResolver_DisabledIgnoresConfig(t *testing.T) {
-	cfg := env.SchemasConfig{
-		Enabled: false,
-		Files: []env.SchemaFile{
-			{RelativePath: "ide/resources.json", Content: `{"title":"configured"}`},
-		},
-	}
-	r := newSchemaResolver(cfg)
-	_, ok := r.instanceFiles["ide/resources.json"]
-	assert.False(t, ok)
-}
-
-// ✅ When Enabled=true, configured files and roles are loaded.
-func TestNewSchemaResolver_EnabledLoadsConfig(t *testing.T) {
-	cfg := env.SchemasConfig{
-		Enabled: true,
-		Files: []env.SchemaFile{
-			{RelativePath: "ide/resources.json", Content: `{"title":"configured"}`},
-		},
-		Roles: []env.RoleSchemas{
-			{
-				RoleName: "admin",
-				Files: []env.SchemaFile{
-					{RelativePath: "ide/resources.json", Content: `{"title":"admin-override"}`},
-				},
-			},
-		},
-	}
-	r := newSchemaResolver(cfg)
-
-	assert.Contains(t, r.instanceFiles, "ide/resources.json")
-	assert.Contains(t, r.roleFiles, "admin")
-	assert.Contains(t, r.roleFiles["admin"], "ide/resources.json")
 }

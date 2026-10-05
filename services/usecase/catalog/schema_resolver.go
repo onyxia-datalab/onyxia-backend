@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/json"
 
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
 // schemaResolver resolves overwriteSchemaWith references in priority order:
@@ -14,25 +14,17 @@ type schemaResolver struct {
 	roleFiles     map[string]map[string]json.RawMessage // roleName -> relativePath -> content
 }
 
-func newSchemaResolver(cfg env.SchemasConfig) *schemaResolver {
+func newSchemaResolver(overrides domain.SchemaOverrides) *schemaResolver {
 	r := &schemaResolver{
-		instanceFiles: make(map[string]json.RawMessage),
-		roleFiles:     make(map[string]map[string]json.RawMessage),
+		instanceFiles: overrides.Instance,
+		roleFiles:     overrides.ByRole,
 	}
-
-	if cfg.Enabled {
-		for _, f := range cfg.Files {
-			r.instanceFiles[f.RelativePath] = json.RawMessage(f.Content)
-		}
-		for _, role := range cfg.Roles {
-			files := make(map[string]json.RawMessage, len(role.Files))
-			for _, f := range role.Files {
-				files[f.RelativePath] = json.RawMessage(f.Content)
-			}
-			r.roleFiles[role.RoleName] = files
-		}
+	if r.instanceFiles == nil {
+		r.instanceFiles = map[string]json.RawMessage{}
 	}
-
+	if r.roleFiles == nil {
+		r.roleFiles = map[string]map[string]json.RawMessage{}
+	}
 	return r
 }
 

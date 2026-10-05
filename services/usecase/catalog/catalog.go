@@ -3,43 +3,40 @@ package catalog
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"slices"
 
-	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
 // Catalog implements ports.CatalogService
 type Catalog struct {
-	envCatalogConfig []env.CatalogConfig
-	pkgRepo          ports.PackageRepository
-	userReader       usercontext.Reader
-	schemaResolver   *schemaResolver
+	catalogs       []domain.CatalogSettings
+	pkgRepo        ports.PackageRepository
+	userReader     usercontext.Reader
+	schemaResolver *schemaResolver
 }
 
 var _ ports.CatalogService = (*Catalog)(nil)
 
 // Constructor
 func NewCatalogService(
-	envCatalogConfig []env.CatalogConfig,
-	schemasConfig env.SchemasConfig,
+	catalogs []domain.CatalogSettings,
+	schemaOverrides domain.SchemaOverrides,
 	pkgRepo ports.PackageRepository,
 	userReader usercontext.Reader,
 ) *Catalog {
 	return &Catalog{
-		envCatalogConfig: envCatalogConfig,
-		pkgRepo:          pkgRepo,
-		userReader:       userReader,
-		schemaResolver:   newSchemaResolver(schemasConfig),
+		catalogs:       catalogs,
+		pkgRepo:        pkgRepo,
+		userReader:     userReader,
+		schemaResolver: newSchemaResolver(schemaOverrides),
 	}
 }
 
 func (uc *Catalog) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, error) {
-	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
+	return uc.buildCatalogs(ctx, func(c domain.CatalogSettings) bool {
 		return len(c.Restrictions) == 0
 	})
 }
@@ -47,7 +44,7 @@ func (uc *Catalog) ListPublicCatalogs(ctx context.Context) ([]domain.Catalog, er
 func (uc *Catalog) ListUserCatalogs(
 	ctx context.Context,
 ) ([]domain.Catalog, error) {
-	return uc.buildCatalogs(ctx, func(c env.CatalogConfig) bool {
+	return uc.buildCatalogs(ctx, func(c domain.CatalogSettings) bool {
 		return uc.isAccessible(ctx, c)
 	})
 }
@@ -60,7 +57,7 @@ func (uc *Catalog) ListUserCatalogs(
 // directly (GetPackage, GetAvailableVersions, GetPackageSchema, install), not
 // just on the listing endpoints — otherwise restrictions only hide a
 // catalog from the UI without actually protecting it.
-func (uc *Catalog) isAccessible(ctx context.Context, c env.CatalogConfig) bool {
+func (uc *Catalog) isAccessible(ctx context.Context, c domain.CatalogSettings) bool {
 	if len(c.Restrictions) == 0 {
 		return true
 	}
@@ -71,7 +68,7 @@ func (uc *Catalog) isAccessible(ctx context.Context, c env.CatalogConfig) bool {
 	}
 
 	for _, r := range c.Restrictions {
-		if r.UserAttributeKey == "" || r.Match == "" {
+		if r.UserAttributeKey == "" || r.Match == nil {
 			continue
 		}
 
@@ -80,10 +77,7 @@ func (uc *Catalog) isAccessible(ctx context.Context, c env.CatalogConfig) bool {
 			continue
 		}
 
-		re, err := regexp.Compile(r.Match)
-		if err != nil {
-			continue
-		}
+		re := r.Match
 
 		switch v := val.(type) {
 		case string:
@@ -131,10 +125,10 @@ func (uc *Catalog) GetPackageSchema(
 	return applyOverwrites(raw, uc.schemaResolver, roles)
 }
 
-func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
-	for i := range uc.envCatalogConfig {
-		if uc.envCatalogConfig[i].ID == catalogID {
-			return &uc.envCatalogConfig[i], nil
+func (uc *Catalog) findCatalog(catalogID string) (*domain.CatalogSettings, error) {
+	for i := range uc.catalogs {
+		if uc.catalogs[i].ID == catalogID {
+			return &uc.catalogs[i], nil
 		}
 	}
 	return nil, fmt.Errorf("catalog %q: %w", catalogID, domain.ErrNotFound)
@@ -145,7 +139,7 @@ func (uc *Catalog) findCatalog(catalogID string) (*env.CatalogConfig, error) {
 // the same way it is simply omitted from ListUserCatalogs — this must be used
 // on every direct-access path (get package, versions, schema, install), not
 // just on listing, otherwise restrictions are cosmetic.
-func (uc *Catalog) findAccessibleCatalog(ctx context.Context, catalogID string) (*env.CatalogConfig, error) {
+func (uc *Catalog) findAccessibleCatalog(ctx context.Context, catalogID string) (*domain.CatalogSettings, error) {
 	cfg, err := uc.findCatalog(catalogID)
 	if err != nil {
 		return nil, err
@@ -195,7 +189,7 @@ func (uc *Catalog) GetAvailableVersions(
 		return nil, fmt.Errorf("catalog %q package %q versions: %w", catalogID, packageName, err)
 	}
 
-	filter, err := versionFilterFrom(*cfg)
+	filter, err := versionFilterFrom(cfg.ID, cfg.Versions)
 	if err != nil {
 		return nil, err
 	}
@@ -218,11 +212,11 @@ func (uc *Catalog) CheckSharingAllowed(ctx context.Context, catalogID string) er
 
 func (uc *Catalog) buildCatalogs(
 	ctx context.Context,
-	include func(env.CatalogConfig) bool,
+	include func(domain.CatalogSettings) bool,
 ) ([]domain.Catalog, error) {
 	out := make([]domain.Catalog, 0)
 
-	for _, cfg := range uc.envCatalogConfig {
+	for _, cfg := range uc.catalogs {
 		if !include(cfg) {
 			continue
 		}
@@ -238,21 +232,11 @@ func (uc *Catalog) buildCatalogs(
 			}
 		}
 
-		name, err := tools.NewLocalizedString(cfg.Name)
-		if err != nil {
-			name = tools.LocalizedString{} // or log it / ignore gracefully
-		}
-
-		desc, err := tools.NewLocalizedString(cfg.Description)
-		if err != nil {
-			desc = tools.LocalizedString{}
-		}
-
 		out = append(out, domain.Catalog{
 			ID:                  cfg.ID,
-			Name:                name,
-			Description:         desc,
-			Status:              domain.CatalogStatus(cfg.Status),
+			Name:                cfg.Name,
+			Description:         cfg.Description,
+			Status:              cfg.Status,
 			HighlightedPackages: append([]string(nil), cfg.Highlighted...),
 			Packages:            pkgs,
 		})

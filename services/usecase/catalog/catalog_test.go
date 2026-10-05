@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +73,7 @@ func (m *MockCatalogRepository) GetPackageSchema(
 func setupCatalogUsecase(
 	t *testing.T,
 	user *usercontext.User,
-	cfgs []env.CatalogConfig,
+	cfgs []domain.CatalogSettings,
 ) (*Catalog, context.Context, *MockCatalogRepository) {
 	t.Helper()
 
@@ -81,17 +81,17 @@ func setupCatalogUsecase(
 	repo := new(MockCatalogRepository)
 
 	if len(cfgs) == 0 {
-		cfgs = []env.CatalogConfig{
+		cfgs = []domain.CatalogSettings{
 			{
 				ID: "default-catalog",
-				Restrictions: []env.Restriction{
-					{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+				Restrictions: []domain.CatalogRestriction{
+					{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 				},
 			},
 		}
 	}
 
-	uc := NewCatalogService(cfgs, env.SchemasConfig{}, repo, reader)
+	uc := NewCatalogService(cfgs, domain.SchemaOverrides{}, repo, reader)
 	return uc, ctx, repo
 }
 
@@ -100,12 +100,12 @@ func setupCatalogUsecase(
 // ✅ Public catalogs should only include unrestricted ones.
 func TestListPublicCatalogs(t *testing.T) {
 	user := usercontext.DefaultTestUser()
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{ID: "public"},
 		{
 			ID: "restricted",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-dev"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-dev")},
 			},
 		},
 	}
@@ -133,17 +133,17 @@ func TestListUserCatalogs_Match(t *testing.T) {
 			"groups": []string{"sspcloud-dev", "users"},
 		},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-dev",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 			},
 		},
 		{
 			ID: "restricted-ops",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-ops"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-ops")},
 			},
 		},
 	}
@@ -170,11 +170,11 @@ func TestListUserCatalogs_NoMatch(t *testing.T) {
 			"groups": []string{"sspcloud-guest"},
 		},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-admin",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-admin"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-admin")},
 			},
 		},
 	}
@@ -199,11 +199,11 @@ func TestListUserCatalogs_RepoError(t *testing.T) {
 			"groups": []string{"sspcloud-dev"},
 		},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-dev",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-dev"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-dev")},
 			},
 		},
 	}
@@ -222,7 +222,7 @@ func TestListUserCatalogs_RepoError(t *testing.T) {
 
 // ✅ GetPackage returns the package when found.
 func TestGetPackage_Found(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	expected := domain.Package{Name: "my-chart", CatalogID: "my-catalog"}
@@ -236,7 +236,7 @@ func TestGetPackage_Found(t *testing.T) {
 
 // ❌ GetPackage — catalog not found.
 func TestGetPackage_CatalogNotFound(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	result, err := uc.GetPackage(ctx, "unknown-catalog", "my-chart")
@@ -247,7 +247,7 @@ func TestGetPackage_CatalogNotFound(t *testing.T) {
 
 // ❌ GetPackage — repo returns an error.
 func TestGetPackage_RepoError(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("GetPackage", mock.Anything, cfgs[0].ID, "my-chart").
@@ -268,11 +268,11 @@ func TestGetPackage_RestrictedCatalogDenied(t *testing.T) {
 		Username:   "test-user",
 		Attributes: map[string]any{"groups": []string{"other-team"}},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-dev",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 			},
 		},
 	}
@@ -290,11 +290,11 @@ func TestGetAvailableVersions_RestrictedCatalogDenied(t *testing.T) {
 		Username:   "test-user",
 		Attributes: map[string]any{"groups": []string{"other-team"}},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-dev",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 			},
 		},
 	}
@@ -312,11 +312,11 @@ func TestGetPackageSchema_RestrictedCatalogDenied(t *testing.T) {
 		Username:   "test-user",
 		Attributes: map[string]any{"groups": []string{"other-team"}},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID: "restricted-dev",
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 			},
 		},
 	}
@@ -332,7 +332,7 @@ func TestGetPackageSchema_RestrictedCatalogDenied(t *testing.T) {
 // --- CheckSharingAllowed -----------------------------------------------------
 
 func TestCheckSharingAllowed_Allowed(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog", AllowSharing: true}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog", AllowSharing: true}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	err := uc.CheckSharingAllowed(ctx, "my-catalog")
@@ -341,7 +341,7 @@ func TestCheckSharingAllowed_Allowed(t *testing.T) {
 }
 
 func TestCheckSharingAllowed_Denied(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog", AllowSharing: false}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog", AllowSharing: false}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	err := uc.CheckSharingAllowed(ctx, "my-catalog")
@@ -350,7 +350,7 @@ func TestCheckSharingAllowed_Denied(t *testing.T) {
 }
 
 func TestCheckSharingAllowed_CatalogNotFound(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	err := uc.CheckSharingAllowed(ctx, "unknown-catalog")
@@ -363,12 +363,12 @@ func TestCheckSharingAllowed_RestrictedCatalogDenied(t *testing.T) {
 		Username:   "test-user",
 		Attributes: map[string]any{"groups": []string{"other-team"}},
 	}
-	cfgs := []env.CatalogConfig{
+	cfgs := []domain.CatalogSettings{
 		{
 			ID:           "restricted-dev",
 			AllowSharing: true,
-			Restrictions: []env.Restriction{
-				{UserAttributeKey: "groups", Match: "sspcloud-(dev|admin)"},
+			Restrictions: []domain.CatalogRestriction{
+				{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-(dev|admin)")},
 			},
 		},
 	}
@@ -381,7 +381,7 @@ func TestCheckSharingAllowed_RestrictedCatalogDenied(t *testing.T) {
 
 // ✅ GetPackageSchema returns the schema bytes when found.
 func TestGetPackageSchema_Found(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	schema := []byte(`{"type":"object"}`)
@@ -396,7 +396,7 @@ func TestGetPackageSchema_Found(t *testing.T) {
 
 // ❌ GetPackageSchema — catalog not found.
 func TestGetPackageSchema_CatalogNotFound(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	result, err := uc.GetPackageSchema(ctx, "unknown-catalog", "my-chart", "1.0.0")
@@ -407,7 +407,7 @@ func TestGetPackageSchema_CatalogNotFound(t *testing.T) {
 
 // ❌ GetPackageSchema — repo returns an error.
 func TestGetPackageSchema_RepoError(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("GetPackageSchema", mock.Anything, cfgs[0].ID, "my-chart", "1.0.0").
@@ -422,14 +422,10 @@ func TestGetPackageSchema_RepoError(t *testing.T) {
 
 // ✅ GetPackageSchema applies instance-wide override.
 func TestGetPackageSchema_InstanceOverride(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
-	schemasConfig := env.SchemasConfig{
-		Enabled: true,
-		Files: []env.SchemaFile{
-			{
-				RelativePath: "ide/customImage.json",
-				Content:      `{"type":"string","const":"overridden"}`,
-			},
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
+	schemasConfig := domain.SchemaOverrides{
+		Instance: map[string]json.RawMessage{
+			"ide/customImage.json": json.RawMessage(`{"type":"string","const":"overridden"}`),
 		},
 	}
 	ctx, reader, _ := usercontext.NewTestUserContext(usercontext.DefaultTestUser())
@@ -450,19 +446,13 @@ func TestGetPackageSchema_InstanceOverride(t *testing.T) {
 
 // ✅ GetPackageSchema applies role-specific override over instance-wide.
 func TestGetPackageSchema_RoleOverrideTakesPrecedenceOverInstance(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
-	schemasConfig := env.SchemasConfig{
-		Enabled: true,
-		Files: []env.SchemaFile{
-			{RelativePath: "ide/resources.json", Content: `{"title":"instance-override"}`},
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
+	schemasConfig := domain.SchemaOverrides{
+		Instance: map[string]json.RawMessage{
+			"ide/resources.json": json.RawMessage(`{"title":"instance-override"}`),
 		},
-		Roles: []env.RoleSchemas{
-			{
-				RoleName: "fullgpu",
-				Files: []env.SchemaFile{
-					{RelativePath: "ide/resources.json", Content: `{"title":"role-override"}`},
-				},
-			},
+		ByRole: map[string]map[string]json.RawMessage{
+			"fullgpu": {"ide/resources.json": json.RawMessage(`{"title":"role-override"}`)},
 		},
 	}
 	user := &usercontext.User{
@@ -487,7 +477,7 @@ func TestGetPackageSchema_RoleOverrideTakesPrecedenceOverInstance(t *testing.T) 
 
 // ✅ GetPackageSchema leaves unknown overwriteSchemaWith paths unchanged.
 func TestGetPackageSchema_UnknownPathLeftUnchanged(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	raw := []byte(`{"x-onyxia":{"overwriteSchemaWith":"unknown/path.json"}}`)
@@ -506,7 +496,7 @@ func TestGetPackageSchema_UnknownPathLeftUnchanged(t *testing.T) {
 
 // ❌ GetPackageSchema — package is excluded.
 func TestGetPackageSchema_ExcludedPackage(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	result, err := uc.GetPackageSchema(ctx, "my-catalog", "excluded-chart", "1.0.0")
@@ -517,7 +507,7 @@ func TestGetPackageSchema_ExcludedPackage(t *testing.T) {
 
 // ❌ GetPackage — package is excluded.
 func TestGetPackage_ExcludedPackage(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	result, err := uc.GetPackage(ctx, "my-catalog", "excluded-chart")
@@ -528,7 +518,7 @@ func TestGetPackage_ExcludedPackage(t *testing.T) {
 
 // ❌ GetAvailableVersions — catalog not found.
 func TestGetAvailableVersions_CatalogNotFound(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	_, err := uc.GetAvailableVersions(ctx, "unknown-catalog", "my-chart")
@@ -538,7 +528,7 @@ func TestGetAvailableVersions_CatalogNotFound(t *testing.T) {
 
 // ❌ GetAvailableVersions — package is excluded.
 func TestGetAvailableVersions_ExcludedPackage(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog", Excluded: []string{"excluded-chart"}}}
 	uc, ctx, _ := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	_, err := uc.GetAvailableVersions(ctx, "my-catalog", "excluded-chart")
@@ -548,7 +538,7 @@ func TestGetAvailableVersions_ExcludedPackage(t *testing.T) {
 
 // ❌ GetAvailableVersions — repo returns an error.
 func TestGetAvailableVersions_RepoError(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "my-catalog"}}
+	cfgs := []domain.CatalogSettings{{ID: "my-catalog"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("GetAvailableVersions", mock.Anything, "my-catalog", "my-chart").
@@ -561,10 +551,9 @@ func TestGetAvailableVersions_RepoError(t *testing.T) {
 
 // ❌ GetAvailableVersions — maxNumber mode without maxNumberOfVersions set.
 func TestGetAvailableVersions_InvalidMaxNumber(t *testing.T) {
-	cfgs := []env.CatalogConfig{{
-		ID:                   "my-catalog",
-		MultipleServicesMode: env.MultipleServicesMaxNumber,
-		MaxNumberOfVersions:  nil,
+	cfgs := []domain.CatalogSettings{{
+		ID:       "my-catalog",
+		Versions: domain.VersionPolicy{Mode: domain.VersionModeMaxNumber},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
@@ -578,7 +567,7 @@ func TestGetAvailableVersions_InvalidMaxNumber(t *testing.T) {
 
 // ✅ ListUserCatalogs — unrestricted catalog is always included.
 func TestListUserCatalogs_UnrestrictedIncluded(t *testing.T) {
-	cfgs := []env.CatalogConfig{{ID: "public"}}
+	cfgs := []domain.CatalogSettings{{ID: "public"}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
 	repo.On("ListPackages", mock.Anything, "public").Return([]domain.Package{}, nil)
@@ -593,9 +582,9 @@ func TestListUserCatalogs_UnrestrictedIncluded(t *testing.T) {
 // ❌ ListUserCatalogs — user has no attributes, restricted catalog excluded.
 func TestListUserCatalogs_NoAttributes(t *testing.T) {
 	user := &usercontext.User{Username: "anon"}
-	cfgs := []env.CatalogConfig{{
+	cfgs := []domain.CatalogSettings{{
 		ID:           "restricted",
-		Restrictions: []env.Restriction{{UserAttributeKey: "groups", Match: "admin"}},
+		Restrictions: []domain.CatalogRestriction{{UserAttributeKey: "groups", Match: regexp.MustCompile("admin")}},
 	}}
 	uc, ctx, _ := setupCatalogUsecase(t, user, cfgs)
 
@@ -605,19 +594,18 @@ func TestListUserCatalogs_NoAttributes(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-// ❌ ListUserCatalogs — restrictions with empty key/match are skipped, no match found.
+// ❌ ListUserCatalogs — restrictions with an empty key or no regex are skipped, no match found.
 func TestListUserCatalogs_SkipsEmptyAndInvalidRestrictions(t *testing.T) {
 	user := &usercontext.User{
 		Username:   "alice",
 		Attributes: map[string]any{"groups": []string{"users"}},
 	}
-	cfgs := []env.CatalogConfig{{
+	cfgs := []domain.CatalogSettings{{
 		ID: "restricted",
-		Restrictions: []env.Restriction{
-			{UserAttributeKey: "", Match: "admin"},          // empty key → skip
-			{UserAttributeKey: "groups", Match: ""},         // empty match → skip
-			{UserAttributeKey: "missing-key", Match: ".*"},  // key absent → skip
-			{UserAttributeKey: "groups", Match: "[invalid"}, // bad regex → skip
+		Restrictions: []domain.CatalogRestriction{
+			{UserAttributeKey: "", Match: regexp.MustCompile("admin")},         // empty key → skip
+			{UserAttributeKey: "groups", Match: nil},                           // no regex → skip
+			{UserAttributeKey: "missing-key", Match: regexp.MustCompile(".*")}, // key absent → skip
 		},
 	}}
 	uc, ctx, _ := setupCatalogUsecase(t, user, cfgs)
@@ -634,9 +622,9 @@ func TestListUserCatalogs_StringAttribute(t *testing.T) {
 		Username:   "alice",
 		Attributes: map[string]any{"role": "admin"},
 	}
-	cfgs := []env.CatalogConfig{{
+	cfgs := []domain.CatalogSettings{{
 		ID:           "admin-catalog",
-		Restrictions: []env.Restriction{{UserAttributeKey: "role", Match: "admin"}},
+		Restrictions: []domain.CatalogRestriction{{UserAttributeKey: "role", Match: regexp.MustCompile("admin")}},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
 	repo.On("ListPackages", mock.Anything, "admin-catalog").Return([]domain.Package{}, nil)
@@ -653,9 +641,9 @@ func TestListUserCatalogs_AnySliceAttribute(t *testing.T) {
 		Username:   "alice",
 		Attributes: map[string]any{"groups": []any{"sspcloud-dev", "users"}},
 	}
-	cfgs := []env.CatalogConfig{{
+	cfgs := []domain.CatalogSettings{{
 		ID:           "dev-catalog",
-		Restrictions: []env.Restriction{{UserAttributeKey: "groups", Match: "sspcloud-dev"}},
+		Restrictions: []domain.CatalogRestriction{{UserAttributeKey: "groups", Match: regexp.MustCompile("sspcloud-dev")}},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, user, cfgs)
 	repo.On("ListPackages", mock.Anything, "dev-catalog").Return([]domain.Package{}, nil)
@@ -668,11 +656,9 @@ func TestListUserCatalogs_AnySliceAttribute(t *testing.T) {
 
 // ✅ GetAvailableVersions applies MaxNumber filter.
 func TestGetAvailableVersions_MaxNumber(t *testing.T) {
-	n := 2
-	cfgs := []env.CatalogConfig{{
-		ID:                   "my-catalog",
-		MultipleServicesMode: env.MultipleServicesMaxNumber,
-		MaxNumberOfVersions:  &n,
+	cfgs := []domain.CatalogSettings{{
+		ID:       "my-catalog",
+		Versions: domain.VersionPolicy{Mode: domain.VersionModeMaxNumber, MaxNumber: 2},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
@@ -687,9 +673,9 @@ func TestGetAvailableVersions_MaxNumber(t *testing.T) {
 
 // ✅ GetAvailableVersions applies SkipPatches filter.
 func TestGetAvailableVersions_SkipPatches(t *testing.T) {
-	cfgs := []env.CatalogConfig{{
-		ID:                   "my-catalog",
-		MultipleServicesMode: env.MultipleServicesSkipPatches,
+	cfgs := []domain.CatalogSettings{{
+		ID:       "my-catalog",
+		Versions: domain.VersionPolicy{Mode: domain.VersionModeSkipPatches},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 
@@ -704,9 +690,9 @@ func TestGetAvailableVersions_SkipPatches(t *testing.T) {
 
 // ✅ GetAvailableVersions applies Latest filter.
 func TestGetAvailableVersions_Latest(t *testing.T) {
-	cfgs := []env.CatalogConfig{{
-		ID:                   "my-catalog",
-		MultipleServicesMode: env.MultipleServicesLatest,
+	cfgs := []domain.CatalogSettings{{
+		ID:       "my-catalog",
+		Versions: domain.VersionPolicy{Mode: domain.VersionModeLatest},
 	}}
 	uc, ctx, repo := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
 

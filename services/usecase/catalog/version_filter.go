@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
 type versionFilter interface {
@@ -51,17 +51,17 @@ func (f maxNumber) apply(versions []string) []string {
 	return versions[:f.n]
 }
 
-func versionFilterFrom(cfg env.CatalogConfig) (versionFilter, error) {
-	switch cfg.MultipleServicesMode {
-	case env.MultipleServicesLatest:
+func versionFilterFrom(catalogID string, policy domain.VersionPolicy) (versionFilter, error) {
+	switch policy.Mode {
+	case domain.VersionModeLatest:
 		return latestOnly{}, nil
-	case env.MultipleServicesSkipPatches:
+	case domain.VersionModeSkipPatches:
 		return skipPatches{}, nil
-	case env.MultipleServicesMaxNumber:
-		if cfg.MaxNumberOfVersions == nil {
-			return nil, fmt.Errorf("catalog %q: multipleServicesMode=maxNumber requires maxNumberOfVersions", cfg.ID)
+	case domain.VersionModeMaxNumber:
+		if policy.MaxNumber <= 0 {
+			return nil, fmt.Errorf("catalog %q: multipleServicesMode=maxNumber requires maxNumberOfVersions > 0", catalogID)
 		}
-		return maxNumber{n: *cfg.MaxNumberOfVersions}, nil
+		return maxNumber{n: policy.MaxNumber}, nil
 	default:
 		return allVersions{}, nil
 	}
