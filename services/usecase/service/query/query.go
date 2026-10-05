@@ -151,8 +151,8 @@ func (uc *Reader) deriveStatusLight(
 	namespace, releaseID string,
 	releaseState ports.ReleaseState,
 ) (domain.ServiceStatus, error) {
-	if releaseState.Status != "deployed" {
-		return deriveStatusFromHelm(releaseState), nil
+	if status, decided := statusFromHelm(releaseState); decided {
+		return status, nil
 	}
 	resources, err := uc.helm.GetReleaseResources(ctx, namespace, releaseID)
 	if err != nil {
@@ -178,12 +178,8 @@ func (uc *Reader) deriveStatusWithDetail(
 		return "", nil, err
 	}
 
-	if !releaseState.Exists {
-		return domain.ServiceStatusGhost, nil, nil
-	}
-
-	if releaseState.Suspended {
-		return domain.ServiceStatusSuspended, nil, nil
+	if status, decided := statusFromHelm(releaseState); decided {
+		return status, nil, nil
 	}
 
 	podInfos, err := uc.pods.GetPodsForRelease(ctx, namespace, releaseID)

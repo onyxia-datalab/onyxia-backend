@@ -210,7 +210,7 @@ func (h *HelmPackageRepository) GetPackageSchema(
 	var chartRef string
 	switch cfg.Type {
 	case env.CatalogTypeHelmRepo:
-		act.RepoURL = cfg.Location
+		applyRepoAccess(&act.ChartPathOptions, cfg)
 		chartRef = packageName
 	default: // OCI
 		p, err := findOCIPackage(cfg, packageName)
@@ -237,6 +237,17 @@ func (h *HelmPackageRepository) GetPackageSchema(
 }
 
 // --- helm repo (index) ---
+
+// applyRepoAccess sets a helm repo catalog's location and credentials on the
+// options used to download one of its charts, so chart downloads (install,
+// schema) reach private repos the same way the index download does.
+func applyRepoAccess(opts *action.ChartPathOptions, cfg env.CatalogConfig) {
+	opts.RepoURL = cfg.Location
+	opts.Username = tools.Deref(cfg.Username)
+	opts.Password = tools.Deref(cfg.Password)
+	opts.CaFile = tools.Deref(cfg.CAFile)
+	opts.InsecureSkipTLSVerify = cfg.SkipTLSVerify
+}
 
 func (h *HelmPackageRepository) loadIndex(catalogName string) (*repo.IndexFile, error) {
 	return h.indexes.Get(

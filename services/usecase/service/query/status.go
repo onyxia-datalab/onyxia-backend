@@ -5,23 +5,30 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-// deriveStatusFromHelm maps a Helm release state to a ServiceStatus without querying pods.
-func deriveStatusFromHelm(releaseState ports.ReleaseState) domain.ServiceStatus {
+// statusFromHelm returns the status when the Helm release state alone decides
+// it. decided is false for an existing, non-suspended "deployed" or
+// "superseded" release: its status then depends on the workloads, which
+// GetService and ListServices inspect at different levels of detail.
+// Both paths go through this function so they never disagree on a status
+// Helm already knows.
+func statusFromHelm(releaseState ports.ReleaseState) (status domain.ServiceStatus, decided bool) {
 	if !releaseState.Exists {
-		return domain.ServiceStatusGhost
+		return domain.ServiceStatusGhost, true
 	}
+	// A suspended release stays "deployed" in Helm (suspension is a helm
+	// upgrade), so this must be checked before looking at the status.
 	if releaseState.Suspended {
-		return domain.ServiceStatusSuspended
+		return domain.ServiceStatusSuspended, true
 	}
 	switch releaseState.Status {
 	case "pending-install", "pending-upgrade", "pending-rollback", "unknown":
-		return domain.ServiceStatusDeploying
+		return domain.ServiceStatusDeploying, true
 	case "failed":
-		return domain.ServiceStatusError
+		return domain.ServiceStatusError, true
 	case "uninstalling":
-		return domain.ServiceStatusTerminating
+		return domain.ServiceStatusTerminating, true
 	default: // "deployed", "superseded"
-		return domain.ServiceStatusRunning
+		return "", false
 	}
 }
 

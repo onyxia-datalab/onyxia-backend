@@ -21,6 +21,7 @@ func SetupServiceQueryController(
 	helmReleaseGtw, err := helm.NewReleaseGtw(
 		app.K8sClient.Config(),
 		helmClient,
+		app.Env.CatalogsConfig,
 		ports.InstallCallbacks{},
 	)
 	if err != nil {

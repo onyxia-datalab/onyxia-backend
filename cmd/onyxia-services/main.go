@@ -48,7 +48,7 @@ func main() {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: env.Security.CORSAllowedOrigins,
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{
 			"Accept",
 			"Authorization",
@@ -58,6 +58,7 @@ func main() {
 			"Origin",
 			"X-Requested-With",
 			"onyxia-region",
+			"X-Onyxia-Project",
 		},
 		ExposedHeaders:   []string{"Link", "Content-Type"},
 		AllowCredentials: true,

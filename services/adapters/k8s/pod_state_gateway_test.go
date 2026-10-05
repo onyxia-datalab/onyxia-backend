@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
@@ -111,6 +112,8 @@ func TestGetPodsForReleaseFiltersByHelmLabel(t *testing.T) {
 	assert.True(t, pods[0].Ready)
 }
 
+var testNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+
 func TestDerivePodInfo(t *testing.T) {
 	tests := []struct {
 		name string
@@ -131,9 +134,20 @@ func TestDerivePodInfo(t *testing.T) {
 			want: ports.PodInfo{Name: "ready", Ready: true},
 		},
 		{
-			name: "running container failed readiness",
+			name: "running container not ready within grace period is starting",
+			pod: podWithStatuses("starting", corev1.ContainerStatus{
+				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{
+					StartedAt: metav1.NewTime(testNow.Add(-time.Minute)),
+				}},
+			}),
+			want: ports.PodInfo{Name: "starting"},
+		},
+		{
+			name: "running container not ready after grace period failed readiness",
 			pod: podWithStatuses("not-ready", corev1.ContainerStatus{
-				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{
+					StartedAt: metav1.NewTime(testNow.Add(-readinessGracePeriod - time.Second)),
+				}},
 			}),
 			want: ports.PodInfo{Name: "not-ready", ErrorReason: ports.PodErrorReasonReadinessFailed},
 		},
@@ -213,11 +227,22 @@ func TestDerivePodInfo(t *testing.T) {
 				ExitCode:    137,
 			},
 		},
+		{
+			name: "last OOM termination is ignored once the container is ready again",
+			pod: podWithStatuses("recovered", corev1.ContainerStatus{
+				Ready: true,
+				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
+				LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+					Reason: "OOMKilled", ExitCode: 137,
+				}},
+			}),
+			want: ports.PodInfo{Name: "recovered", Ready: true},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, derivePodInfo(tt.pod))
+			assert.Equal(t, tt.want, derivePodInfo(tt.pod, testNow))
 		})
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"helm.sh/helm/v4/pkg/action"
@@ -24,6 +25,7 @@ import (
 
 type Helm struct {
 	settings           *cli.EnvSettings
+	catalogs           map[string]env.CatalogConfig
 	global             ports.InstallCallbacks
 	restConfig         *rest.Config
 	helmClient         *Client
@@ -35,11 +37,17 @@ var _ ports.ReleaseGateway = (*Helm)(nil)
 func NewReleaseGtw(
 	k8sConfig *rest.Config,
 	client *Client,
+	catalogs []env.CatalogConfig,
 	global ports.InstallCallbacks,
 ) (*Helm, error) {
+	catalogMap := make(map[string]env.CatalogConfig, len(catalogs))
+	for _, c := range catalogs {
+		catalogMap[c.ID] = c
+	}
 
 	return &Helm{
 		settings:   client.Settings,
+		catalogs:   catalogMap,
 		global:     global,
 		restConfig: k8sConfig,
 		helmClient: client,
@@ -92,7 +100,11 @@ func (i *Helm) StartInstall(
 	if pkg.ChartRef != "" {
 		chartRef = pkg.ChartRef
 	} else {
-		act.RepoURL = pkg.RepoURL
+		if cfg, ok := i.catalogs[pkg.CatalogID]; ok {
+			applyRepoAccess(&act.ChartPathOptions, cfg)
+		} else {
+			act.RepoURL = pkg.RepoURL
+		}
 		chartRef = pkg.Name
 	}
 

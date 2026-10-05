@@ -2,12 +2,14 @@ package kube
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
 
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"
@@ -43,12 +45,18 @@ func (c *Client) Config() *rest.Config {
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	_, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	ver, err := c.Clientset().Discovery().ServerVersion()
+	// ServerVersion() takes no context, so issue the same request through the
+	// REST client to make the timeout effective.
+	body, err := c.Clientset().Discovery().RESTClient().Get().AbsPath("/version").Do(ctx).Raw()
 	if err != nil {
 		return fmt.Errorf("kube: API unreachable: %w", err)
+	}
+	var ver version.Info
+	if err := json.Unmarshal(body, &ver); err != nil {
+		return fmt.Errorf("kube: decode server version: %w", err)
 	}
 	slog.InfoContext(ctx, "kube: API reachable", slog.String("server_version", ver.GitVersion))
 	return nil

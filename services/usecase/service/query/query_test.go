@@ -57,7 +57,7 @@ func secretData(owner string, share bool) map[string][]byte {
 }
 
 // readerForState drives GetService through the Helm-state path.
-// Covers Ghost (Exists=false) and Suspended (handled explicitly in deriveStatusWithDetail).
+// Covers Ghost (Exists=false) and Suspended (both decided by statusFromHelm).
 func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
 	t.Helper()
 	uc, ctx, m := setupReader(t, testUsername)
@@ -75,8 +75,8 @@ func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, err
 	return uc.GetService(ctx, testNamespace, testRelease)
 }
 
-// readerForHelmStatus drives ListServices through deriveStatusFromHelm.
-// Use this to test Helm status string mappings (pending-*, failed, uninstalling).
+// readerForHelmStatus drives ListServices for a release whose status Helm
+// alone decides (see statusFromHelm): no workload mock is set up.
 func readerForHelmStatus(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
 	t.Helper()
 	uc, ctx, m := setupReader(t, testUsername)

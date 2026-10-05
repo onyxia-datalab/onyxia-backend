@@ -12,6 +12,7 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v4/pkg/action"
 	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
 	"helm.sh/helm/v4/pkg/repo/v1"
 )
@@ -139,4 +140,24 @@ func TestGetAvailableVersions_All(t *testing.T) {
 	versions, err := repoAdapter.GetAvailableVersions(context.Background(), lr.cfg.ID, "mychart")
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"2.0.0", "1.0.0"}, versions)
+}
+
+func TestApplyRepoAccessCopiesCatalogCredentials(t *testing.T) {
+	user, pass, ca := "alice", "s3cret", "/etc/ca.pem"
+	cfg := env.CatalogConfig{
+		Location:      "https://charts.example.org",
+		Username:      &user,
+		Password:      &pass,
+		CAFile:        &ca,
+		SkipTLSVerify: true,
+	}
+
+	var opts action.ChartPathOptions
+	applyRepoAccess(&opts, cfg)
+
+	assert.Equal(t, "https://charts.example.org", opts.RepoURL)
+	assert.Equal(t, "alice", opts.Username)
+	assert.Equal(t, "s3cret", opts.Password)
+	assert.Equal(t, "/etc/ca.pem", opts.CaFile)
+	assert.True(t, opts.InsecureSkipTLSVerify)
 }

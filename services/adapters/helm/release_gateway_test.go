@@ -33,7 +33,7 @@ func newAdapter(t *testing.T, cb ports.InstallCallbacks) *Helm {
 	client, err := NewClient("")
 	require.NoError(t, err)
 
-	adapter, err := NewReleaseGtw(k8sCfg, client, cb)
+	adapter, err := NewReleaseGtw(k8sCfg, client, nil, cb)
 	require.NoError(t, err)
 
 	return adapter

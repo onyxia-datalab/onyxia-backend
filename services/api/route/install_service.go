@@ -23,6 +23,7 @@ func SetupInstallController(
 	helmRealeaseGtw, err := helm.NewReleaseGtw(
 		app.K8sClient.Config(),
 		helmClient,
+		app.Env.CatalogsConfig,
 		ports.InstallCallbacks{},
 	)
 

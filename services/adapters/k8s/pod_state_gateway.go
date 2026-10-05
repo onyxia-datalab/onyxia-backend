@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	corev1 "k8s.io/api/core/v1"
@@ -98,30 +99,40 @@ func (g *K8sWorkloadStateGateway) GetPodsForRelease(
 		)
 	}
 
+	now := time.Now()
 	infos := make([]ports.PodInfo, 0, len(list.Items))
 	for _, pod := range list.Items {
-		infos = append(infos, derivePodInfo(pod))
+		infos = append(infos, derivePodInfo(pod, now))
 	}
 	return infos, nil
 }
 
+// readinessGracePeriod is how long a running container may stay not ready
+// before it is reported as ReadinessFailed. Until then it is considered to
+// be starting (readiness probes of interactive services can take a while).
+const readinessGracePeriod = 5 * time.Minute
+
 // derivePodInfo inspects a pod's conditions and container statuses to produce a PodInfo.
 // Error priority (highest first): CrashLoopBackOff > OOMKilled > ImagePull > ConfigError > Unschedulable > ReadinessFailed.
-func derivePodInfo(pod corev1.Pod) ports.PodInfo {
+func derivePodInfo(pod corev1.Pod, now time.Time) ports.PodInfo {
 	info := ports.PodInfo{Name: pod.Name}
 
 	updatePodError(&info, unschedulableError(pod.Status.Conditions))
 	for _, status := range pod.Status.ContainerStatuses {
 		updatePodError(&info, waitingContainerError(status))
 		updatePodError(&info, terminatedContainerError(status.State.Terminated))
-		updatePodError(&info, terminatedContainerError(status.LastTerminationState.Terminated))
+		// Kubernetes keeps the last termination until the next one: once the
+		// container is ready again, a past OOMKill is history, not an error.
+		if !status.Ready {
+			updatePodError(&info, terminatedContainerError(status.LastTerminationState.Terminated))
+		}
 	}
 
 	if info.ErrorReason != "" {
 		return info
 	}
 
-	applyContainerReadiness(&info, pod.Status.ContainerStatuses)
+	applyContainerReadiness(&info, pod.Status.ContainerStatuses, now)
 
 	return info
 }
@@ -188,7 +199,7 @@ func updatePodError(info *ports.PodInfo, candidate ports.PodInfo) {
 	*info = candidate
 }
 
-func applyContainerReadiness(info *ports.PodInfo, statuses []corev1.ContainerStatus) {
+func applyContainerReadiness(info *ports.PodInfo, statuses []corev1.ContainerStatus, now time.Time) {
 	if len(statuses) == 0 {
 		return
 	}
@@ -199,7 +210,8 @@ func applyContainerReadiness(info *ports.PodInfo, statuses []corev1.ContainerSta
 			continue
 		}
 		info.Ready = false
-		if status.State.Running != nil {
+		if running := status.State.Running; running != nil &&
+			now.Sub(running.StartedAt.Time) > readinessGracePeriod {
 			info.ErrorReason = ports.PodErrorReasonReadinessFailed
 		}
 	}
