@@ -17,9 +17,6 @@ type StartRequest struct {
 	Values       map[string]interface{}
 }
 
-type StartResponse struct {
-}
-
 type SuspendRequest struct {
 	User        usercontext.User
 	ReleaseName string

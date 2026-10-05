@@ -13,7 +13,6 @@ import (
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
-	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/catalog"
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/namespace"
 )
@@ -63,15 +62,7 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, serve
 
 	// One release gateway for both the install and the query paths, so that
 	// the installs it tracks are the ones the shutdown drain waits for.
-	releaseGtw, err := helm.NewReleaseGtw(
-		app.K8sClient.Config(),
-		helmClient,
-		app.Env.CatalogsConfig,
-		ports.InstallCallbacks{},
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to setup helm release gateway: %w", err)
-	}
+	releaseGtw := helm.NewReleaseGtw(app.K8sClient.Config(), helmClient, app.Env.CatalogsConfig)
 
 	installCtrl := SetupInstallController(app, releaseGtw, catalogUc, namespaceAuthz)
 	catalogCtrl := SetupCatalogController(catalogUc, app)

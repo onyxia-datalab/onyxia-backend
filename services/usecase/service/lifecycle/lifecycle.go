@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -34,21 +33,21 @@ func NewLifecycle(
 func (uc *Lifecycle) Start(
 	ctx context.Context,
 	req domain.StartRequest,
-) (domain.StartResponse, error) {
+) error {
 	if err := uc.namespaces.Check(req.User, req.Namespace); err != nil {
-		return domain.StartResponse{}, err
+		return err
 	}
 
 	// Go through the catalog use case rather than the raw package repository
 	// so catalog restrictions apply to installs, not just to browsing.
 	pkg, err := uc.catalogSvc.GetPackage(ctx, &req.User, req.CatalogID, req.PackageName)
 	if err != nil {
-		return domain.StartResponse{}, fmt.Errorf("get package: %w", err)
+		return fmt.Errorf("get package: %w", err)
 	}
 
 	if req.Share {
 		if err := uc.catalogSvc.CheckSharingAllowed(ctx, &req.User, req.CatalogID); err != nil {
-			return domain.StartResponse{}, fmt.Errorf("check sharing allowed: %w", err)
+			return fmt.Errorf("check sharing allowed: %w", err)
 		}
 	}
 
@@ -57,10 +56,10 @@ func (uc *Lifecycle) Start(
 	// creates its release.
 	state, err := uc.helm.GetReleaseState(ctx, req.Namespace, req.ReleaseID)
 	if err != nil {
-		return domain.StartResponse{}, fmt.Errorf("get release state: %w", err)
+		return fmt.Errorf("get release state: %w", err)
 	}
 	if state.Exists {
-		return domain.StartResponse{}, fmt.Errorf(
+		return fmt.Errorf(
 			"%w: release %q already exists in namespace %q",
 			domain.ErrAlreadyExists,
 			req.ReleaseID,
@@ -76,41 +75,14 @@ func (uc *Lifecycle) Start(
 		Share:        req.Share,
 	}
 	if err := uc.records.CreateServiceRecord(ctx, req.Namespace, record); err != nil {
-		return domain.StartResponse{}, fmt.Errorf("create service record: %w", err)
+		return fmt.Errorf("create service record: %w", err)
 	}
 
-	opts := ports.InstallOptions{
-		Callbacks: ports.InstallCallbacks{
-			OnStart: func(release, chart string) {
-				slog.InfoContext(ctx, "helm install started",
-					slog.String("release", release),
-					slog.String("chart", chart),
-					slog.String("namespace", req.Namespace),
-				)
-			},
-			OnSuccess: func(release, chart string) {
-				slog.InfoContext(ctx, "helm install succeeded",
-					slog.String("release", release),
-					slog.String("chart", chart),
-					slog.String("namespace", req.Namespace),
-				)
-			},
-			OnError: func(release, chart string, err error) {
-				slog.ErrorContext(ctx, "helm install failed",
-					slog.String("release", release),
-					slog.String("chart", chart),
-					slog.String("namespace", req.Namespace),
-					slog.Any("error", err),
-				)
-			},
-		},
+	if err := uc.helm.StartInstall(ctx, req.Namespace, req.ReleaseID, &pkg, req.Version, req.Values); err != nil {
+		return fmt.Errorf("helm start: %w", err)
 	}
 
-	if err := uc.helm.StartInstall(ctx, req.Namespace, req.ReleaseID, &pkg, req.Version, req.Values, opts); err != nil {
-		return domain.StartResponse{}, fmt.Errorf("helm start: %w", err)
-	}
-
-	return domain.StartResponse{}, nil
+	return nil
 }
 
 // authorize enforces that user may act in namespace, then the same

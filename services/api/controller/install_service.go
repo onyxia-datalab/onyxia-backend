@@ -159,7 +159,7 @@ func (ic *InstallController) InstallService(
 	}
 
 	// Execute use case.
-	if _, err := ic.serviceLifecycleUc.Start(ctx, dreq); err != nil {
+	if err := ic.serviceLifecycleUc.Start(ctx, dreq); err != nil {
 		slog.ErrorContext(ctx, "install failed", slog.Any("error", err))
 		if errors.Is(err, domain.ErrNotFound) {
 			// installService has no 404 response in the spec: a missing or

@@ -15,8 +15,6 @@ import (
 	"helm.sh/helm/v4/pkg/chart/loader"
 	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
 	"helm.sh/helm/v4/pkg/cli"
-	"helm.sh/helm/v4/pkg/cli/values"
-	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/release"
 	"helm.sh/helm/v4/pkg/release/common"
 	releasev1 "helm.sh/helm/v4/pkg/release/v1"
@@ -28,7 +26,6 @@ import (
 type Helm struct {
 	settings           *cli.EnvSettings
 	catalogs           map[string]env.CatalogConfig
-	global             ports.InstallCallbacks
 	restConfig         *rest.Config
 	helmClient         *Client
 	configForNamespace func(string) (*action.Configuration, error)
@@ -43,8 +40,7 @@ func NewReleaseGtw(
 	k8sConfig *rest.Config,
 	client *Client,
 	catalogs []env.CatalogConfig,
-	global ports.InstallCallbacks,
-) (*Helm, error) {
+) *Helm {
 	catalogMap := make(map[string]env.CatalogConfig, len(catalogs))
 	for _, c := range catalogs {
 		catalogMap[c.ID] = c
@@ -53,10 +49,9 @@ func NewReleaseGtw(
 	return &Helm{
 		settings:   client.Settings,
 		catalogs:   catalogMap,
-		global:     global,
 		restConfig: k8sConfig,
 		helmClient: client,
-	}, nil
+	}
 }
 
 // cfgForNamespace creates a Helm action.Configuration scoped to the given namespace.
@@ -81,7 +76,6 @@ func (i *Helm) StartInstall(
 	pkg *domain.Package,
 	version string,
 	vals map[string]interface{},
-	opts ports.InstallOptions,
 ) error {
 
 	if releaseName == "" {
@@ -123,15 +117,6 @@ func (i *Helm) StartInstall(
 		return fmt.Errorf("loading chart: %w", err)
 	}
 
-	// Merge values (env/flags + caller vals)
-	valMap, err := (&values.Options{}).MergeValues(getter.All(i.settings))
-	if err != nil {
-		return fmt.Errorf("merging values: %w", err)
-	}
-	for k, v := range vals {
-		valMap[k] = v
-	}
-
 	// The HTTP request ends as soon as this method returns. Preserve its values
 	// without letting request cancellation abort the asynchronous Helm action.
 	installCtx := context.WithoutCancel(ctx)
@@ -145,25 +130,19 @@ func (i *Helm) StartInstall(
 			slog.Bool("disableHooks", act.DisableHooks),
 			slog.Duration("timeout", act.Timeout),
 		)
-		notifyInstallStart(i.global, releaseName, chartRef)
-		notifyInstallStart(opts.Callbacks, releaseName, chartRef)
-		_, runErr := act.RunWithContext(installCtx, chart, valMap)
+		_, runErr := act.RunWithContext(installCtx, chart, vals)
 		if runErr != nil {
 			slog.ErrorContext(installCtx, "helm install failed",
 				slog.String("release", releaseName),
 				slog.String("chart", chartRef),
 				slog.Any("error", runErr),
 			)
-			notifyInstallError(i.global, releaseName, chartRef, runErr)
-			notifyInstallError(opts.Callbacks, releaseName, chartRef, runErr)
 			return
 		}
 		slog.InfoContext(installCtx, "helm install completed",
 			slog.String("release", releaseName),
 			slog.String("chart", chartRef),
 		)
-		notifyInstallSuccess(i.global, releaseName, chartRef)
-		notifyInstallSuccess(opts.Callbacks, releaseName, chartRef)
 	})
 
 	return nil
@@ -184,24 +163,6 @@ func (i *Helm) WaitForInstalls(ctx context.Context) error {
 		return nil
 	case <-ctx.Done():
 		return fmt.Errorf("background helm installs still running: %w", ctx.Err())
-	}
-}
-
-func notifyInstallStart(callbacks ports.InstallCallbacks, release, chart string) {
-	if callbacks.OnStart != nil {
-		callbacks.OnStart(release, chart)
-	}
-}
-
-func notifyInstallSuccess(callbacks ports.InstallCallbacks, release, chart string) {
-	if callbacks.OnSuccess != nil {
-		callbacks.OnSuccess(release, chart)
-	}
-}
-
-func notifyInstallError(callbacks ports.InstallCallbacks, release, chart string, err error) {
-	if callbacks.OnError != nil {
-		callbacks.OnError(release, chart, err)
 	}
 }
 

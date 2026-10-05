@@ -39,18 +39,10 @@ const (
 	ReleaseStatusUnknown ReleaseStatus = "unknown"
 )
 
-type InstallCallbacks struct {
-	OnStart   func(release, chart string)
-	OnSuccess func(release, chart string)
-	OnError   func(release, chart string, err error)
-}
-
-type InstallOptions struct {
-	Callbacks InstallCallbacks // per-call callbacks (optional)
-}
-
 type ReleaseGateway interface {
-	// Start a Helm install in the background and returns immediately.
+	// StartInstall starts the install in the background and returns as soon
+	// as the chart is resolved; the install's outcome is logged and observed
+	// through the release state.
 	StartInstall(
 		ctx context.Context,
 		namespace string,
@@ -58,7 +50,6 @@ type ReleaseGateway interface {
 		pkg *domain.Package,
 		version string,
 		vals map[string]interface{},
-		opts InstallOptions,
 	) error
 
 	// SuspendRelease scales all Deployments and StatefulSets of a release to 0.

@@ -21,9 +21,8 @@ func (m *MockReleaseGateway) StartInstall(
 	pkg *domain.Package,
 	version string,
 	vals map[string]interface{},
-	opts ports.InstallOptions,
 ) error {
-	return m.Called(ctx, namespace, releaseName, pkg, version, vals, opts).Error(0)
+	return m.Called(ctx, namespace, releaseName, pkg, version, vals).Error(0)
 }
 
 func (m *MockReleaseGateway) SuspendRelease(ctx context.Context, namespace, releaseName string) error {

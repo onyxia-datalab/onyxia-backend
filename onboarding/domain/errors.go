@@ -7,6 +7,5 @@ import "github.com/onyxia-datalab/onyxia-backend/internal/apperror"
 // familiar domain.ErrXxx names. They are the same underlying error values,
 // so errors.Is works identically through either name.
 var (
-	ErrUnauthorized = apperror.ErrUnauthorized
-	ErrForbidden    = apperror.ErrForbidden
+	ErrForbidden = apperror.ErrForbidden
 )

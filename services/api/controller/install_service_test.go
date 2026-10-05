@@ -12,7 +12,7 @@ import (
 )
 
 type lifecycleStub struct {
-	start      func(context.Context, domain.StartRequest) (domain.StartResponse, error)
+	start      func(context.Context, domain.StartRequest) error
 	suspendErr error
 	resumeErr  error
 	deleteErr  error
@@ -23,9 +23,9 @@ type lifecycleStub struct {
 func (s *lifecycleStub) Start(
 	ctx context.Context,
 	req domain.StartRequest,
-) (domain.StartResponse, error) {
+) error {
 	if s.start == nil {
-		return domain.StartResponse{}, nil
+		return nil
 	}
 	return s.start(ctx, req)
 }
@@ -78,9 +78,9 @@ func TestInstallServiceSelectsPackageVersionAndCanonicalReleaseID(t *testing.T) 
 			lifecycle := &lifecycleStub{start: func(
 				_ context.Context,
 				req domain.StartRequest,
-			) (domain.StartResponse, error) {
+			) error {
 				captured = req
-				return domain.StartResponse{}, nil
+				return nil
 			}}
 			ctrl := NewInstallController(lifecycle, users)
 
@@ -160,8 +160,8 @@ func TestInstallServiceWrapsUnexpectedNotFoundAsInvalidInput(t *testing.T) {
 	lifecycle := &lifecycleStub{start: func(
 		context.Context,
 		domain.StartRequest,
-	) (domain.StartResponse, error) {
-		return domain.StartResponse{}, domain.ErrNotFound
+	) error {
+		return domain.ErrNotFound
 	}}
 	ctrl := NewInstallController(lifecycle, users)
 

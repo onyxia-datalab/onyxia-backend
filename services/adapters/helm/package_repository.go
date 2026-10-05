@@ -12,7 +12,6 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"helm.sh/helm/v4/pkg/action"
-	"helm.sh/helm/v4/pkg/chart"
 	"helm.sh/helm/v4/pkg/chart/loader"
 	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
 	"helm.sh/helm/v4/pkg/cli"
@@ -22,9 +21,6 @@ import (
 )
 
 var _ ports.PackageRepository = (*HelmPackageRepository)(nil)
-
-// ensure chart package is referenced (used via chart.Charter interface from loader)
-var _ chart.Charter = (*chartv2.Chart)(nil)
 
 // ociPackageTTL is effectively infinite: OCI versions are immutable so
 // cached metadata never goes stale. Eviction happens on process restart.
@@ -112,8 +108,8 @@ func (h *HelmPackageRepository) ListPackages(
 				CatalogID:   cfg.ID,
 				Name:        cv.Name,
 				Description: cv.Description,
-				HomeUrl:     tools.MustParseURL(cv.Home),
-				IconUrl:     tools.MustParseURL(cv.Icon),
+				HomeUrl:     tools.ParseURLOrEmpty(cv.Home),
+				IconUrl:     tools.ParseURLOrEmpty(cv.Icon),
 			})
 		}
 		return pkgs, nil
@@ -148,8 +144,8 @@ func (h *HelmPackageRepository) GetPackage(
 			CatalogID:   cfg.ID,
 			Name:        cv.Name,
 			Description: cv.Description,
-			HomeUrl:     tools.MustParseURL(cv.Home),
-			IconUrl:     tools.MustParseURL(cv.Icon),
+			HomeUrl:     tools.ParseURLOrEmpty(cv.Home),
+			IconUrl:     tools.ParseURLOrEmpty(cv.Icon),
 			RepoURL:     cfg.Location,
 		}, nil
 	case env.CatalogTypeOCI:
@@ -383,8 +379,8 @@ func (h *HelmPackageRepository) getOCIPackage(
 			CatalogID:   cfg.ID,
 			Name:        p.Name,
 			Description: ch.Metadata.Description,
-			HomeUrl:     tools.MustParseURL(ch.Metadata.Home),
-			IconUrl:     tools.MustParseURL(ch.Metadata.Icon),
+			HomeUrl:     tools.ParseURLOrEmpty(ch.Metadata.Home),
+			IconUrl:     tools.ParseURLOrEmpty(ch.Metadata.Icon),
 			ChartRef:    chartRef,
 		}, nil
 	})

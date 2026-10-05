@@ -73,10 +73,10 @@ func TestStart_Success(t *testing.T) {
 	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).Return(pkg, nil)
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", ctx, req.Namespace, mock.Anything).Return(nil)
-	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values, mock.Anything).
+	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values).
 		Return(nil)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
 	m.catalog.AssertExpectations(t)
@@ -100,10 +100,10 @@ func TestStart_ServiceRecordIsCorrect(t *testing.T) {
 		Owner:        req.User.Username,
 		Share:        true,
 	}).Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
 	m.records.AssertExpectations(t)
@@ -116,7 +116,7 @@ func TestStart_GetPackageError(t *testing.T) {
 	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, errors.New("index unavailable"))
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "index unavailable")
 	m.records.AssertNotCalled(t, "CreateServiceRecord")
@@ -130,7 +130,7 @@ func TestStart_PackageNotFound(t *testing.T) {
 	m.catalog.On("GetPackage", ctx, &req.User, req.CatalogID, req.PackageName).
 		Return(domain.Package{}, domain.ErrNotFound)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	m.records.AssertNotCalled(t, "CreateServiceRecord")
@@ -151,7 +151,7 @@ func TestStart_SharingNotAllowed(t *testing.T) {
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	m.catalog.On("CheckSharingAllowed", mock.Anything, mock.Anything, req.CatalogID).Return(domain.ErrForbidden)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	m.helm.AssertNotCalled(t, "GetReleaseState")
@@ -169,10 +169,10 @@ func TestStart_ShareFalseSkipsSharingCheck(t *testing.T) {
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
 	m.catalog.AssertNotCalled(t, "CheckSharingAllowed", mock.Anything, mock.Anything, mock.Anything)
@@ -187,7 +187,7 @@ func TestStart_AlreadyExists(t *testing.T) {
 	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
 		Return(ports.ReleaseState{Exists: true}, nil)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	m.records.AssertNotCalled(t, "CreateServiceRecord")
@@ -203,7 +203,7 @@ func TestStart_GetReleaseStateError(t *testing.T) {
 	m.helm.On("GetReleaseState", mock.Anything, req.Namespace, req.ReleaseID).
 		Return(ports.ReleaseState{}, errors.New("helm unavailable"))
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "helm unavailable")
 	m.records.AssertNotCalled(t, "CreateServiceRecord")
@@ -220,7 +220,7 @@ func TestStart_RecordError(t *testing.T) {
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("k8s unavailable"))
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "k8s unavailable")
 	m.helm.AssertNotCalled(t, "StartInstall")
@@ -236,7 +236,7 @@ func TestStart_RecordAlreadyExistsDoesNotOverwriteOrInstall(t *testing.T) {
 	m.records.On("CreateServiceRecord", mock.Anything, req.Namespace, mock.Anything).
 		Return(domain.ErrAlreadyExists)
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
 	m.helm.AssertNotCalled(t, "StartInstall")
@@ -251,35 +251,12 @@ func TestStart_HelmError(t *testing.T) {
 	notInstalled(m, req)
 	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("invalid release name"))
 
-	_, err := uc.Start(ctx, req)
+	err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "invalid release name")
-}
-
-func TestStart_InvokesInstallCallbacks(t *testing.T) {
-	uc, ctx, m := setupLifecycle(t)
-	req := baseRequest()
-	pkg := resolvedPkg(req)
-
-	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
-	notInstalled(m, req)
-	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil)
-	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			opts := args.Get(6).(ports.InstallOptions)
-			opts.Callbacks.OnStart("release", "chart")
-			opts.Callbacks.OnSuccess("release", "chart")
-			opts.Callbacks.OnError("release", "chart", errors.New("simulated"))
-		}).
-		Return(nil)
-
-	_, err := uc.Start(ctx, req)
-
-	require.NoError(t, err)
 }
 
 // --- Suspend / Resume / Delete: ownership ---------------------------------
@@ -557,7 +534,7 @@ func TestLifecycle_ForeignNamespaceForbidden(t *testing.T) {
 		"start": func(uc *Lifecycle, ctx context.Context) error {
 			req := baseRequest()
 			req.Namespace = foreign
-			_, err := uc.Start(ctx, req)
+			err := uc.Start(ctx, req)
 			return err
 		},
 		"suspend": func(uc *Lifecycle, ctx context.Context) error {

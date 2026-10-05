@@ -60,8 +60,8 @@ type stubLifecycle struct {
 	sharedErr  error
 }
 
-func (s *stubLifecycle) Start(context.Context, domain.StartRequest) (domain.StartResponse, error) {
-	return domain.StartResponse{}, s.startErr
+func (s *stubLifecycle) Start(context.Context, domain.StartRequest) error {
+	return s.startErr
 }
 func (s *stubLifecycle) Suspend(context.Context, domain.SuspendRequest) error { return s.suspendErr }
 func (s *stubLifecycle) Resume(context.Context, domain.ResumeRequest) error   { return s.resumeErr }

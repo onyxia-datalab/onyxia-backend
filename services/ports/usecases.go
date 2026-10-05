@@ -39,7 +39,7 @@ type CatalogService interface {
 // operation returns ErrForbidden when the caller may not act in the
 // request's namespace, and ErrNotFound for a service they cannot see.
 type ServiceLifecycle interface {
-	Start(ctx context.Context, req domain.StartRequest) (domain.StartResponse, error)
+	Start(ctx context.Context, req domain.StartRequest) error
 	Suspend(ctx context.Context, req domain.SuspendRequest) error
 	Resume(ctx context.Context, req domain.ResumeRequest) error
 	Delete(ctx context.Context, req domain.DeleteRequest) error
