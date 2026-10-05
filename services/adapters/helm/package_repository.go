@@ -100,7 +100,14 @@ func (h *HelmPackageRepository) ListPackages(
 	case env.CatalogTypeHelmRepo:
 		cvs, err := h.listCharts(catalogID)
 		if err != nil {
-			return nil, err
+			if len(cvs) == 0 {
+				return nil, err
+			}
+			// Some index entries are broken: list the valid charts anyway.
+			slog.WarnContext(ctx, "Ignoring invalid charts in the catalog index",
+				slog.String("catalog_id", catalogID),
+				slog.Any("error", err),
+			)
 		}
 		pkgs := make([]domain.Package, 0, len(cvs))
 		for _, cv := range cvs {

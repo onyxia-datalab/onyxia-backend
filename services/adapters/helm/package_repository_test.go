@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
@@ -160,4 +161,19 @@ func TestApplyRepoAccessCopiesCatalogCredentials(t *testing.T) {
 	assert.Equal(t, "s3cret", opts.Password)
 	assert.Equal(t, "/etc/ca.pem", opts.CaFile)
 	assert.True(t, opts.InsecureSkipTLSVerify)
+}
+
+func TestListHelmPackages_IgnoresBrokenIndexEntries(t *testing.T) {
+	lr := newLocalHelmRepo(t, &chartv2.Metadata{Name: "ok", Version: "1.0.0", APIVersion: "v2"})
+	// A chart entry without any version cannot be resolved.
+	raw, err := os.ReadFile(filepath.Join(lr.tmpDir, "index.yaml"))
+	require.NoError(t, err)
+	patched := strings.Replace(string(raw), "entries:\n", "entries:\n  broken: []\n", 1)
+	require.NoError(t, os.WriteFile(filepath.Join(lr.tmpDir, "index.yaml"), []byte(patched), 0o644))
+
+	pkgs, err := lr.newAdapter(t).ListPackages(context.Background(), lr.cfg.ID)
+
+	require.NoError(t, err)
+	require.Len(t, pkgs, 1)
+	assert.Equal(t, "ok", pkgs[0].Name)
 }

@@ -703,3 +703,17 @@ func TestGetAvailableVersions_Latest(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"2.0.0"}, versions)
 }
+
+// ✅ ListCatalogs — an unreachable repository only hides its own catalog.
+func TestListCatalogs_SkipsCatalogWhoseRepositoryFails(t *testing.T) {
+	cfgs := []domain.CatalogSettings{{ID: "broken"}, {ID: "ok"}}
+	uc, ctx, repo, user := setupCatalogUsecase(t, usercontext.DefaultTestUser(), cfgs)
+	repo.On("ListPackages", mock.Anything, "broken").Return(nil, errors.New("repository unreachable"))
+	repo.On("ListPackages", mock.Anything, "ok").Return([]domain.Package{{Name: "chart"}}, nil)
+
+	result, err := uc.ListCatalogs(ctx, user)
+
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, "ok", result[0].ID)
+}

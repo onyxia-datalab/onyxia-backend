@@ -2,7 +2,9 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -206,6 +208,7 @@ func (uc *Catalog) buildCatalogs(
 	include func(domain.CatalogSettings) bool,
 ) ([]domain.Catalog, error) {
 	out := make([]domain.Catalog, 0)
+	var failures []error
 
 	for _, cfg := range uc.catalogs {
 		if !include(cfg) {
@@ -214,7 +217,13 @@ func (uc *Catalog) buildCatalogs(
 
 		allPkgs, err := uc.pkgRepo.ListPackages(ctx, cfg.ID)
 		if err != nil {
-			return nil, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err)
+			// One unreachable repository must not hide every other catalog.
+			slog.ErrorContext(ctx, "Skipping catalog: cannot list its packages",
+				slog.String("catalog_id", cfg.ID),
+				slog.Any("error", err),
+			)
+			failures = append(failures, fmt.Errorf("catalog %q: list packages: %w", cfg.ID, err))
+			continue
 		}
 		pkgs := make([]domain.Package, 0, len(allPkgs))
 		for _, p := range allPkgs {
@@ -233,5 +242,8 @@ func (uc *Catalog) buildCatalogs(
 		})
 	}
 
+	if len(out) == 0 && len(failures) > 0 {
+		return nil, errors.Join(failures...)
+	}
 	return out, nil
 }
