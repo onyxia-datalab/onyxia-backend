@@ -206,3 +206,37 @@ func TestGetReleaseStateTranslatesHelmStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestListReleaseStates(t *testing.T) {
+	cfg := action.NewConfiguration()
+	cfg.Releases = storage.Init(driver.NewMemory())
+	cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+	for _, rel := range []*releasev1.Release{
+		// Two revisions: only the latest one counts.
+		{Name: "jupyter", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusSuperseded}},
+		{
+			Name: "jupyter", Namespace: "ns", Version: 2,
+			Info:     &releasev1.Info{Status: common.StatusDeployed},
+			Config:   map[string]interface{}{"global": map[string]interface{}{"suspend": true}},
+			Manifest: "---\nkind: Deployment\nmetadata:\n  name: jupyter\n---\nkind: Service\nmetadata:\n  name: jupyter\n",
+		},
+		{Name: "broken", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusFailed}},
+		{Name: "gone", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusUninstalled}},
+	} {
+		require.NoError(t, cfg.Releases.Create(rel))
+	}
+
+	i := newAdapter(t)
+	i.configForNamespace = func(string) (*action.Configuration, error) { return cfg, nil }
+
+	states, err := i.ListReleaseStates(context.Background(), "ns")
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]ports.ReleaseState{
+		"jupyter": {
+			Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed,
+			Resources: []ports.ManifestResource{{Kind: "Deployment", Name: "jupyter"}, {Kind: "Service", Name: "jupyter"}},
+		},
+		"broken": {Exists: true, Status: ports.ReleaseStatusFailed},
+	}, states)
+}

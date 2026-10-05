@@ -18,12 +18,26 @@ type PodInfo struct {
 	Limit        string
 }
 
-// WorkloadStateGateway provides Kubernetes workload state for a set of manifest resources.
+// WorkloadStateGateway provides Kubernetes workload state.
 type WorkloadStateGateway interface {
 	// GetPodsForRelease returns pod-level detail for error diagnosis (used by GetService).
 	GetPodsForRelease(ctx context.Context, namespace, releaseID string) ([]PodInfo, error)
 
-	// GetControllerReadiness returns true when all controller resources in the provided list
-	// are ready. The implementation decides which kinds it handles; unknown kinds are ignored.
-	GetControllerReadiness(ctx context.Context, namespace string, resources []ManifestResource) (bool, error)
+	// GetWorkloadReadiness snapshots the readiness of the namespace's
+	// workloads in a constant number of calls, so that the readiness of many
+	// releases can be checked without a request per release.
+	GetWorkloadReadiness(ctx context.Context, namespace string) (WorkloadReadiness, error)
 }
+
+// WorkloadReadiness is a snapshot of a namespace's workload readiness.
+type WorkloadReadiness interface {
+	// AllReady reports whether every workload controller among resources is
+	// ready. The implementation decides which kinds are controllers; other
+	// kinds are ignored. A declared controller that doesn't exist is not ready.
+	AllReady(resources []ManifestResource) bool
+}
+
+// WorkloadReadinessFunc adapts a function to WorkloadReadiness.
+type WorkloadReadinessFunc func(resources []ManifestResource) bool
+
+func (f WorkloadReadinessFunc) AllReady(resources []ManifestResource) bool { return f(resources) }

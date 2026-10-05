@@ -72,7 +72,9 @@ func (uc *Reader) GetService(
 // ListServices returns services visible to the current user
 // (see namespace.Authorizer.CanAccessService).
 // Pod queries are skipped — status is derived from the release state and the
-// workload controllers only.
+// workload controllers only. The number of calls to the cluster does not
+// depend on the number of services: one list of the records, one of the
+// releases and, if any service needs it, one snapshot of the workloads.
 func (uc *Reader) ListServices(
 	ctx context.Context,
 	user usercontext.User,
@@ -87,18 +89,37 @@ func (uc *Reader) ListServices(
 		return nil, fmt.Errorf("list service records: %w", err)
 	}
 
-	services := make([]domain.Service, 0, len(records))
+	visible := make([]ports.ServiceRecord, 0, len(records))
 	for _, rec := range records {
-		if !uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
-			continue
+		if uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
+			visible = append(visible, rec)
 		}
-		releaseState, err := uc.helm.GetReleaseState(ctx, namespace, rec.ReleaseID)
-		if err != nil {
-			return nil, fmt.Errorf("get release state: %w", err)
-		}
-		status, err := uc.deriveStatusLight(ctx, namespace, rec.ReleaseID, releaseState)
-		if err != nil {
-			return nil, fmt.Errorf("derive status: %w", err)
+	}
+	if len(visible) == 0 {
+		return []domain.Service{}, nil
+	}
+
+	releases, err := uc.helm.ListReleaseStates(ctx, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("list release states: %w", err)
+	}
+
+	var workloads ports.WorkloadReadiness // fetched on first need
+	services := make([]domain.Service, 0, len(visible))
+	for _, rec := range visible {
+		// A record without a release yields the zero state: a Ghost.
+		release := releases[rec.ReleaseID]
+		status, decided := statusFromRelease(release)
+		if !decided {
+			if workloads == nil {
+				if workloads, err = uc.pods.GetWorkloadReadiness(ctx, namespace); err != nil {
+					return nil, fmt.Errorf("get workload readiness: %w", err)
+				}
+			}
+			status = domain.ServiceStatusDeploying
+			if workloads.AllReady(release.Resources) {
+				status = domain.ServiceStatusRunning
+			}
 		}
 		services = append(services, toService(namespace, rec, status))
 	}
@@ -115,30 +136,6 @@ func toService(namespace string, rec ports.ServiceRecord, status domain.ServiceS
 		Share:        rec.Share,
 		Status:       status,
 	}
-}
-
-// deriveStatusLight maps a Helm release state to a ServiceStatus using the workload
-// controller status when deployed — no pod listing.
-func (uc *Reader) deriveStatusLight(
-	ctx context.Context,
-	namespace, releaseID string,
-	releaseState ports.ReleaseState,
-) (domain.ServiceStatus, error) {
-	if status, decided := statusFromRelease(releaseState); decided {
-		return status, nil
-	}
-	resources, err := uc.helm.GetReleaseResources(ctx, namespace, releaseID)
-	if err != nil {
-		return "", fmt.Errorf("get release resources: %w", err)
-	}
-	ready, err := uc.pods.GetControllerReadiness(ctx, namespace, resources)
-	if err != nil {
-		return "", err
-	}
-	if ready {
-		return domain.ServiceStatusRunning, nil
-	}
-	return domain.ServiceStatusDeploying, nil
 }
 
 // deriveStatusWithDetail applies the full derivation including pod queries.

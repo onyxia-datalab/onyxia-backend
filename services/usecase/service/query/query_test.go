@@ -83,8 +83,8 @@ func readerForHelmStatus(t *testing.T, state ports.ReleaseState) (domain.Service
 
 	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
 		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(state, nil)
+	m.helm.On("ListReleaseStates", mock.Anything, testNamespace).
+		Return(map[string]ports.ReleaseState{testRelease: state}, nil)
 
 	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
 	if err != nil || len(svcs) == 0 {
@@ -222,146 +222,6 @@ func TestGetService_FieldsMappedFromRecord(t *testing.T) {
 	assert.True(t, svc.Share)
 }
 
-// --- ListServices -----------------------------------------------------------
-
-func TestListServices_Empty(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{}, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	assert.Empty(t, svcs)
-}
-
-func TestListServices_ListError(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return(nil, errors.New("api error"))
-
-	_, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	assert.ErrorContains(t, err, "api error")
-}
-
-func TestListServices_FiltersOutOtherOwnerUnshared(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record("svc-bob", "bob", false)}, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	assert.Empty(t, svcs)
-	// The state of a service the caller can't see is not even looked up.
-	m.helm.AssertNotCalled(t, "GetReleaseState", mock.Anything, mock.Anything, mock.Anything)
-}
-
-func TestListServices_IncludesOwnedService(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
-		Return([]ports.ManifestResource{}, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, mock.Anything).
-		Return(true, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, testRelease, svcs[0].ReleaseID)
-}
-
-func TestListServices_IncludesSharedServiceFromOtherOwner(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record("svc-bob-shared", "bob", true)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, "svc-bob-shared").
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, "svc-bob-shared").
-		Return([]ports.ManifestResource{}, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, mock.Anything).
-		Return(true, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, "svc-bob-shared", svcs[0].ReleaseID)
-}
-
-func TestListServices_PersonalNamespaceShowsAnyOwner(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, personalNamespace).
-		Return([]ports.ServiceRecord{record("svc-legacy", "legacy-owner", false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, personalNamespace, "svc-legacy").
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, personalNamespace, "svc-legacy").
-		Return([]ports.ManifestResource{}, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, personalNamespace, mock.Anything).
-		Return(true, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, personalNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, "svc-legacy", svcs[0].ReleaseID)
-}
-
-// --- deriveStatusLight (via ListServices) -----------------------------------
-
-func TestListServices_DeployedRelease_Ready(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	resources := []ports.ManifestResource{{Kind: "Deployment", Name: "my-deploy"}}
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
-		Return(resources, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, resources).
-		Return(true, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, domain.ServiceStatusRunning, svcs[0].Status)
-}
-
-func TestListServices_DeployedRelease_NotReady(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	resources := []ports.ManifestResource{{Kind: "Deployment", Name: "my-deploy"}}
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
-		Return(resources, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, resources).
-		Return(false, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, domain.ServiceStatusDeploying, svcs[0].Status)
-}
-
 func TestGetService_HelmStateError(t *testing.T) {
 	uc, ctx, m := setupReader(t)
 
@@ -390,68 +250,6 @@ func TestGetService_PodQueryError(t *testing.T) {
 	assert.ErrorContains(t, err, "k8s down")
 }
 
-func TestListServices_HelmStateError(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{}, errors.New("helm down"))
-
-	_, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	assert.ErrorContains(t, err, "helm down")
-}
-
-func TestListServices_ReleaseResourcesError(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
-		Return(nil, errors.New("k8s down"))
-
-	_, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	assert.ErrorContains(t, err, "k8s down")
-}
-
-func TestListServices_ControllerReadinessError(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
-	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
-		Return([]ports.ManifestResource{}, nil)
-	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, []ports.ManifestResource{}).
-		Return(false, errors.New("k8s down"))
-
-	_, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	assert.ErrorContains(t, err, "k8s down")
-}
-
-func TestListServices_NonDeployedRelease_NoK8sCall(t *testing.T) {
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-
-	require.NoError(t, err)
-	require.Len(t, svcs, 1)
-	assert.Equal(t, domain.ServiceStatusDeploying, svcs[0].Status)
-	m.pods.AssertNotCalled(t, "GetControllerReadiness")
-	m.helm.AssertNotCalled(t, "GetReleaseResources")
-}
-
 // --- namespace authorization ------------------------------------------------
 
 func TestGetService_ForeignNamespaceForbidden(t *testing.T) {
@@ -461,6 +259,197 @@ func TestGetService_ForeignNamespaceForbidden(t *testing.T) {
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	m.records.AssertNotCalled(t, "GetServiceRecord", mock.Anything, mock.Anything, mock.Anything)
+}
+
+// --- ListServices -----------------------------------------------------------
+
+// listFixture stubs the namespace listings ListServices reads.
+type listFixture struct {
+	records   []ports.ServiceRecord
+	releases  map[string]ports.ReleaseState
+	workloads ports.WorkloadReadiness
+}
+
+func (f listFixture) stub(m queryMocks, ns string) {
+	m.records.On("ListServiceRecords", mock.Anything, ns).Return(f.records, nil)
+	if f.releases != nil {
+		m.helm.On("ListReleaseStates", mock.Anything, ns).Return(f.releases, nil)
+	}
+	if f.workloads != nil {
+		m.pods.On("GetWorkloadReadiness", mock.Anything, ns).Return(f.workloads, nil)
+	}
+}
+
+var deployedWithWeb = ports.ReleaseState{
+	Exists:    true,
+	Status:    ports.ReleaseStatusDeployed,
+	Resources: []ports.ManifestResource{{Kind: "Deployment", Name: "web"}},
+}
+
+func readiness(ready bool) ports.WorkloadReadiness {
+	return ports.WorkloadReadinessFunc(func([]ports.ManifestResource) bool { return ready })
+}
+
+func TestListServices_Empty(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{records: []ports.ServiceRecord{}}.stub(m, testNamespace)
+
+	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	require.NoError(t, err)
+	assert.Empty(t, svcs)
+	m.helm.AssertNotCalled(t, "ListReleaseStates", mock.Anything, mock.Anything)
+}
+
+func TestListServices_RecordsListError(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	m.records.On("ListServiceRecords", mock.Anything, testNamespace).Return(nil, errors.New("api error"))
+
+	_, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	assert.ErrorContains(t, err, "api error")
+}
+
+func TestListServices_Visibility(t *testing.T) {
+	tests := []struct {
+		name      string
+		namespace string
+		owner     string
+		share     bool
+		visible   bool
+	}{
+		{"owned service", testNamespace, testUsername, false, true},
+		{"service shared by another owner", testNamespace, "bob", true, true},
+		{"unshared service of another owner", testNamespace, "bob", false, false},
+		{"personal namespace shows any owner", personalNamespace, "legacy-owner", false, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uc, ctx, m := setupReader(t)
+			listFixture{
+				records:   []ports.ServiceRecord{record("svc", tt.owner, tt.share)},
+				releases:  map[string]ports.ReleaseState{"svc": deployedWithWeb},
+				workloads: readiness(true),
+			}.stub(m, tt.namespace)
+
+			svcs, err := uc.ListServices(ctx, testCaller, tt.namespace)
+
+			require.NoError(t, err)
+			if tt.visible {
+				require.Len(t, svcs, 1)
+				assert.Equal(t, "svc", svcs[0].ReleaseID)
+			} else {
+				assert.Empty(t, svcs)
+				// Nothing is read for services the caller can't see.
+				m.helm.AssertNotCalled(t, "ListReleaseStates", mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
+
+func TestListServices_DeployedReleaseFollowsWorkloads(t *testing.T) {
+	for _, ready := range []bool{true, false} {
+		uc, ctx, m := setupReader(t)
+		var gotResources []ports.ManifestResource
+		listFixture{
+			records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+			releases: map[string]ports.ReleaseState{testRelease: deployedWithWeb},
+			workloads: ports.WorkloadReadinessFunc(func(r []ports.ManifestResource) bool {
+				gotResources = r
+				return ready
+			}),
+		}.stub(m, testNamespace)
+
+		svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+		require.NoError(t, err)
+		require.Len(t, svcs, 1)
+		want := domain.ServiceStatusDeploying
+		if ready {
+			want = domain.ServiceStatusRunning
+		}
+		assert.Equal(t, want, svcs[0].Status)
+		assert.Equal(t, deployedWithWeb.Resources, gotResources)
+	}
+}
+
+func TestListServices_RecordWithoutReleaseIsGhost(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{
+		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+		releases: map[string]ports.ReleaseState{},
+	}.stub(m, testNamespace)
+
+	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	require.NoError(t, err)
+	require.Len(t, svcs, 1)
+	assert.Equal(t, domain.ServiceStatusGhost, svcs[0].Status)
+}
+
+// The number of calls doesn't grow with the number of services: one list of
+// releases and one workload snapshot, fetched only when a service needs it.
+func TestListServices_ConstantNumberOfCalls(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{
+		records: []ports.ServiceRecord{
+			record("a", testUsername, false),
+			record("b", testUsername, false),
+			record("c", testUsername, false),
+			record("pending", testUsername, false),
+		},
+		releases: map[string]ports.ReleaseState{
+			"a": deployedWithWeb, "b": deployedWithWeb, "c": deployedWithWeb,
+			"pending": {Exists: true, Status: ports.ReleaseStatusPending},
+		},
+		workloads: readiness(true),
+	}.stub(m, testNamespace)
+
+	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	require.NoError(t, err)
+	require.Len(t, svcs, 4)
+	m.helm.AssertNumberOfCalls(t, "ListReleaseStates", 1)
+	m.pods.AssertNumberOfCalls(t, "GetWorkloadReadiness", 1)
+	m.helm.AssertNotCalled(t, "GetReleaseState", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestListServices_NoWorkloadCallWhenReleasesDecide(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{
+		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+		releases: map[string]ports.ReleaseState{testRelease: {Exists: true, Status: ports.ReleaseStatusPending}},
+	}.stub(m, testNamespace)
+
+	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	require.NoError(t, err)
+	assert.Equal(t, domain.ServiceStatusDeploying, svcs[0].Status)
+	m.pods.AssertNotCalled(t, "GetWorkloadReadiness", mock.Anything, mock.Anything)
+}
+
+func TestListServices_ReleasesListError(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{records: []ports.ServiceRecord{record(testRelease, testUsername, false)}}.stub(m, testNamespace)
+	m.helm.On("ListReleaseStates", mock.Anything, testNamespace).Return(nil, errors.New("helm down"))
+
+	_, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	assert.ErrorContains(t, err, "helm down")
+}
+
+func TestListServices_WorkloadReadinessError(t *testing.T) {
+	uc, ctx, m := setupReader(t)
+	listFixture{
+		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+		releases: map[string]ports.ReleaseState{testRelease: deployedWithWeb},
+	}.stub(m, testNamespace)
+	m.pods.On("GetWorkloadReadiness", mock.Anything, testNamespace).Return(nil, errors.New("k8s down"))
+
+	_, err := uc.ListServices(ctx, testCaller, testNamespace)
+
+	assert.ErrorContains(t, err, "k8s down")
 }
 
 func TestListServices_ForeignNamespaceForbidden(t *testing.T) {

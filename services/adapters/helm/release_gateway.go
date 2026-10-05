@@ -267,32 +267,6 @@ func globalSuspendSupported(chartValues map[string]interface{}) bool {
 	return ok
 }
 
-// GetReleaseResources parses the release manifest and returns all declared resources.
-func (h *Helm) GetReleaseResources(
-	ctx context.Context,
-	namespace, releaseName string,
-) ([]ports.ManifestResource, error) {
-	cfg, err := h.cfgForNamespace(namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	rel, err := action.NewGet(cfg).Run(releaseName)
-	if err != nil {
-		if errors.Is(err, driver.ErrReleaseNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("get release %q: %w", releaseName, err)
-	}
-
-	r, ok := rel.(*releasev1.Release)
-	if !ok {
-		return nil, fmt.Errorf("unexpected release type for %q", releaseName)
-	}
-
-	return parseManifestResources(r.Manifest), nil
-}
-
 // parseManifestResources splits a multi-document YAML manifest and extracts
 // the Kind and metadata.name of each resource.
 func parseManifestResources(manifest string) []ports.ManifestResource {
@@ -320,8 +294,8 @@ func parseManifestResources(manifest string) []ports.ManifestResource {
 	return resources
 }
 
-// GetReleaseState returns whether the release exists and whether global.suspend is true.
-// Returns ReleaseState{Exists: false} (no error) when the release is not found.
+// GetReleaseState returns ReleaseState{Exists: false} (no error) when the
+// release is not found.
 func (h *Helm) GetReleaseState(
 	ctx context.Context,
 	namespace, releaseName string,
@@ -338,25 +312,70 @@ func (h *Helm) GetReleaseState(
 		}
 		return ports.ReleaseState{}, err
 	}
+	return releaseState(rel), nil
+}
+
+// ListReleaseStates reads every release of the namespace with one list of
+// the Helm storage (the latest revision of each release).
+func (h *Helm) ListReleaseStates(
+	ctx context.Context,
+	namespace string,
+) (map[string]ports.ReleaseState, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	cfg, err := h.cfgForNamespace(namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	rels, err := action.NewList(cfg).Run()
+	if err != nil {
+		return nil, fmt.Errorf("list releases in %q: %w", namespace, err)
+	}
+
+	states := make(map[string]ports.ReleaseState, len(rels))
+	for _, rel := range rels {
+		r, ok := rel.(*releasev1.Release)
+		if !ok {
+			continue
+		}
+		if state := releaseState(r); state.Exists {
+			states[r.Name] = state
+		}
+	}
+	return states, nil
+}
+
+// releaseState extracts the state of a release returned by the Helm storage.
+func releaseState(rel release.Releaser) ports.ReleaseState {
+	r, ok := rel.(*releasev1.Release)
+	if !ok {
+		return ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}
+	}
+
+	status := ports.ReleaseStatusUnknown
+	if r.Info != nil {
+		if r.Info.Status == common.StatusUninstalled {
+			// Uninstalled with --keep-history: only the history remains.
+			return ports.ReleaseState{Exists: false}
+		}
+		status = releaseStatus(r.Info.Status)
+	}
 
 	suspended := false
-	status := ports.ReleaseStatusUnknown
-	if r, ok := rel.(*releasev1.Release); ok {
-		if global, ok := r.Config["global"].(map[string]interface{}); ok {
-			if v, ok := global["suspend"].(bool); ok {
-				suspended = v
-			}
-		}
-		if r.Info != nil {
-			if r.Info.Status == common.StatusUninstalled {
-				// Uninstalled with --keep-history: only the history remains.
-				return ports.ReleaseState{Exists: false}, nil
-			}
-			status = releaseStatus(r.Info.Status)
+	if global, ok := r.Config["global"].(map[string]interface{}); ok {
+		if v, ok := global["suspend"].(bool); ok {
+			suspended = v
 		}
 	}
 
-	return ports.ReleaseState{Exists: true, Suspended: suspended, Status: status}, nil
+	return ports.ReleaseState{
+		Exists:    true,
+		Suspended: suspended,
+		Status:    status,
+		Resources: parseManifestResources(r.Manifest),
+	}
 }
 
 // releaseStatus translates a Helm release status into the port's vocabulary.

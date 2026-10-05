@@ -45,13 +45,13 @@ func (m *MockReleaseGateway) GetReleaseState(
 	return args.Get(0).(ports.ReleaseState), args.Error(1)
 }
 
-func (m *MockReleaseGateway) GetReleaseResources(
+func (m *MockReleaseGateway) ListReleaseStates(
 	ctx context.Context,
-	namespace, releaseName string,
-) ([]ports.ManifestResource, error) {
-	args := m.Called(ctx, namespace, releaseName)
+	namespace string,
+) (map[string]ports.ReleaseState, error) {
+	args := m.Called(ctx, namespace)
 	if v := args.Get(0); v != nil {
-		return v.([]ports.ManifestResource), args.Error(1)
+		return v.(map[string]ports.ReleaseState), args.Error(1)
 	}
 	return nil, args.Error(1)
 }
@@ -213,11 +213,13 @@ func (m *MockWorkloadStateGateway) GetPodsForRelease(
 	return nil, args.Error(1)
 }
 
-func (m *MockWorkloadStateGateway) GetControllerReadiness(
+func (m *MockWorkloadStateGateway) GetWorkloadReadiness(
 	ctx context.Context,
 	namespace string,
-	resources []ports.ManifestResource,
-) (bool, error) {
-	args := m.Called(ctx, namespace, resources)
-	return args.Bool(0), args.Error(1)
+) (ports.WorkloadReadiness, error) {
+	args := m.Called(ctx, namespace)
+	if v := args.Get(0); v != nil {
+		return v.(ports.WorkloadReadiness), args.Error(1)
+	}
+	return nil, args.Error(1)
 }

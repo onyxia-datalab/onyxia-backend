@@ -16,13 +16,12 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetControllerReadiness(t *testing.T) {
+func TestGetWorkloadReadiness(t *testing.T) {
 	tests := []struct {
 		name      string
 		objects   []runtime.Object
 		resources []ports.ManifestResource
 		wantReady bool
-		wantError bool
 	}{
 		{
 			name: "all supported controllers are ready",
@@ -59,9 +58,9 @@ func TestGetControllerReadiness(t *testing.T) {
 			wantReady: true,
 		},
 		{
-			name:      "missing controller returns an error",
+			name:      "missing controller is not ready",
 			resources: []ports.ManifestResource{{Kind: "Deployment", Name: "missing"}},
-			wantError: true,
+			wantReady: false,
 		},
 	}
 
@@ -69,20 +68,29 @@ func TestGetControllerReadiness(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gateway := NewWorkloadStateGtw(k8sfake.NewClientset(tt.objects...))
 
-			ready, err := gateway.GetControllerReadiness(
-				context.Background(),
-				"project",
-				tt.resources,
-			)
+			snapshot, err := gateway.GetWorkloadReadiness(context.Background(), "project")
 
-			if tt.wantError {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantReady, ready)
+			assert.Equal(t, tt.wantReady, snapshot.AllReady(tt.resources))
 		})
 	}
+}
+
+// One snapshot serves any number of releases with two list calls in total.
+func TestGetWorkloadReadinessListsEachKindOnce(t *testing.T) {
+	cs := k8sfake.NewClientset(deployment("a", nil, 1), deployment("b", nil, 0))
+	gateway := NewWorkloadStateGtw(cs)
+
+	snapshot, err := gateway.GetWorkloadReadiness(context.Background(), "project")
+	require.NoError(t, err)
+	assert.True(t, snapshot.AllReady([]ports.ManifestResource{{Kind: "Deployment", Name: "a"}}))
+	assert.False(t, snapshot.AllReady([]ports.ManifestResource{{Kind: "Deployment", Name: "b"}}))
+
+	var verbs []string
+	for _, a := range cs.Actions() {
+		verbs = append(verbs, a.GetVerb()+" "+a.GetResource().Resource)
+	}
+	assert.Equal(t, []string{"list deployments", "list statefulsets"}, verbs)
 }
 
 func TestGetPodsForReleaseFiltersByHelmLabel(t *testing.T) {

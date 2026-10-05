@@ -13,49 +13,57 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// GetControllerReadiness returns true when all Deployments and StatefulSets in the
-// provided resource list have their desired replica count ready.
-// Other resource kinds are ignored.
-func (g *K8sWorkloadStateGateway) GetControllerReadiness(
+// GetWorkloadReadiness lists the Deployments and StatefulSets of the
+// namespace once; the returned snapshot answers for any number of releases.
+func (g *K8sWorkloadStateGateway) GetWorkloadReadiness(
 	ctx context.Context,
 	namespace string,
-	resources []ports.ManifestResource,
-) (bool, error) {
-	for _, resource := range resources {
-		ready, handled, err := g.controllerReady(ctx, namespace, resource)
-		if err != nil {
-			return false, err
-		}
-		if handled && !ready {
-			return false, nil
-		}
+) (ports.WorkloadReadiness, error) {
+	snapshot := workloadSnapshot{}
+
+	deployments, err := g.client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list deployments: %w", err)
 	}
-	return true, nil
+	for _, d := range deployments.Items {
+		snapshot[ports.ManifestResource{Kind: kindDeployment, Name: d.Name}] =
+			replicasReady(d.Spec.Replicas, d.Status.ReadyReplicas)
+	}
+
+	statefulSets, err := g.client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list statefulsets: %w", err)
+	}
+	for _, s := range statefulSets.Items {
+		snapshot[ports.ManifestResource{Kind: kindStatefulSet, Name: s.Name}] =
+			replicasReady(s.Spec.Replicas, s.Status.ReadyReplicas)
+	}
+
+	return snapshot, nil
 }
 
-func (g *K8sWorkloadStateGateway) controllerReady(
-	ctx context.Context,
-	namespace string,
-	resource ports.ManifestResource,
-) (ready bool, handled bool, err error) {
-	switch resource.Kind {
-	case "Deployment":
-		deployment, err := g.client.AppsV1().Deployments(namespace).
-			Get(ctx, resource.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, true, err
+const (
+	kindDeployment  = "Deployment"
+	kindStatefulSet = "StatefulSet"
+)
+
+// workloadSnapshot maps each workload controller of a namespace to its
+// readiness.
+type workloadSnapshot map[ports.ManifestResource]bool
+
+// AllReady implements ports.WorkloadReadiness: only Deployments and
+// StatefulSets are considered, and one missing from the namespace (not
+// created yet, or deleted) is not ready.
+func (s workloadSnapshot) AllReady(resources []ports.ManifestResource) bool {
+	for _, r := range resources {
+		if r.Kind != kindDeployment && r.Kind != kindStatefulSet {
+			continue
 		}
-		return replicasReady(deployment.Spec.Replicas, deployment.Status.ReadyReplicas), true, nil
-	case "StatefulSet":
-		statefulSet, err := g.client.AppsV1().StatefulSets(namespace).
-			Get(ctx, resource.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, true, err
+		if !s[r] {
+			return false
 		}
-		return replicasReady(statefulSet.Spec.Replicas, statefulSet.Status.ReadyReplicas), true, nil
-	default:
-		return false, false, nil
 	}
+	return true
 }
 
 func replicasReady(replicas *int32, readyReplicas int32) bool {
