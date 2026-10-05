@@ -12,7 +12,6 @@ type StartRequest struct {
 	ReleaseID    string
 	Namespace    string
 	FriendlyName string
-	Name         string
 	Share        bool
 	Values       map[string]interface{}
 }

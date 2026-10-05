@@ -44,7 +44,6 @@ func baseRequest() domain.StartRequest {
 		ReleaseID:    "release-abc",
 		Namespace:    "user-alice",
 		FriendlyName: "My Jupyter",
-		Name:         "jupyter-alice",
 		Share:        false,
 		Values:       map[string]interface{}{"key": "val"},
 	}

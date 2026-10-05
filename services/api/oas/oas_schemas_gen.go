@@ -23,8 +23,6 @@ type Catalog struct {
 	Status OptCatalogStatus `json:"status"`
 	// Names of important packages of the catalog to highlight in the UI.
 	HighlightedPackages []string `json:"highlightedPackages"`
-	// Describes if the catalog is visible in user or project context.
-	Visible OptCatalogVisible `json:"visible"`
 	// List of packages available in the catalog.
 	Packages []Package `json:"packages"`
 }
@@ -52,11 +50,6 @@ func (s *Catalog) GetStatus() OptCatalogStatus {
 // GetHighlightedPackages returns the value of HighlightedPackages.
 func (s *Catalog) GetHighlightedPackages() []string {
 	return s.HighlightedPackages
-}
-
-// GetVisible returns the value of Visible.
-func (s *Catalog) GetVisible() OptCatalogVisible {
-	return s.Visible
 }
 
 // GetPackages returns the value of Packages.
@@ -87,11 +80,6 @@ func (s *Catalog) SetStatus(val OptCatalogStatus) {
 // SetHighlightedPackages sets the value of HighlightedPackages.
 func (s *Catalog) SetHighlightedPackages(val []string) {
 	s.HighlightedPackages = val
-}
-
-// SetVisible sets the value of Visible.
-func (s *Catalog) SetVisible(val OptCatalogVisible) {
-	s.Visible = val
 }
 
 // SetPackages sets the value of Packages.
@@ -139,34 +127,6 @@ func (s *CatalogStatus) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Describes if the catalog is visible in user or project context.
-type CatalogVisible struct {
-	// Should this catalog be visible in user context?.
-	User bool `json:"user"`
-	// Should this catalog be visible in project context?.
-	Project bool `json:"project"`
-}
-
-// GetUser returns the value of User.
-func (s *CatalogVisible) GetUser() bool {
-	return s.User
-}
-
-// GetProject returns the value of Project.
-func (s *CatalogVisible) GetProject() bool {
-	return s.Project
-}
-
-// SetUser sets the value of User.
-func (s *CatalogVisible) SetUser(val bool) {
-	s.User = val
-}
-
-// SetProject sets the value of Project.
-func (s *CatalogVisible) SetProject(val bool) {
-	s.Project = val
 }
 
 type DeleteServiceForbidden Problem
@@ -269,6 +229,10 @@ type GetMyPackageNotFound Problem
 
 func (*GetMyPackageNotFound) getMyPackageRes() {}
 
+type GetMyPackageUnauthorized Problem
+
+func (*GetMyPackageUnauthorized) getMyPackageRes() {}
+
 type GetPackageSchemaBadRequest Problem
 
 func (*GetPackageSchemaBadRequest) getPackageSchemaRes() {}
@@ -276,6 +240,10 @@ func (*GetPackageSchemaBadRequest) getPackageSchemaRes() {}
 type GetPackageSchemaInternalServerError Problem
 
 func (*GetPackageSchemaInternalServerError) getPackageSchemaRes() {}
+
+type GetPackageSchemaNotFound Problem
+
+func (*GetPackageSchemaNotFound) getPackageSchemaRes() {}
 
 type GetPackageSchemaOK map[string]jx.Raw
 
@@ -289,6 +257,10 @@ func (s *GetPackageSchemaOK) init() GetPackageSchemaOK {
 }
 
 func (*GetPackageSchemaOK) getPackageSchemaRes() {}
+
+type GetPackageSchemaUnauthorized Problem
+
+func (*GetPackageSchemaUnauthorized) getPackageSchemaRes() {}
 
 type GetServiceForbidden Problem
 
@@ -389,6 +361,10 @@ func (*InstallServiceForbidden) installServiceRes() {}
 type InstallServiceInternalServerError Problem
 
 func (*InstallServiceInternalServerError) installServiceRes() {}
+
+type InstallServiceNotFound Problem
+
+func (*InstallServiceNotFound) installServiceRes() {}
 
 type InstallServiceUnauthorized Problem
 
@@ -599,52 +575,6 @@ func (o OptCatalogStatus) Get() (v CatalogStatus, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptCatalogStatus) Or(d CatalogStatus) CatalogStatus {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptCatalogVisible returns new OptCatalogVisible with value set to v.
-func NewOptCatalogVisible(v CatalogVisible) OptCatalogVisible {
-	return OptCatalogVisible{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptCatalogVisible is optional CatalogVisible.
-type OptCatalogVisible struct {
-	Value CatalogVisible
-	Set   bool
-}
-
-// IsSet returns true if OptCatalogVisible was set.
-func (o OptCatalogVisible) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptCatalogVisible) Reset() {
-	var v CatalogVisible
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptCatalogVisible) SetTo(v CatalogVisible) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptCatalogVisible) Get() (v CatalogVisible, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptCatalogVisible) Or(d CatalogVisible) CatalogVisible {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -1261,18 +1191,14 @@ type ServiceInstallRequest struct {
 	CatalogId string `json:"catalogId"`
 	// Package name used to create the service.
 	PackageName string `json:"packageName"`
-	// Version of the Helm package.
+	// Version of the Helm package. The latest version when absent.
 	PackageVersion OptString `json:"packageVersion"`
-	// Chart version (empty for latest).
-	Version OptString `json:"version"`
-	// Options of package (values.yaml for Helm).
+	// Options of the package (values.yaml for Helm).
 	Options ServiceInstallRequestOptions `json:"options"`
-	// When true.
+	// When true, the service is visible to all users of the namespace.
 	Share OptBool `json:"share"`
-	// Friendly name for the service.
+	// Display name of the service. The package name when absent.
 	FriendlyName OptString `json:"friendlyName"`
-	// A chosen name for the service.
-	Name string `json:"name"`
 }
 
 // GetCatalogId returns the value of CatalogId.
@@ -1290,11 +1216,6 @@ func (s *ServiceInstallRequest) GetPackageVersion() OptString {
 	return s.PackageVersion
 }
 
-// GetVersion returns the value of Version.
-func (s *ServiceInstallRequest) GetVersion() OptString {
-	return s.Version
-}
-
 // GetOptions returns the value of Options.
 func (s *ServiceInstallRequest) GetOptions() ServiceInstallRequestOptions {
 	return s.Options
@@ -1308,11 +1229,6 @@ func (s *ServiceInstallRequest) GetShare() OptBool {
 // GetFriendlyName returns the value of FriendlyName.
 func (s *ServiceInstallRequest) GetFriendlyName() OptString {
 	return s.FriendlyName
-}
-
-// GetName returns the value of Name.
-func (s *ServiceInstallRequest) GetName() string {
-	return s.Name
 }
 
 // SetCatalogId sets the value of CatalogId.
@@ -1330,11 +1246,6 @@ func (s *ServiceInstallRequest) SetPackageVersion(val OptString) {
 	s.PackageVersion = val
 }
 
-// SetVersion sets the value of Version.
-func (s *ServiceInstallRequest) SetVersion(val OptString) {
-	s.Version = val
-}
-
 // SetOptions sets the value of Options.
 func (s *ServiceInstallRequest) SetOptions(val ServiceInstallRequestOptions) {
 	s.Options = val
@@ -1350,12 +1261,7 @@ func (s *ServiceInstallRequest) SetFriendlyName(val OptString) {
 	s.FriendlyName = val
 }
 
-// SetName sets the value of Name.
-func (s *ServiceInstallRequest) SetName(val string) {
-	s.Name = val
-}
-
-// Options of package (values.yaml for Helm).
+// Options of the package (values.yaml for Helm).
 type ServiceInstallRequestOptions map[string]jx.Raw
 
 func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
