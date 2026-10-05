@@ -26,6 +26,10 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder --chmod=0755 /out/app /
+# Extra CA certificates (PEM), e.g. a private IdP or Helm repository CA, can
+# be mounted here — same directory as onyxia-api's CACERTS_DIR. Go adds them
+# to the system roots (/etc/ssl/certs/ca-certificates.crt stays trusted).
+ENV SSL_CERT_DIR=/usr/local/share/ca-certificates
 USER 65532:65532
 
 ENTRYPOINT ["/app"]

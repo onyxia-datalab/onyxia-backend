@@ -1,15 +1,10 @@
 package domain
 
-import (
-	"context"
-)
+import "github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 
+// OnboardingRequest asks to onboard User's personal namespace, or the
+// namespace of Group when it is set.
 type OnboardingRequest struct {
-	Group     *string // Use pointer to indicate optional value
-	UserName  string
-	UserRoles []string
-}
-
-type OnboardingUsecase interface {
-	Onboard(ctx context.Context, req OnboardingRequest) error
+	User  usercontext.User
+	Group *string
 }

@@ -2,6 +2,7 @@ package helm
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,71 +10,80 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/kube/fake"
+	"helm.sh/helm/v4/pkg/release/common"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	"helm.sh/helm/v4/pkg/storage"
+	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/rest"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-func newAdapter(t *testing.T, cb ports.HelmStartCallbacks) *Helm {
+func newAdapter(t *testing.T) *Helm {
 	t.Helper()
 
 	k8sCfg := &rest.Config{
 		Host: "https://fake-cluster",
 	}
 
-	adapter, err := NewReleaseGtw(k8sCfg, cb)
+	client, err := NewClient("")
 	require.NoError(t, err)
 
-	return adapter
-}
-
-func defaultCallbacks() ports.HelmStartCallbacks {
-	return ports.HelmStartCallbacks{
-		OnStart:   func(_, _ string) {},
-		OnSuccess: func(_, _ string) {},
-		OnError:   func(_, _ string, _ error) {},
-	}
+	return NewReleaseGtw(k8sCfg, client, nil)
 }
 
 func TestStartInstallEmptyArgs(t *testing.T) {
-	i := newAdapter(t, defaultCallbacks())
+	i := newAdapter(t)
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"",
-		domain.PackageVersion{},
+		&domain.Package{},
+		"",
 		nil,
-		ports.HelmStartOptions{},
 	)
 	require.Error(t, err)
+}
 
+func TestStartInstallRequiresPackage(t *testing.T) {
+	i := newAdapter(t)
+
+	err := i.StartInstall(
+		context.Background(),
+		"test-ns",
+		"rel",
+		nil,
+		"",
+		nil,
+	)
+	require.ErrorContains(t, err, "package is required")
 }
 
 func TestStartInstallLocateChartError(t *testing.T) {
-	i := newAdapter(t, defaultCallbacks())
+	i := newAdapter(t)
 
-	// Chart inexistant → act.LocateChart renvoie une erreur (pré-flight)
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "this-chart-does-not-exist",
-			},
-			Version: "0.1.0",
-			RepoURL: "fake-repo",
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      "this-chart-does-not-exist",
+			RepoURL:   "fake-repo",
 		},
+		"0.1.0",
 		nil,
-		ports.HelmStartOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "locating chart")
 }
 
 func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
-	i := newAdapter(t, defaultCallbacks())
+	i := newAdapter(t)
 
 	tmp := t.TempDir()
 	nonChartDir := filepath.Join(tmp, "not-a-chart")
@@ -81,53 +91,152 @@ func TestStartInstallLoaderErrorWhenPathIsNotAChart(t *testing.T) {
 
 	err := i.StartInstall(
 		context.Background(),
+		"test-ns",
 		"rel",
-		domain.PackageVersion{
-			Package: domain.Package{
-				CatalogID: "fake-cat",
-				Name:      "",
-			},
-			Version: "0.1.0",
-			RepoURL: nonChartDir,
+		&domain.Package{
+			CatalogID: "fake-cat",
+			Name:      nonChartDir, // local path used as chartRef when no RepoURL is set
 		},
+		"0.1.0",
 		map[string]interface{}{},
-		ports.HelmStartOptions{},
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "loading chart")
 }
 
-func TestStartInstallNoCallbacksOnPreflightErrors(t *testing.T) {
+func TestUninstallRelease(t *testing.T) {
+	cfg := action.NewConfiguration()
+	cfg.Releases = storage.Init(driver.NewMemory())
+	cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+	rel := &releasev1.Release{
+		Name:      "rel",
+		Namespace: "test-ns",
+		Version:   1,
+		Info:      &releasev1.Info{Status: common.StatusDeployed},
+	}
+	require.NoError(t, cfg.Releases.Create(rel))
 
-	startCalled := false
-	successCalled := false
-	errorCalled := false
+	i := newAdapter(t)
+	requestedNamespace := ""
+	i.configForNamespace = func(namespace string) (*action.Configuration, error) {
+		requestedNamespace = namespace
+		return cfg, nil
+	}
 
-	i := newAdapter(t, ports.HelmStartCallbacks{
-		OnStart:   func(_, _ string) { startCalled = true },
-		OnSuccess: func(_, _ string) { successCalled = true },
-		OnError:   func(_, _ string, _ error) { errorCalled = true },
-	})
+	require.NoError(t, i.UninstallRelease(context.Background(), "test-ns", "rel"))
+	assert.Equal(t, "test-ns", requestedNamespace)
+	_, err := cfg.Releases.History("rel")
+	assert.ErrorIs(t, err, driver.ErrReleaseNotFound)
+}
 
-	err := i.StartInstall(context.Background(), "rel", domain.PackageVersion{
-		Package: domain.Package{
-			CatalogID: "fake-cat",
-			Name:      "unknown-chart",
+func TestUninstallReleaseIgnoresMissingRelease(t *testing.T) {
+	cfg := action.NewConfiguration()
+	cfg.Releases = storage.Init(driver.NewMemory())
+	cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+
+	i := newAdapter(t)
+	i.configForNamespace = func(string) (*action.Configuration, error) { return cfg, nil }
+
+	require.NoError(t, i.UninstallRelease(context.Background(), "test-ns", "missing"))
+}
+
+func TestUninstallReleaseHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	i := newAdapter(t)
+	i.configForNamespace = func(string) (*action.Configuration, error) {
+		t.Fatal("configuration should not be created for a canceled context")
+		return nil, nil
+	}
+
+	assert.ErrorIs(t, i.UninstallRelease(ctx, "test-ns", "rel"), context.Canceled)
+}
+
+func TestWaitForInstalls(t *testing.T) {
+	i := newAdapter(t)
+
+	release := make(chan struct{})
+	i.installs.Go(func() { <-release }) // stands in for a running install
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(t, i.WaitForInstalls(ctx), context.DeadlineExceeded)
+
+	close(release)
+	require.NoError(t, i.WaitForInstalls(context.Background()))
+}
+
+func TestGetReleaseStateTranslatesHelmStatus(t *testing.T) {
+	tests := []struct {
+		helm common.Status
+		want ports.ReleaseState
+	}{
+		{common.StatusPendingInstall, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusPendingUpgrade, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusPendingRollback, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusDeployed, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}},
+		{common.StatusSuperseded, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}},
+		{common.StatusFailed, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}},
+		{common.StatusUninstalling, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}},
+		{common.StatusUnknown, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}},
+		// Uninstalled with --keep-history: only the history is left.
+		{common.StatusUninstalled, ports.ReleaseState{Exists: false}},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.helm), func(t *testing.T) {
+			cfg := action.NewConfiguration()
+			cfg.Releases = storage.Init(driver.NewMemory())
+			cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+			require.NoError(t, cfg.Releases.Create(&releasev1.Release{
+				Name:      "rel",
+				Namespace: "test-ns",
+				Version:   1,
+				Info:      &releasev1.Info{Status: tt.helm},
+			}))
+
+			i := newAdapter(t)
+			i.configForNamespace = func(string) (*action.Configuration, error) { return cfg, nil }
+
+			state, err := i.GetReleaseState(context.Background(), "test-ns", "rel")
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, state)
+		})
+	}
+}
+
+func TestListReleaseStates(t *testing.T) {
+	cfg := action.NewConfiguration()
+	cfg.Releases = storage.Init(driver.NewMemory())
+	cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+	for _, rel := range []*releasev1.Release{
+		// Two revisions: only the latest one counts.
+		{Name: "jupyter", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusSuperseded}},
+		{
+			Name: "jupyter", Namespace: "ns", Version: 2,
+			Info:     &releasev1.Info{Status: common.StatusDeployed},
+			Config:   map[string]interface{}{"global": map[string]interface{}{"suspend": true}},
+			Manifest: "---\nkind: Deployment\nmetadata:\n  name: jupyter\n---\nkind: Service\nmetadata:\n  name: jupyter\n",
 		},
-		Version: "0.1.0",
-		RepoURL: "fake-repo",
-	}, nil, ports.HelmStartOptions{
-		Callbacks: ports.HelmStartCallbacks{
-			OnStart:   func(_, _ string) { startCalled = true },
-			OnSuccess: func(_, _ string) { successCalled = true },
-			OnError:   func(_, _ string, _ error) { errorCalled = true },
+		{Name: "broken", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusFailed}},
+		{Name: "gone", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusUninstalled}},
+	} {
+		require.NoError(t, cfg.Releases.Create(rel))
+	}
+
+	i := newAdapter(t)
+	i.configForNamespace = func(string) (*action.Configuration, error) { return cfg, nil }
+
+	states, err := i.ListReleaseStates(context.Background(), "ns")
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]ports.ReleaseState{
+		"jupyter": {
+			Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed,
+			Resources: []ports.ManifestResource{{Kind: "Deployment", Name: "jupyter"}, {Kind: "Service", Name: "jupyter"}},
 		},
-	})
-	require.Error(t, err)
-
-	time.Sleep(50 * time.Millisecond)
-
-	assert.False(t, startCalled, "OnStart should not be called on preflight error")
-	assert.False(t, successCalled, "OnSuccess should not be called on preflight error")
-	assert.False(t, errorCalled, "OnError should not be called on preflight error")
+		"broken": {Exists: true, Status: ports.ReleaseStatusFailed},
+	}, states)
 }

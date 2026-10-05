@@ -2,19 +2,18 @@ package bootstrap
 
 import (
 	_ "embed"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
+	"github.com/onyxia-datalab/onyxia-backend/internal/server"
 )
 
 //go:embed env.default.yaml
 var defaultConfig []byte
 
-type Server struct {
-	Port int `mapstructure:"port"        json:"port"`
-}
-
 type OIDC struct {
 	IssuerURI     string `mapstructure:"issuerURI"     json:"issuerURI"`
 	SkipTLSVerify bool   `mapstructure:"skipTLSVerify" json:"skipTLSVerify"`
+	PublicKey     string `mapstructure:"publicKey"     json:"publicKey"`
 	Audience      string `mapstructure:"audience"      json:"audience"`
 	UsernameClaim string `mapstructure:"usernameClaim" json:"usernameClaim"`
 	GroupsClaim   string `mapstructure:"groupsClaim"   json:"groupsClaim"`
@@ -65,11 +64,11 @@ type Onboarding struct {
 }
 
 type Env struct {
-	AuthenticationMode string     `mapstructure:"authenticationMode" json:"authenticationMode"`
-	Server             Server     `mapstructure:"server"             json:"server"`
-	OIDC               OIDC       `mapstructure:"oidc"               json:"oidc"`
-	Security           Security   `mapstructure:"security"           json:"security"`
-	Onboarding         Onboarding `mapstructure:"onboarding"         json:"onboarding"`
+	AuthenticationMode string        `mapstructure:"authenticationMode" json:"authenticationMode"`
+	Server             server.Config `mapstructure:"server"             json:"server"`
+	OIDC               OIDC          `mapstructure:"oidc"               json:"oidc"`
+	Security           Security      `mapstructure:"security"           json:"security"`
+	Onboarding         Onboarding    `mapstructure:"onboarding"         json:"onboarding"`
 }
 
 func NewEnv() (Env, error) {

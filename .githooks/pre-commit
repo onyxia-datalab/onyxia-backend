@@ -1,12 +1,25 @@
 #!/bin/sh
-make fmt
-if ! git diff --quiet; then
-  echo "❌ go fmt made changes, please review and re-stage"
+# Checks the staged snapshot — exactly what is about to be committed — rather
+# than the working tree, so partial commits work and unstaged noise (e.g.
+# go.sum lines an editor adds in the background) never blocks a commit.
+set -eu
+
+snapshot=$(mktemp -d)
+trap 'rm -rf "$snapshot"' EXIT
+git checkout-index --all --prefix="$snapshot/"
+cd "$snapshot"
+
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+  echo "❌ staged files are not gofmt-formatted:"
+  echo "$unformatted" | sed 's/^/   /'
+  echo "   run 'make fmt' and re-stage them"
   exit 1
 fi
 
-go mod tidy
-if ! git diff --quiet; then
-  echo "❌ go mod tidy made changes, please review and re-stage"
+if ! go mod tidy -diff >/dev/null 2>&1; then
+  echo "❌ staged go.mod/go.sum are not tidy:"
+  go mod tidy -diff || true
+  echo "   run 'go mod tidy' and stage go.mod/go.sum"
   exit 1
 fi

@@ -1,30 +1,43 @@
 package domain
 
-import (
-	"context"
-)
+import "github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
+
+// The requests carry the caller: the use cases decide what they may do.
 
 type StartRequest struct {
-	Username      string
-	OnyxiaProject string
-	CatalogID     string
-	PackageName   string
-	Version       string
-	ReleaseID     string
-	Namespace     string
-	FriendlyName  string
-	Name          string
-	Share         bool
-	Values        map[string]interface{}
+	User         usercontext.User
+	CatalogID    string
+	PackageName  string
+	Version      string
+	ReleaseID    string
+	Namespace    string
+	FriendlyName string
+	Name         string
+	Share        bool
+	Values       map[string]interface{}
 }
 
-type StartResponse struct {
+type SuspendRequest struct {
+	User        usercontext.User
+	ReleaseName string
+	Namespace   string
 }
 
-type ServiceLifecycle interface {
-	Start(ctx context.Context, req StartRequest) (StartResponse, error)
-	Resume(ctx context.Context) error
-	Delete(ctx context.Context) error
-	Rename(ctx context.Context) error
-	Share(ctx context.Context) error
+type ResumeRequest struct {
+	User        usercontext.User
+	ReleaseName string
+	Namespace   string
+}
+
+type DeleteRequest struct {
+	User        usercontext.User
+	ReleaseName string
+	Namespace   string
+}
+
+type SetSharedRequest struct {
+	User        usercontext.User
+	ReleaseName string
+	Namespace   string
+	Shared      bool
 }

@@ -2,38 +2,41 @@ package usecase
 
 import (
 	"context"
+	"fmt"
+	"slices"
 
-	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 type onboardingUsecase struct {
-	namespaceService  port.NamespaceService
-	namespace         domain.Namespace
-	quotas            domain.Quotas
-	userContextReader usercontext.Reader
+	namespaceService ports.NamespaceService
+	namespace        domain.Namespace
+	quotas           domain.Quotas
 }
 
 func NewOnboardingUsecase(
-	namespaceService port.NamespaceService,
+	namespaceService ports.NamespaceService,
 	namespace domain.Namespace,
 	quotas domain.Quotas,
-	userContextReader usercontext.Reader,
-
 ) *onboardingUsecase {
 	return &onboardingUsecase{
-		namespaceService:  namespaceService,
-		namespace:         namespace,
-		quotas:            quotas,
-		userContextReader: userContextReader,
+		namespaceService: namespaceService,
+		namespace:        namespace,
+		quotas:           quotas,
 	}
 }
 
+// Onboard creates the namespace and applies its quota. A group namespace can
+// only be onboarded by a member of the group (ErrForbidden otherwise).
 func (s *onboardingUsecase) Onboard(ctx context.Context, req domain.OnboardingRequest) error {
+	if req.Group != nil && !slices.Contains(req.User.Groups, *req.Group) {
+		return fmt.Errorf("%w: user %q is not a member of group %q", domain.ErrForbidden, req.User.Username, *req.Group)
+	}
+
 	namespace := s.getNamespace(req)
 
-	if err := s.createNamespace(ctx, namespace); err != nil {
+	if err := s.createNamespace(ctx, namespace, req.User.Attributes); err != nil {
 		return err
 	}
 
@@ -48,5 +51,5 @@ func (s *onboardingUsecase) getNamespace(req domain.OnboardingRequest) string {
 	if req.Group != nil {
 		return s.namespace.GroupNamespacePrefix + *req.Group
 	}
-	return s.namespace.NamespacePrefix + req.UserName
+	return s.namespace.NamespacePrefix + req.User.Username
 }

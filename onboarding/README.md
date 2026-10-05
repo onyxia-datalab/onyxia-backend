@@ -56,11 +56,14 @@ The configuration is loaded via [Viper](https://github.com/spf13/viper) from:
 | Variable        | Description           | Default              |
 | --------------- | --------------------- | -------------------- |
 | `issuerURI`     | OIDC Issuer URI       | `""`                 |
-| `skipTLSVerify` | Skip TLS verification | `false`              |
+| `skipTLSVerify` | Disable TLS certificate verification when retrieving the IdP's discovery document and keys. Token signatures are still verified. Not intended for production: mount the IdP's CA in `/usr/local/share/ca-certificates` instead. | `false` |
+| `publicKey`     | Optional: base64-encoded X.509 (DER) RSA public key used to validate tokens instead of retrieving the keys from `issuerURI`. In this mode the issuer is never contacted and the token issuer is not checked (same as onyxia-api's `oidc.public-key`). | `""` |
 | `audience`      | OIDC Audience         | `""`                 |
 | `usernameClaim` | Claim for username    | `preferred_username` |
 | `groupsClaim`   | Claim for groups      | `groups`             |
 | `rolesClaim`    | Claim for roles       | `roles`              |
+
+Extra CA certificates (PEM) mounted in `/usr/local/share/ca-certificates` are trusted in addition to the system ones (`SSL_CERT_DIR`, same directory as onyxia-api's `CACERTS_DIR`).
 
 ### Onboarding
 

@@ -3,10 +3,11 @@ package usecase
 import (
 	"context"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
-	"github.com/stretchr/testify/mock"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 // ---------- Shared Test Constants ----------
@@ -23,25 +24,25 @@ const (
 // ---------- NamespaceService mock ----------
 type MockNamespaceService struct{ mock.Mock }
 
-var _ port.NamespaceService = (*MockNamespaceService)(nil)
+var _ ports.NamespaceService = (*MockNamespaceService)(nil)
 
 func (m *MockNamespaceService) CreateNamespace(
 	ctx context.Context,
 	name string,
 	annotations map[string]string,
 	labels map[string]string,
-) (port.NamespaceCreationResult, error) {
+) (ports.NamespaceCreationResult, error) {
 	args := m.Called(ctx, name)
-	return args.Get(0).(port.NamespaceCreationResult), args.Error(1)
+	return args.Get(0).(ports.NamespaceCreationResult), args.Error(1)
 }
 
 func (m *MockNamespaceService) ApplyResourceQuotas(
 	ctx context.Context,
 	namespace string,
 	quota *domain.Quota,
-) (port.QuotaApplicationResult, error) {
+) (ports.QuotaApplicationResult, error) {
 	args := m.Called(ctx, namespace, quota)
-	return args.Get(0).(port.QuotaApplicationResult), args.Error(1)
+	return args.Get(0).(ports.QuotaApplicationResult), args.Error(1)
 }
 
 // ---------- Usercontext helpers ----------
@@ -61,9 +62,7 @@ var defaultTestUser = &usercontext.User{
 func setupUsecase(
 	mockService *MockNamespaceService,
 	quotas domain.Quotas,
-) domain.OnboardingUsecase {
-
-	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
+) ports.OnboardingUsecase {
 
 	return NewOnboardingUsecase(
 		mockService,
@@ -77,7 +76,6 @@ func setupUsecase(
 			},
 		},
 		quotas,
-		reader,
 	)
 }
 
@@ -85,8 +83,6 @@ func setupPrivateUsecase(
 	mockService *MockNamespaceService,
 	quotas domain.Quotas,
 ) *onboardingUsecase {
-	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
-
 	return &onboardingUsecase{
 		namespaceService: mockService,
 		namespace: domain.Namespace{
@@ -97,7 +93,6 @@ func setupPrivateUsecase(
 				Static:  nil,
 			},
 		},
-		quotas:            quotas,
-		userContextReader: reader,
+		quotas: quotas,
 	}
 }

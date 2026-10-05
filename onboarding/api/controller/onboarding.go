@@ -2,22 +2,21 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
 type OnboardingController struct {
-	OnboardingUsecase domain.OnboardingUsecase
+	OnboardingUsecase ports.OnboardingUsecase
 	users             usercontext.UserGetter
 }
 
 func NewOnboardingController(
-	onboardingUsecase domain.OnboardingUsecase,
+	onboardingUsecase ports.OnboardingUsecase,
 	users usercontext.UserGetter,
 ) *OnboardingController {
 	return &OnboardingController{
@@ -34,38 +33,21 @@ func (c *OnboardingController) Onboard(
 
 	user, ok := c.users.GetUser(ctx)
 	if !ok || user == nil {
-		err := fmt.Errorf("user not found in context")
-		slog.ErrorContext(ctx, "Failed to retrieve user from context", slog.Any("error", err))
-		return &api.OnboardForbidden{}, err
+		slog.ErrorContext(ctx, "Failed to retrieve user from context")
+		return nil, domain.ErrForbidden
 	}
 
-	// Extract optional value from OptString
-	var groupPtr *string
-	if req.Group.Set { // Check if value is set
-		groupPtr = &req.Group.Value
-
-		// Check if the requested group is in user's groups
-		if !slices.Contains(user.Groups, *groupPtr) {
-			err := fmt.Errorf("user does not have access to group: %s", *groupPtr)
-			slog.ErrorContext(ctx, "Unauthorized group access",
-				slog.String("group", *groupPtr),
-				slog.Any("userGroups", user.Groups),
-				slog.Any("error", err),
-			)
-			return &api.OnboardUnauthorized{}, err
-		}
+	var group *string
+	if req.Group.Set {
+		group = &req.Group.Value
 	}
 
-	err := c.OnboardingUsecase.Onboard(ctx, domain.OnboardingRequest{
-		Group:     groupPtr,
-		UserName:  user.Username,
-		UserRoles: user.Roles,
-	})
-	if err != nil {
-		slog.ErrorContext(ctx, "Onboarding failed",
-			slog.Any("error", err),
-		)
-		return &api.OnboardForbidden{}, err
+	if err := c.OnboardingUsecase.Onboard(ctx, domain.OnboardingRequest{
+		User:  *user,
+		Group: group,
+	}); err != nil {
+		slog.ErrorContext(ctx, "Onboarding failed", slog.Any("error", err))
+		return nil, err
 	}
 
 	slog.InfoContext(ctx, "Onboarding successful")

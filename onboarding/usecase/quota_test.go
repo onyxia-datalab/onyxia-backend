@@ -5,8 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/port"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,12 +21,12 @@ func TestApplyQuotasSuccess(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaCreated, nil)
+		Return(ports.QuotaCreated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.NoError(t, err)
@@ -47,12 +48,12 @@ func TestApplyQuotasAlreadyUpToDate(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaUnchanged, nil)
+		Return(ports.QuotaUnchanged, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.NoError(t, err)
@@ -73,7 +74,7 @@ func TestApplyQuotasQuotasDisabled(t *testing.T) {
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.NoError(t, err)
@@ -89,12 +90,12 @@ func TestApplyQuotasQuotaUpdated(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaUpdated, nil)
+		Return(ports.QuotaUpdated, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.NoError(t, err)
@@ -116,12 +117,12 @@ func TestApplyQuotasQuotaIgnored(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaIgnored, nil)
+		Return(ports.QuotaIgnored, nil)
 
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.NoError(t, err)
@@ -142,11 +143,11 @@ func TestApplyQuotasFailure(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	mockService.On("ApplyResourceQuotas", mock.Anything, userNamespace, &quotas.Default).
-		Return(port.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
+		Return(ports.QuotaApplicationResult(""), errors.New("failed to apply quotas"))
 	err := usecase.applyQuotas(
 		context.Background(),
 		userNamespace,
-		domain.OnboardingRequest{UserName: testUserName},
+		domain.OnboardingRequest{User: *defaultTestUser},
 	)
 
 	assert.Error(t, err)
@@ -169,7 +170,7 @@ func TestGetQuotaGroupQuota(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	groupName := testGroupName
-	req := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: &groupName, User: *defaultTestUser}
 
 	quota := usecase.getQuota(context.Background(), req, groupNamespace)
 
@@ -187,7 +188,7 @@ func TestGetGroupQuotaFallbackToDefault(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	groupName := testGroupName
-	req := domain.OnboardingRequest{UserName: testUserName, Group: &groupName}
+	req := domain.OnboardingRequest{User: *defaultTestUser, Group: &groupName}
 
 	quota := usecase.getGroupQuota(context.Background(), req, userNamespace)
 
@@ -209,7 +210,7 @@ func TestGetQuotaUserQuota(t *testing.T) {
 	}
 	usecase := setupPrivateUsecase(mockService, quotas)
 
-	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)
 
@@ -224,7 +225,7 @@ func TestGetQuotaDefaultQuota(t *testing.T) {
 	}
 	usecase := setupPrivateUsecase(mockService, quotas)
 
-	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)
 
@@ -242,8 +243,7 @@ func TestGetQuotaRoleQuota(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	req := domain.OnboardingRequest{
-		UserName:  testUserName,
-		UserRoles: []string{"admin"}, // ✅ Only one role, should be used
+		User: usercontext.User{Username: testUserName, Roles: []string{"admin"}}, // ✅ Only one role, should be used
 	}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)
@@ -264,8 +264,7 @@ func TestGetQuotaRoleQuotaAppliesFirstMatch(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	req := domain.OnboardingRequest{
-		UserName:  testUserName,
-		UserRoles: []string{"developer", "admin"}, // ✅ "developer" should be used
+		User: usercontext.User{Username: testUserName, Roles: []string{"developer", "admin"}}, // ✅ "developer" should be used
 	}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)
@@ -288,8 +287,7 @@ func TestGetQuotaUserQuotaWhenNoRoleMatches(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	req := domain.OnboardingRequest{
-		UserName:  testUserName,
-		UserRoles: []string{"nonexistent-role"}, // ❌ Role is not in the quota map
+		User: usercontext.User{Username: testUserName, Roles: []string{"nonexistent-role"}}, // ❌ Role is not in the quota map
 	}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)
@@ -308,8 +306,7 @@ func TestGetQuotaDefaultQuotaWhenNoRoleAndUserQuotaDisabled(t *testing.T) {
 	usecase := setupPrivateUsecase(mockService, quotas)
 
 	req := domain.OnboardingRequest{
-		UserName:  testUserName,
-		UserRoles: []string{}, // ✅ No roles provided
+		User: usercontext.User{Username: testUserName, Roles: []string{}}, // ✅ No roles provided
 	}
 
 	quota := usecase.getQuota(context.Background(), req, userNamespace)

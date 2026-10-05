@@ -8,18 +8,20 @@ import (
 	"log/slog"
 
 	"github.com/go-faster/jx"
+
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
 type CatalogController struct {
-	catalogs   domain.CatalogService
+	catalogs   ports.CatalogService
 	userReader usercontext.Reader
 }
 
 func NewCatalogController(
-	catalogs domain.CatalogService,
+	catalogs ports.CatalogService,
 	userReader usercontext.Reader,
 ) *CatalogController {
 	return &CatalogController{catalogs: catalogs, userReader: userReader}
@@ -28,24 +30,12 @@ func NewCatalogController(
 func (cc *CatalogController) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, error) {
 	slog.InfoContext(ctx, "GetMyCatalogs")
 
-	var (
-		catalogs []domain.Catalog
-		err      error
-	)
-
-	if _, authenticated := cc.userReader.GetUser(ctx); authenticated {
-		catalogs, err = cc.catalogs.ListUserCatalogs(ctx)
-	} else {
-		catalogs, err = cc.catalogs.ListPublicCatalogs(ctx)
-	}
-
+	// This operation is also open to anonymous callers (user is then nil).
+	user, _ := cc.userReader.GetUser(ctx)
+	catalogs, err := cc.catalogs.ListCatalogs(ctx, user)
 	if err != nil {
 		slog.ErrorContext(ctx, "Failed to list catalogs", slog.String("error", err.Error()))
-		problem := &api.Problem{}
-		problem.Title.SetTo("Unable to list catalogs")
-		problem.Status.SetTo(500)
-		problem.Detail.SetTo(err.Error())
-		return problem, err
+		return nil, err
 	}
 
 	slog.InfoContext(ctx, "Catalogs fetched", slog.Int("count", len(catalogs)))
@@ -124,21 +114,19 @@ func (cc *CatalogController) GetMyPackage(
 		slog.String("package_name", packageName),
 	)
 
-	pkg, err := cc.catalogs.GetPackage(ctx, catalogID, packageName)
+	user, _ := cc.userReader.GetUser(ctx)
+	pkg, err := cc.catalogs.GetPackage(ctx, user, catalogID, packageName)
 	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			problem := &api.GetMyPackageNotFound{}
-			problem.Title.SetTo("Not found")
-			problem.Status.SetTo(404)
-			problem.Detail.SetTo(err.Error())
-			return problem, nil
+		if !errors.Is(err, domain.ErrNotFound) {
+			slog.ErrorContext(ctx, "Failed to get package", slog.String("error", err.Error()))
 		}
-		slog.ErrorContext(ctx, "Failed to get package", slog.String("error", err.Error()))
-		problem := &api.GetMyPackageInternalServerError{}
-		problem.Title.SetTo("Unable to get package")
-		problem.Status.SetTo(500)
-		problem.Detail.SetTo(err.Error())
-		return problem, err
+		return nil, err
+	}
+
+	versions, err := cc.catalogs.GetAvailableVersions(ctx, user, catalogID, packageName)
+	if err != nil {
+		slog.ErrorContext(ctx, "Failed to get package versions", slog.String("error", err.Error()))
+		return nil, err
 	}
 
 	return &api.DetailedPackage{
@@ -146,7 +134,7 @@ func (cc *CatalogController) GetMyPackage(
 		Description: api.NewOptString(pkg.Description),
 		Icon:        pkg.IconUrl,
 		Home:        api.NewOptURI(pkg.HomeUrl),
-		Versions:    pkg.Versions,
+		Versions:    versions,
 	}, nil
 }
 
@@ -162,19 +150,23 @@ func (cc *CatalogController) GetPackageSchema(
 		slog.String("version", version),
 	)
 
-	raw, err := cc.catalogs.GetPackageSchema(ctx, catalogID, packageName, version)
+	user, _ := cc.userReader.GetUser(ctx)
+	raw, err := cc.catalogs.GetPackageSchema(ctx, user, catalogID, packageName, version)
 	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			// getPackageSchema has no 404 response in the spec: a missing or
+			// restricted-but-hidden catalog/package is reported as a bad
+			// request instead.
+			return nil, fmt.Errorf("%w: %s", domain.ErrInvalidInput, err)
+		}
 		slog.ErrorContext(ctx, "Failed to get package schema", slog.String("error", err.Error()))
-		problem := &api.GetPackageSchemaInternalServerError{}
-		problem.Title.SetTo("Unable to get package schema")
-		problem.Status.SetTo(500)
-		problem.Detail.SetTo(err.Error())
-		return problem, err
+		return nil, err
 	}
 
 	var rawMap map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &rawMap); err != nil {
-		return nil, fmt.Errorf("parsing schema: %w", err)
+		slog.ErrorContext(ctx, "Failed to parse package schema", slog.String("error", err.Error()))
+		return nil, err
 	}
 
 	result := make(api.GetPackageSchemaOK, len(rawMap))

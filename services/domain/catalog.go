@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"context"
-
 	"github.com/onyxia-datalab/onyxia-backend/internal/tools"
 )
 
@@ -21,15 +19,3 @@ const (
 	CatalogStatusProd CatalogStatus = "PROD"
 	CatalogStatusTest CatalogStatus = "TEST"
 )
-
-type CatalogService interface {
-	ListPublicCatalogs(ctx context.Context) ([]Catalog, error)
-	ListUserCatalogs(ctx context.Context) ([]Catalog, error)
-	GetPackage(ctx context.Context, catalogID string, packageName string) (*PackageRef, error)
-	GetPackageSchema(
-		ctx context.Context,
-		catalogID string,
-		packageName string,
-		version string,
-	) ([]byte, error)
-}

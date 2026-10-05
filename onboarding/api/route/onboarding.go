@@ -1,7 +1,7 @@
 package route
 
 import (
-	"github.com/onyxia-datalab/onyxia-backend/onboarding/adapter/kubernetes"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/adapters/kubernetes"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/bootstrap"
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
@@ -47,7 +47,6 @@ func SetupOnboardingController(
 			GroupEnabled: envQuotas.GroupEnabled,
 			Group:        convertBootstrapQuotaToDomain(envQuotas.Group),
 		},
-		app.UserContextReader,
 	)
 
 	return controller.NewOnboardingController(onboardingUsecase, app.UserContextReader)
