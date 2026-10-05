@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -30,6 +31,9 @@ type Helm struct {
 	restConfig         *rest.Config
 	helmClient         *Client
 	configForNamespace func(string) (*action.Configuration, error)
+	// installs tracks the background installs started by StartInstall so a
+	// graceful shutdown can wait for them (see WaitForInstalls).
+	installs sync.WaitGroup
 }
 
 var _ ports.ReleaseGateway = (*Helm)(nil)
@@ -131,7 +135,7 @@ func (i *Helm) StartInstall(
 	// without letting request cancellation abort the asynchronous Helm action.
 	installCtx := context.WithoutCancel(ctx)
 
-	go func() {
+	i.installs.Go(func() {
 		slog.InfoContext(installCtx, "helm install started",
 			slog.String("release", releaseName),
 			slog.String("chart", chartRef),
@@ -159,9 +163,27 @@ func (i *Helm) StartInstall(
 		)
 		notifyInstallSuccess(i.global, releaseName, chartRef)
 		notifyInstallSuccess(opts.Callbacks, releaseName, chartRef)
-	}()
+	})
 
 	return nil
+}
+
+// WaitForInstalls blocks until every background install started by
+// StartInstall has finished, or ctx is done. An install interrupted by the
+// process exit leaves its release in pending-install.
+func (i *Helm) WaitForInstalls(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		i.installs.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("background helm installs still running: %w", ctx.Err())
+	}
 }
 
 func notifyInstallStart(callbacks ports.InstallCallbacks, release, chart string) {

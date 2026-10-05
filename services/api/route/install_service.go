@@ -1,9 +1,6 @@
 package route
 
 import (
-	"fmt"
-
-	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/k8s"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap"
@@ -15,31 +12,16 @@ import (
 
 func SetupInstallController(
 	app *bootstrap.Application,
-	helmClient *helm.Client,
+	releaseGtw ports.ReleaseGateway,
 	catalogUc domain.CatalogService,
 	namespaceAuthz namespace.Authorizer,
-) (*controller.InstallController, error) {
-
-	helmRealeaseGtw, err := helm.NewReleaseGtw(
-		app.K8sClient.Config(),
-		helmClient,
-		app.Env.CatalogsConfig,
-		ports.InstallCallbacks{},
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("helm adapter: %w", err)
-	}
-
+) *controller.InstallController {
 	serviceLifecycleUc := lifecycle.NewLifecycle(
 		k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset()),
-		helmRealeaseGtw,
+		releaseGtw,
 		catalogUc,
 		namespaceAuthz,
 	)
 
-	ctrl := controller.NewInstallController(serviceLifecycleUc, app.UserContextReader, namespaceAuthz)
-
-	return ctrl, nil
-
+	return controller.NewInstallController(serviceLifecycleUc, app.UserContextReader, namespaceAuthz)
 }

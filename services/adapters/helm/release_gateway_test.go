@@ -235,3 +235,17 @@ func TestUninstallReleaseHonorsCanceledContext(t *testing.T) {
 
 	assert.ErrorIs(t, i.UninstallRelease(ctx, "test-ns", "rel"), context.Canceled)
 }
+
+func TestWaitForInstalls(t *testing.T) {
+	i := newAdapter(t, defaultCallbacks())
+
+	release := make(chan struct{})
+	i.installs.Go(func() { <-release }) // stands in for a running install
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(t, i.WaitForInstalls(ctx), context.DeadlineExceeded)
+
+	close(release)
+	require.NoError(t, i.WaitForInstalls(context.Background()))
+}

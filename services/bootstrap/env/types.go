@@ -1,8 +1,6 @@
 package env
 
-type Server struct {
-	Port int `mapstructure:"port"        json:"port"`
-}
+import "github.com/onyxia-datalab/onyxia-backend/internal/server"
 
 type OIDC struct {
 	IssuerURI     string `mapstructure:"issuerURI"     json:"issuerURI"`
@@ -24,7 +22,7 @@ type Kubernetes struct {
 }
 type Env struct {
 	AuthenticationMode string          `mapstructure:"authenticationMode" json:"authenticationMode"`
-	Server             Server          `mapstructure:"server"             json:"server"`
+	Server             server.Config   `mapstructure:"server"             json:"server"`
 	OIDC               OIDC            `mapstructure:"oidc"               json:"oidc"`
 	Security           Security        `mapstructure:"security"           json:"security"`
 	CatalogsConfig     []CatalogConfig `mapstructure:"catalogs"           json:"catalogs"`

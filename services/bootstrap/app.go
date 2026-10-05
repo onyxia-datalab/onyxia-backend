@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/kube"
+	"github.com/onyxia-datalab/onyxia-backend/internal/logging"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
 )
@@ -15,12 +16,17 @@ type Application struct {
 	K8sClient         *kube.Client
 	UserContextReader usercontext.Reader
 	UserContextWriter usercontext.Writer
+	// FlushLogs flushes buffered log records. Call it before the process exits.
+	FlushLogs func() error
 }
 
 func NewApplication(ctx context.Context) (*Application, error) {
 	userReader, userWriter := usercontext.NewUserContext()
 
-	InitLogger(userReader)
+	flushLogs, err := logging.SetupDefault(userReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize logger: %w", err)
+	}
 
 	env, err := env.New()
 	if err != nil {
@@ -44,6 +50,7 @@ func NewApplication(ctx context.Context) (*Application, error) {
 		K8sClient:         k8sClient,
 		UserContextReader: userReader,
 		UserContextWriter: userWriter,
+		FlushLogs:         flushLogs,
 	}
 
 	slog.InfoContext(ctx, "Application initialized successfully")
