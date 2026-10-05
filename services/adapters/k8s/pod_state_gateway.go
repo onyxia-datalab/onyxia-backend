@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -143,7 +144,7 @@ func unschedulableError(conditions []corev1.PodCondition) ports.PodInfo {
 			condition.Status == corev1.ConditionFalse &&
 			condition.Reason == "Unschedulable" {
 			return ports.PodInfo{
-				ErrorReason: ports.PodErrorReasonUnschedulable,
+				ErrorReason: domain.ServiceErrorReasonUnschedulable,
 				Message:     condition.Message,
 			}
 		}
@@ -160,19 +161,19 @@ func waitingContainerError(status corev1.ContainerStatus) ports.PodInfo {
 	switch waiting.Reason {
 	case "CrashLoopBackOff":
 		return ports.PodInfo{
-			ErrorReason:  ports.PodErrorReasonCrashLoop,
+			ErrorReason:  domain.ServiceErrorReasonCrashLoop,
 			RestartCount: status.RestartCount,
 			Message:      waiting.Message,
 		}
 	case "ImagePullBackOff", "ErrImagePull":
 		return ports.PodInfo{
-			ErrorReason: ports.PodErrorReasonImagePull,
+			ErrorReason: domain.ServiceErrorReasonImagePull,
 			Image:       status.Image,
 			Message:     waiting.Message,
 		}
 	case "CreateContainerConfigError":
 		return ports.PodInfo{
-			ErrorReason: ports.PodErrorReasonConfigError,
+			ErrorReason: domain.ServiceErrorReasonConfigError,
 			Message:     waiting.Message,
 		}
 	default:
@@ -185,7 +186,7 @@ func terminatedContainerError(terminated *corev1.ContainerStateTerminated) ports
 		return ports.PodInfo{}
 	}
 	return ports.PodInfo{
-		ErrorReason: ports.PodErrorReasonOOMKilled,
+		ErrorReason: domain.ServiceErrorReasonOOMKilled,
 		ExitCode:    terminated.ExitCode,
 	}
 }
@@ -212,23 +213,23 @@ func applyContainerReadiness(info *ports.PodInfo, statuses []corev1.ContainerSta
 		info.Ready = false
 		if running := status.State.Running; running != nil &&
 			now.Sub(running.StartedAt.Time) > readinessGracePeriod {
-			info.ErrorReason = ports.PodErrorReasonReadinessFailed
+			info.ErrorReason = domain.ServiceErrorReasonReadinessFailed
 		}
 	}
 }
 
 // errorPriority returns the severity of a pod error reason (higher = more severe).
-func errorPriority(r ports.PodErrorReason) int {
+func errorPriority(r domain.ServiceErrorReason) int {
 	switch r {
-	case ports.PodErrorReasonCrashLoop:
+	case domain.ServiceErrorReasonCrashLoop:
 		return 5
-	case ports.PodErrorReasonOOMKilled:
+	case domain.ServiceErrorReasonOOMKilled:
 		return 4
-	case ports.PodErrorReasonImagePull:
+	case domain.ServiceErrorReasonImagePull:
 		return 3
-	case ports.PodErrorReasonConfigError:
+	case domain.ServiceErrorReasonConfigError:
 		return 2
-	case ports.PodErrorReasonUnschedulable:
+	case domain.ServiceErrorReasonUnschedulable:
 		return 1
 	default:
 		return 0

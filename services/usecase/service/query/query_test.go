@@ -57,7 +57,7 @@ func secretData(owner string, share bool) map[string][]byte {
 }
 
 // readerForState drives GetService through the Helm-state path.
-// Covers Ghost (Exists=false) and Suspended (both decided by statusFromHelm).
+// Covers Ghost (Exists=false) and Suspended (both decided by statusFromRelease).
 func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
 	t.Helper()
 	uc, ctx, m := setupReader(t, testUsername)
@@ -76,7 +76,7 @@ func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, err
 }
 
 // readerForHelmStatus drives ListServices for a release whose status Helm
-// alone decides (see statusFromHelm): no workload mock is set up.
+// alone decides (see statusFromRelease): no workload mock is set up.
 func readerForHelmStatus(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
 	t.Helper()
 	uc, ctx, m := setupReader(t, testUsername)
@@ -104,7 +104,7 @@ func readerForPodsGetService(t *testing.T, pods []ports.PodInfo) (domain.Service
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 		Return(pods, nil)
 
@@ -173,7 +173,7 @@ func TestGetService_AllowsSharedFromOtherOwner(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData("someone-else", true), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 		Return([]ports.PodInfo{}, nil)
 
@@ -190,7 +190,7 @@ func TestGetService_AllowsOwnerCaseInsensitive(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData("ALICE", false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 		Return([]ports.PodInfo{}, nil)
 
@@ -206,7 +206,7 @@ func TestGetService_PersonalNamespaceShowsAnyOwner(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, personalNamespace, testRelease).
 		Return(secretData("someone-else", false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, personalNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, personalNamespace, testRelease).
 		Return([]ports.PodInfo{}, nil)
 
@@ -222,7 +222,7 @@ func TestGetService_FieldsMappedFromSecret(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, true), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 		Return([]ports.PodInfo{{Name: "p", Ready: true}}, nil)
 
@@ -270,7 +270,7 @@ func TestListServices_FiltersOutOtherOwnerUnshared(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, "svc-bob").
 		Return(secretData("bob", false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, "svc-bob").
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, mock.Anything).
 		Return(true, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, "svc-bob").
@@ -290,7 +290,7 @@ func TestListServices_IncludesOwnedService(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
 		Return([]ports.ManifestResource{}, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, mock.Anything).
@@ -311,7 +311,7 @@ func TestListServices_IncludesSharedServiceFromOtherOwner(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, "svc-bob-shared").
 		Return(secretData("bob", true), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, "svc-bob-shared").
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, "svc-bob-shared").
 		Return([]ports.ManifestResource{}, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, mock.Anything).
@@ -332,7 +332,7 @@ func TestListServices_PersonalNamespaceShowsAnyOwner(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, personalNamespace, "svc-legacy").
 		Return(secretData("legacy-owner", false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, personalNamespace, "svc-legacy").
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, personalNamespace, "svc-legacy").
 		Return([]ports.ManifestResource{}, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, personalNamespace, mock.Anything).
@@ -371,7 +371,7 @@ func TestListServices_DeployedRelease_Ready(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
 		Return(resources, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, resources).
@@ -394,7 +394,7 @@ func TestListServices_DeployedRelease_NotReady(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
 		Return(resources, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, resources).
@@ -426,7 +426,7 @@ func TestGetService_PodQueryError(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 		Return(nil, errors.New("k8s down"))
 
@@ -458,7 +458,7 @@ func TestListServices_ReleaseResourcesError(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
 		Return(nil, errors.New("k8s down"))
 
@@ -475,7 +475,7 @@ func TestListServices_ControllerReadinessError(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "deployed"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, nil)
 	m.helm.On("GetReleaseResources", mock.Anything, testNamespace, testRelease).
 		Return([]ports.ManifestResource{}, nil)
 	m.pods.On("GetControllerReadiness", mock.Anything, testNamespace, []ports.ManifestResource{}).
@@ -494,7 +494,7 @@ func TestListServices_NonDeployedRelease_NoK8sCall(t *testing.T) {
 	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
 		Return(secretData(testUsername, false), nil)
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
-		Return(ports.ReleaseState{Exists: true, Status: "pending-install"}, nil)
+		Return(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil)
 
 	svcs, err := uc.ListServices(ctx, testNamespace)
 

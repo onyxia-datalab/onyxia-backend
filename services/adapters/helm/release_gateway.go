@@ -18,6 +18,7 @@ import (
 	"helm.sh/helm/v4/pkg/cli/values"
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/release"
+	"helm.sh/helm/v4/pkg/release/common"
 	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/rest"
@@ -378,7 +379,7 @@ func (h *Helm) GetReleaseState(
 	}
 
 	suspended := false
-	status := ""
+	status := ports.ReleaseStatusUnknown
 	if r, ok := rel.(*releasev1.Release); ok {
 		if global, ok := r.Config["global"].(map[string]interface{}); ok {
 			if v, ok := global["suspend"].(bool); ok {
@@ -386,9 +387,29 @@ func (h *Helm) GetReleaseState(
 			}
 		}
 		if r.Info != nil {
-			status = string(r.Info.Status)
+			if r.Info.Status == common.StatusUninstalled {
+				// Uninstalled with --keep-history: only the history remains.
+				return ports.ReleaseState{Exists: false}, nil
+			}
+			status = releaseStatus(r.Info.Status)
 		}
 	}
 
 	return ports.ReleaseState{Exists: true, Suspended: suspended, Status: status}, nil
+}
+
+// releaseStatus translates a Helm release status into the port's vocabulary.
+func releaseStatus(s common.Status) ports.ReleaseStatus {
+	switch s {
+	case common.StatusPendingInstall, common.StatusPendingUpgrade, common.StatusPendingRollback:
+		return ports.ReleaseStatusPending
+	case common.StatusDeployed, common.StatusSuperseded:
+		return ports.ReleaseStatusDeployed
+	case common.StatusFailed:
+		return ports.ReleaseStatusFailed
+	case common.StatusUninstalling:
+		return ports.ReleaseStatusUninstalling
+	default:
+		return ports.ReleaseStatusUnknown
+	}
 }

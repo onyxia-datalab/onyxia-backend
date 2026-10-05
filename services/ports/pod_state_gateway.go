@@ -1,24 +1,16 @@
 package ports
 
-import "context"
+import (
+	"context"
 
-// PodErrorReason identifies the root cause of a pod failure.
-type PodErrorReason string
-
-const (
-	PodErrorReasonCrashLoop       PodErrorReason = "crash_loop"
-	PodErrorReasonOOMKilled       PodErrorReason = "oom_killed"
-	PodErrorReasonImagePull       PodErrorReason = "image_pull"
-	PodErrorReasonConfigError     PodErrorReason = "config_error"
-	PodErrorReasonUnschedulable   PodErrorReason = "unschedulable"
-	PodErrorReasonReadinessFailed PodErrorReason = "readiness_failed"
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
 // PodInfo is the minimal pod state needed to derive the service status.
 type PodInfo struct {
 	Name         string
 	Ready        bool
-	ErrorReason  PodErrorReason // empty string means no error
+	ErrorReason  domain.ServiceErrorReason // empty string means no error
 	RestartCount int32
 	ExitCode     int32
 	Image        string

@@ -5,30 +5,29 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-// statusFromHelm returns the status when the Helm release state alone decides
-// it. decided is false for an existing, non-suspended "deployed" or
-// "superseded" release: its status then depends on the workloads, which
-// GetService and ListServices inspect at different levels of detail.
-// Both paths go through this function so they never disagree on a status
-// Helm already knows.
-func statusFromHelm(releaseState ports.ReleaseState) (status domain.ServiceStatus, decided bool) {
+// statusFromRelease returns the status when the release state alone decides
+// it. decided is false for an existing, non-suspended, deployed release: its
+// status then depends on the workloads, which GetService and ListServices
+// inspect at different levels of detail. Both paths go through this function
+// so they never disagree on a status the release already decides.
+func statusFromRelease(releaseState ports.ReleaseState) (status domain.ServiceStatus, decided bool) {
 	if !releaseState.Exists {
 		return domain.ServiceStatusGhost, true
 	}
-	// A suspended release stays "deployed" in Helm (suspension is a helm
-	// upgrade), so this must be checked before looking at the status.
+	// A suspended release is still deployed (suspension is an upgrade), so
+	// this must be checked before looking at the status.
 	if releaseState.Suspended {
 		return domain.ServiceStatusSuspended, true
 	}
 	switch releaseState.Status {
-	case "pending-install", "pending-upgrade", "pending-rollback", "unknown":
-		return domain.ServiceStatusDeploying, true
-	case "failed":
-		return domain.ServiceStatusError, true
-	case "uninstalling":
-		return domain.ServiceStatusTerminating, true
-	default: // "deployed", "superseded"
+	case ports.ReleaseStatusDeployed:
 		return "", false
+	case ports.ReleaseStatusFailed:
+		return domain.ServiceStatusError, true
+	case ports.ReleaseStatusUninstalling:
+		return domain.ServiceStatusTerminating, true
+	default: // pending, unknown
+		return domain.ServiceStatusDeploying, true
 	}
 }
 
@@ -46,7 +45,7 @@ func derivePodStatus(pods []ports.PodInfo) (domain.ServiceStatus, *domain.Servic
 		}
 		if pod.ErrorReason != "" {
 			return domain.ServiceStatusError, &domain.ServiceError{
-				Reason:       domain.ServiceErrorReason(pod.ErrorReason),
+				Reason:       pod.ErrorReason,
 				PodName:      pod.Name,
 				Message:      pod.Message,
 				RestartCount: pod.RestartCount,

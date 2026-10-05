@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -149,7 +150,7 @@ func TestDerivePodInfo(t *testing.T) {
 					StartedAt: metav1.NewTime(testNow.Add(-readinessGracePeriod - time.Second)),
 				}},
 			}),
-			want: ports.PodInfo{Name: "not-ready", ErrorReason: ports.PodErrorReasonReadinessFailed},
+			want: ports.PodInfo{Name: "not-ready", ErrorReason: domain.ServiceErrorReasonReadinessFailed},
 		},
 		{
 			name: "unschedulable condition is reported",
@@ -164,7 +165,7 @@ func TestDerivePodInfo(t *testing.T) {
 			},
 			want: ports.PodInfo{
 				Name:        "unschedulable",
-				ErrorReason: ports.PodErrorReasonUnschedulable,
+				ErrorReason: domain.ServiceErrorReasonUnschedulable,
 				Message:     "insufficient cpu",
 			},
 		},
@@ -186,7 +187,7 @@ func TestDerivePodInfo(t *testing.T) {
 			},
 			want: ports.PodInfo{
 				Name:        "image-pull",
-				ErrorReason: ports.PodErrorReasonImagePull,
+				ErrorReason: domain.ServiceErrorReasonImagePull,
 				Image:       "registry.invalid/image",
 				Message:     "back-off pulling image",
 			},
@@ -208,7 +209,7 @@ func TestDerivePodInfo(t *testing.T) {
 			),
 			want: ports.PodInfo{
 				Name:         "crash-loop",
-				ErrorReason:  ports.PodErrorReasonCrashLoop,
+				ErrorReason:  domain.ServiceErrorReasonCrashLoop,
 				RestartCount: 4,
 				Message:      "back-off restarting container",
 			},
@@ -223,7 +224,7 @@ func TestDerivePodInfo(t *testing.T) {
 			}),
 			want: ports.PodInfo{
 				Name:        "oom",
-				ErrorReason: ports.PodErrorReasonOOMKilled,
+				ErrorReason: domain.ServiceErrorReasonOOMKilled,
 				ExitCode:    137,
 			},
 		},

@@ -151,7 +151,7 @@ func (uc *Reader) deriveStatusLight(
 	namespace, releaseID string,
 	releaseState ports.ReleaseState,
 ) (domain.ServiceStatus, error) {
-	if status, decided := statusFromHelm(releaseState); decided {
+	if status, decided := statusFromRelease(releaseState); decided {
 		return status, nil
 	}
 	resources, err := uc.helm.GetReleaseResources(ctx, namespace, releaseID)
@@ -178,7 +178,7 @@ func (uc *Reader) deriveStatusWithDetail(
 		return "", nil, err
 	}
 
-	if status, decided := statusFromHelm(releaseState); decided {
+	if status, decided := statusFromRelease(releaseState); decided {
 		return status, nil, nil
 	}
 

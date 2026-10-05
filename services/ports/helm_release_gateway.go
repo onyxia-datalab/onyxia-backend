@@ -17,10 +17,27 @@ type ManifestResource struct {
 type ReleaseState struct {
 	Exists    bool
 	Suspended bool
-	// Status is the Helm release status (e.g. "deployed", "failed", "pending-install").
-	// Empty when Exists is false.
-	Status string
+	// Status is empty when Exists is false.
+	Status ReleaseStatus
 }
+
+// ReleaseStatus is the phase of a release, as reported by the deployment
+// tool and translated by the adapter.
+type ReleaseStatus string
+
+const (
+	// ReleaseStatusPending: an install, upgrade or rollback is in progress.
+	ReleaseStatusPending ReleaseStatus = "pending"
+	// ReleaseStatusDeployed: the manifests are applied; whether the service
+	// is up depends on its workloads.
+	ReleaseStatusDeployed ReleaseStatus = "deployed"
+	// ReleaseStatusFailed: the last operation on the release failed.
+	ReleaseStatusFailed ReleaseStatus = "failed"
+	// ReleaseStatusUninstalling: the release is being removed.
+	ReleaseStatusUninstalling ReleaseStatus = "uninstalling"
+	// ReleaseStatusUnknown: the deployment tool doesn't know the state.
+	ReleaseStatusUnknown ReleaseStatus = "unknown"
+)
 
 type InstallCallbacks struct {
 	OnStart   func(release, chart string)

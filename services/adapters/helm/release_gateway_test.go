@@ -249,3 +249,43 @@ func TestWaitForInstalls(t *testing.T) {
 	close(release)
 	require.NoError(t, i.WaitForInstalls(context.Background()))
 }
+
+func TestGetReleaseStateTranslatesHelmStatus(t *testing.T) {
+	tests := []struct {
+		helm common.Status
+		want ports.ReleaseState
+	}{
+		{common.StatusPendingInstall, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusPendingUpgrade, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusPendingRollback, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}},
+		{common.StatusDeployed, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}},
+		{common.StatusSuperseded, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}},
+		{common.StatusFailed, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}},
+		{common.StatusUninstalling, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}},
+		{common.StatusUnknown, ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}},
+		// Uninstalled with --keep-history: only the history is left.
+		{common.StatusUninstalled, ports.ReleaseState{Exists: false}},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.helm), func(t *testing.T) {
+			cfg := action.NewConfiguration()
+			cfg.Releases = storage.Init(driver.NewMemory())
+			cfg.KubeClient = &fake.PrintingKubeClient{Out: io.Discard, LogOutput: io.Discard}
+			require.NoError(t, cfg.Releases.Create(&releasev1.Release{
+				Name:      "rel",
+				Namespace: "test-ns",
+				Version:   1,
+				Info:      &releasev1.Info{Status: tt.helm},
+			}))
+
+			i := newAdapter(t, defaultCallbacks())
+			i.configForNamespace = func(string) (*action.Configuration, error) { return cfg, nil }
+
+			state, err := i.GetReleaseState(context.Background(), "test-ns", "rel")
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, state)
+		})
+	}
+}
