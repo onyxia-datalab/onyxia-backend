@@ -2,10 +2,10 @@ package k8s
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
+	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,150 +18,152 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 )
 
-func TestCreate(t *testing.T) {
-	ctx := context.Background()
-	cs := k8sfake.NewClientset()
-	gw := NewOnyxiaSecretGtw(cs)
-
-	ns, name := "user-ddecrulle", "jupyter-python-721817"
-	data := map[string][]byte{"owner": []byte("ddecrulle")}
-
-	err := gw.CreateOnyxiaSecret(ctx, ns, name, data)
-	require.NoError(t, err)
-
-	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
-	require.NoError(t, err)
-
-	assert.Equal(t, onyxiaSecretType, got.Type)
-	assert.True(t, reflect.DeepEqual(data, got.Data))
-}
-
-func TestCreateReturnsAlreadyExists(t *testing.T) {
-	ctx := context.Background()
-	cs := k8sfake.NewClientset()
-	gw := NewOnyxiaSecretGtw(cs)
-
-	ns, name := "ns", "secret"
-	// seed
-	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: buildOnyxiaSecretName(name), Namespace: ns},
-		Type:       corev1.SecretType("other"),
-		Data:       map[string][]byte{"owner": []byte("old")},
+func seedSecret(t *testing.T, cs *k8sfake.Clientset, ns, name string, typ corev1.SecretType, data map[string][]byte) {
+	t.Helper()
+	_, err := cs.CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: ns},
+		Type:       typ,
+		Data:       data,
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
+}
 
-	err = gw.CreateOnyxiaSecret(ctx, ns, name, map[string][]byte{"owner": []byte("ddecrulle")})
+// The secret layout is shared with onyxia-api (Java): both APIs must be able
+// to read the services the other one installed.
+func TestCreateServiceRecordWritesOnyxiaApiFormat(t *testing.T) {
+	ctx := context.Background()
+	cs := k8sfake.NewClientset()
+	gw := NewOnyxiaSecretGtw(cs)
+
+	err := gw.CreateServiceRecord(ctx, "user-alice", ports.ServiceRecord{
+		ReleaseID:    "jupyter-python-721817",
+		CatalogID:    "ide",
+		FriendlyName: "My Jupyter",
+		Owner:        "alice",
+		Share:        true,
+	})
+	require.NoError(t, err)
+
+	got, err := cs.CoreV1().Secrets("user-alice").
+		Get(ctx, "sh.onyxia.release.v1.jupyter-python-721817", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, corev1.SecretType("onyxia.sh/release.v1"), got.Type)
+	assert.Equal(t, map[string][]byte{
+		"catalog":      []byte("ide"),
+		"friendlyName": []byte("My Jupyter"),
+		"owner":        []byte("alice"),
+		"share":        []byte("true"),
+	}, got.Data)
+}
+
+func TestCreateServiceRecordReturnsAlreadyExists(t *testing.T) {
+	ctx := context.Background()
+	cs := k8sfake.NewClientset()
+	gw := NewOnyxiaSecretGtw(cs)
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("rel"), "other", map[string][]byte{"owner": []byte("old")})
+
+	err := gw.CreateServiceRecord(ctx, "ns", ports.ServiceRecord{ReleaseID: "rel", Owner: "alice"})
 	require.ErrorIs(t, err, domain.ErrAlreadyExists)
 
-	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
+	got, err := cs.CoreV1().Secrets("ns").Get(ctx, buildOnyxiaSecretName("rel"), metav1.GetOptions{})
 	require.NoError(t, err)
-
-	assert.Equal(t, corev1.SecretType("other"), got.Type)
-	assert.Equal(t, map[string][]byte{"owner": []byte("old")}, got.Data)
+	assert.Equal(t, map[string][]byte{"owner": []byte("old")}, got.Data, "existing record must not be overwritten")
 }
 
-func TestUpdateRetryOnConflict(t *testing.T) {
-	ctx := context.Background()
+func TestGetServiceRecord(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("rel"), onyxiaSecretType, map[string][]byte{
+		"catalog": []byte("ide"), "friendlyName": []byte("F"), "owner": []byte("bob"), "share": []byte("true"),
+	})
 
-	ns, name := "ns", "secret"
-	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: buildOnyxiaSecretName(name), Namespace: ns},
-		Type:       onyxiaSecretType,
-		Data:       map[string][]byte{"x": []byte("y")},
-	}, metav1.CreateOptions{})
+	rec, err := gw.GetServiceRecord(context.Background(), "ns", "rel")
+
 	require.NoError(t, err)
-
-	conflictedOnce := false
-	cs.PrependReactor(
-		"update",
-		"secrets",
-		func(action k8stesting.Action) (bool, runtime.Object, error) {
-			if !conflictedOnce {
-				conflictedOnce = true
-				return true, nil, apierrors.NewConflict(
-					schema.GroupResource{Resource: "secrets"}, buildOnyxiaSecretName(name), nil)
-			}
-			return false, nil, nil
-		},
-	)
-
-	newData := map[string][]byte{"owner": []byte("ddecrulle")}
-	err = gw.UpdateOnyxiaSecret(ctx, ns, name, newData)
-	require.NoError(t, err)
-
-	got, err := cs.CoreV1().Secrets(ns).Get(ctx, buildOnyxiaSecretName(name), metav1.GetOptions{})
-	require.NoError(t, err)
-	// Update merges: keys not passed in are kept.
-	assert.Equal(t, map[string][]byte{"x": []byte("y"), "owner": []byte("ddecrulle")}, got.Data)
+	assert.Equal(t, ports.ServiceRecord{
+		ReleaseID: "rel", CatalogID: "ide", FriendlyName: "F", Owner: "bob", Share: true,
+	}, rec)
 }
 
-func TestUpdateReturnsNotFoundIfDeletedDuringUpdate(t *testing.T) {
-	ctx := context.Background()
+func TestGetServiceRecordWithoutDataIsEmpty(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("rel"), onyxiaSecretType, nil)
 
-	ns, name := "ns", "secret"
+	rec, err := gw.GetServiceRecord(context.Background(), "ns", "rel")
 
-	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: buildOnyxiaSecretName(name), Namespace: ns},
-		Type:       onyxiaSecretType,
-		Data:       map[string][]byte{"x": []byte("y")},
-	}, metav1.CreateOptions{})
 	require.NoError(t, err)
+	assert.Equal(t, ports.ServiceRecord{ReleaseID: "rel"}, rec)
+}
 
-	// First GET will simulate a concurrent deletion by removing the object
-	getOnce := false
-	cs.PrependReactor(
-		"get",
-		"secrets",
-		func(action k8stesting.Action) (bool, runtime.Object, error) {
-			if getOnce {
-				return false, nil, nil
-			}
-			getOnce = true
+func TestGetServiceRecordNotFound(t *testing.T) {
+	gw := NewOnyxiaSecretGtw(k8sfake.NewClientset())
 
-			// Simulate concurrent deletion
-			gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
-			_ = cs.Tracker().Delete(gvr, ns, buildOnyxiaSecretName(name))
+	_, err := gw.GetServiceRecord(context.Background(), "ns", "missing")
 
-			// Make this first GET look like a NotFound due to concurrent deletion.
-			return true, nil, apierrors.NewNotFound(
-				schema.GroupResource{Group: "", Resource: "secrets"},
-				buildOnyxiaSecretName(name),
-			)
-		},
-	)
-
-	newData := map[string][]byte{"owner": []byte("ddecrulle")}
-	err = gw.UpdateOnyxiaSecret(ctx, ns, name, newData)
 	require.ErrorIs(t, err, domain.ErrNotFound)
 }
 
-func TestDeleteIgnoresNotFound(t *testing.T) {
-	ctx := context.Background()
+func TestListServiceRecordsOnlyReturnsOnyxiaSecrets(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("a"), onyxiaSecretType, map[string][]byte{"owner": []byte("alice")})
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("b"), onyxiaSecretType, map[string][]byte{"owner": []byte("bob")})
+	seedSecret(t, cs, "ns", "unrelated", corev1.SecretTypeOpaque, nil)
+	seedSecret(t, cs, "other-ns", buildOnyxiaSecretName("c"), onyxiaSecretType, nil)
 
-	err := gw.DeleteOnyxiaSecret(ctx, "ns", "missing")
+	var fieldSelector string
+	cs.PrependReactor("list", "secrets", func(a k8stesting.Action) (bool, runtime.Object, error) {
+		fieldSelector = a.(k8stesting.ListAction).GetListRestrictions().Fields.String()
+		return false, nil, nil
+	})
+
+	recs, err := gw.ListServiceRecords(context.Background(), "ns")
+
 	require.NoError(t, err)
+	assert.ElementsMatch(t, []ports.ServiceRecord{
+		{ReleaseID: "a", Owner: "alice"},
+		{ReleaseID: "b", Owner: "bob"},
+	}, recs)
+	assert.Equal(t, "type=onyxia.sh/release.v1", fieldSelector)
 }
 
-func TestReadReturnsEmptyMapWhenNil(t *testing.T) {
+func TestSetServiceSharedKeepsOtherKeysAndRetriesOnConflict(t *testing.T) {
 	ctx := context.Background()
 	cs := k8sfake.NewClientset()
 	gw := NewOnyxiaSecretGtw(cs)
+	seedSecret(t, cs, "ns", buildOnyxiaSecretName("rel"), onyxiaSecretType, map[string][]byte{
+		"owner": []byte("alice"), "share": []byte("false"),
+	})
 
-	ns, name := "ns", "secret-nil"
-	_, err := cs.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: buildOnyxiaSecretName(name), Namespace: ns},
-		Type:       onyxiaSecretType,
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
+	conflictedOnce := false
+	cs.PrependReactor("update", "secrets", func(k8stesting.Action) (bool, runtime.Object, error) {
+		if !conflictedOnce {
+			conflictedOnce = true
+			return true, nil, apierrors.NewConflict(
+				schema.GroupResource{Resource: "secrets"}, buildOnyxiaSecretName("rel"), nil)
+		}
+		return false, nil, nil
+	})
 
-	m, err := gw.ReadOnyxiaSecretData(ctx, ns, name)
+	require.NoError(t, gw.SetServiceShared(ctx, "ns", "rel", true))
+
+	got, err := cs.CoreV1().Secrets("ns").Get(ctx, buildOnyxiaSecretName("rel"), metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.NotNil(t, m)
-	assert.Empty(t, m)
+	assert.True(t, conflictedOnce)
+	assert.Equal(t, map[string][]byte{"owner": []byte("alice"), "share": []byte("true")}, got.Data)
+}
+
+func TestSetServiceSharedNotFound(t *testing.T) {
+	gw := NewOnyxiaSecretGtw(k8sfake.NewClientset())
+
+	err := gw.SetServiceShared(context.Background(), "ns", "missing", true)
+
+	require.ErrorIs(t, err, domain.ErrNotFound)
+}
+
+func TestDeleteServiceRecordIgnoresNotFound(t *testing.T) {
+	gw := NewOnyxiaSecretGtw(k8sfake.NewClientset())
+
+	require.NoError(t, gw.DeleteServiceRecord(context.Background(), "ns", "missing"))
 }

@@ -12,7 +12,7 @@ import (
 )
 
 type Reader struct {
-	secrets    ports.OnyxiaSecretGateway
+	records    ports.ServiceRecordGateway
 	helm       ports.ReleaseGateway
 	pods       ports.WorkloadStateGateway
 	userReader usercontext.UsernameGetter
@@ -22,14 +22,14 @@ type Reader struct {
 var _ ports.ServiceQuery = (*Reader)(nil)
 
 func NewReader(
-	secrets ports.OnyxiaSecretGateway,
+	records ports.ServiceRecordGateway,
 	helm ports.ReleaseGateway,
 	pods ports.WorkloadStateGateway,
 	userReader usercontext.UsernameGetter,
 	namespaces namespace.Authorizer,
 ) *Reader {
 	return &Reader{
-		secrets:    secrets,
+		records:    records,
 		helm:       helm,
 		pods:       pods,
 		userReader: userReader,
@@ -47,17 +47,15 @@ func (uc *Reader) GetService(
 ) (domain.Service, error) {
 	username, _ := uc.userReader.GetUsername(ctx)
 
-	secretData, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseID)
+	rec, err := uc.records.GetServiceRecord(ctx, namespace, releaseID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.Service{}, domain.ErrNotFound
 		}
-		return domain.Service{}, fmt.Errorf("read secret: %w", err)
+		return domain.Service{}, fmt.Errorf("read service record: %w", err)
 	}
 
-	owner := string(secretData["owner"])
-	share := string(secretData["share"]) == "true"
-	if !uc.namespaces.CanAccessService(username, namespace, owner, share) {
+	if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
 		return domain.Service{}, domain.ErrNotFound
 	}
 
@@ -66,82 +64,54 @@ func (uc *Reader) GetService(
 		return domain.Service{}, fmt.Errorf("derive status: %w", err)
 	}
 
-	return domain.Service{
-		ReleaseID:    releaseID,
-		Namespace:    namespace,
-		FriendlyName: string(secretData["friendlyName"]),
-		Owner:        owner,
-		CatalogID:    string(secretData["catalog"]),
-		Share:        share,
-		Status:       status,
-		Error:        svcErr,
-	}, nil
+	svc := toService(namespace, rec, status)
+	svc.Error = svcErr
+	return svc, nil
 }
 
 // ListServices returns services visible to the current user
 // (see namespace.Authorizer.CanAccessService).
-// Pod queries are skipped — status is derived from the Helm release state only.
+// Pod queries are skipped — status is derived from the release state and the
+// workload controllers only.
 func (uc *Reader) ListServices(
 	ctx context.Context,
 	namespace string,
 ) ([]domain.Service, error) {
 	username, _ := uc.userReader.GetUsername(ctx)
 
-	releaseIDs, err := uc.secrets.ListOnyxiaSecretNames(ctx, namespace)
+	records, err := uc.records.ListServiceRecords(ctx, namespace)
 	if err != nil {
-		return nil, fmt.Errorf("list secrets: %w", err)
+		return nil, fmt.Errorf("list service records: %w", err)
 	}
 
-	services := make([]domain.Service, 0, len(releaseIDs))
-	for _, id := range releaseIDs {
-		svc, err := uc.buildLightService(ctx, namespace, id)
-		if err != nil {
-			if errors.Is(err, domain.ErrNotFound) {
-				// Secret disappeared between list and get — skip.
-				continue
-			}
-			return nil, err
-		}
-		if !uc.namespaces.CanAccessService(username, namespace, svc.Owner, svc.Share) {
+	services := make([]domain.Service, 0, len(records))
+	for _, rec := range records {
+		if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
 			continue
 		}
-		services = append(services, svc)
+		releaseState, err := uc.helm.GetReleaseState(ctx, namespace, rec.ReleaseID)
+		if err != nil {
+			return nil, fmt.Errorf("get release state: %w", err)
+		}
+		status, err := uc.deriveStatusLight(ctx, namespace, rec.ReleaseID, releaseState)
+		if err != nil {
+			return nil, fmt.Errorf("derive status: %w", err)
+		}
+		services = append(services, toService(namespace, rec, status))
 	}
 	return services, nil
 }
 
-// buildLightService builds a service entry for the list — no pod query, no error detail.
-func (uc *Reader) buildLightService(
-	ctx context.Context,
-	namespace, releaseID string,
-) (domain.Service, error) {
-	secretData, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return domain.Service{}, domain.ErrNotFound
-		}
-		return domain.Service{}, fmt.Errorf("read secret: %w", err)
-	}
-
-	releaseState, err := uc.helm.GetReleaseState(ctx, namespace, releaseID)
-	if err != nil {
-		return domain.Service{}, fmt.Errorf("get release state: %w", err)
-	}
-
-	status, err := uc.deriveStatusLight(ctx, namespace, releaseID, releaseState)
-	if err != nil {
-		return domain.Service{}, fmt.Errorf("derive status: %w", err)
-	}
-
+func toService(namespace string, rec ports.ServiceRecord, status domain.ServiceStatus) domain.Service {
 	return domain.Service{
-		ReleaseID:    releaseID,
+		ReleaseID:    rec.ReleaseID,
 		Namespace:    namespace,
-		FriendlyName: string(secretData["friendlyName"]),
-		Owner:        string(secretData["owner"]),
-		CatalogID:    string(secretData["catalog"]),
-		Share:        string(secretData["share"]) == "true",
+		FriendlyName: rec.FriendlyName,
+		Owner:        rec.Owner,
+		CatalogID:    rec.CatalogID,
+		Share:        rec.Share,
 		Status:       status,
-	}, nil
+	}
 }
 
 // deriveStatusLight maps a Helm release state to a ServiceStatus using the workload

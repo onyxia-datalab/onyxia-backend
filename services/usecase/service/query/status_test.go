@@ -66,8 +66,8 @@ func TestGetService_ReleaseDecidedStatuses(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.releaseStatus), func(t *testing.T) {
 			uc, ctx, m := setupReader(t, testUsername)
-			m.secrets.On("ReadOnyxiaSecretData", mock.Anything, testNamespace, testRelease).
-				Return(secretData(testUsername, false), nil)
+			m.records.On("GetServiceRecord", mock.Anything, testNamespace, testRelease).
+				Return(record(testRelease, testUsername, false), nil)
 			m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
 				Return(ports.ReleaseState{Exists: true, Status: tt.releaseStatus}, nil)
 

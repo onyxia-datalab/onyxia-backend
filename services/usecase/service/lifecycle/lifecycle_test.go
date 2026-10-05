@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"strconv"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -17,7 +16,7 @@ import (
 
 type lifecycleMocks struct {
 	helm    *mocks.MockReleaseGateway
-	secrets *mocks.MockOnyxiaSecretGateway
+	records *mocks.MockServiceRecordGateway
 	catalog *mocks.MockCatalogService
 }
 
@@ -25,10 +24,10 @@ func setupLifecycle(t *testing.T) (*Lifecycle, context.Context, lifecycleMocks) 
 	t.Helper()
 	m := lifecycleMocks{
 		helm:    new(mocks.MockReleaseGateway),
-		secrets: new(mocks.MockOnyxiaSecretGateway),
+		records: new(mocks.MockServiceRecordGateway),
 		catalog: new(mocks.MockCatalogService),
 	}
-	uc := NewLifecycle(m.secrets, m.helm, m.catalog, namespace.NewAuthorizer("user-", "projet-"))
+	uc := NewLifecycle(m.records, m.helm, m.catalog, namespace.NewAuthorizer("user-", "projet-"))
 	return uc, context.Background(), m
 }
 
@@ -69,7 +68,7 @@ func TestStart_Success(t *testing.T) {
 
 	m.catalog.On("GetPackage", ctx, req.CatalogID, req.PackageName).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", ctx, req.Namespace, req.ReleaseID, mock.Anything).Return(nil)
+	m.records.On("CreateServiceRecord", ctx, req.Namespace, mock.Anything).Return(nil)
 	m.helm.On("StartInstall", ctx, req.Namespace, req.ReleaseID, mock.Anything, req.Version, req.Values, mock.Anything).
 		Return(nil)
 
@@ -77,11 +76,11 @@ func TestStart_Success(t *testing.T) {
 
 	require.NoError(t, err)
 	m.catalog.AssertExpectations(t)
-	m.secrets.AssertExpectations(t)
+	m.records.AssertExpectations(t)
 	m.helm.AssertExpectations(t)
 }
 
-func TestStart_SecretDataIsCorrect(t *testing.T) {
+func TestStart_ServiceRecordIsCorrect(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 	req.Share = true
@@ -90,21 +89,20 @@ func TestStart_SecretDataIsCorrect(t *testing.T) {
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	m.catalog.On("CheckSharingAllowed", mock.Anything, req.CatalogID).Return(nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", ctx, req.Namespace, req.ReleaseID,
-		map[string][]byte{
-			"catalog":      []byte(req.CatalogID),
-			"friendlyName": []byte(req.FriendlyName),
-			"owner":        []byte(req.Username),
-			"share":        []byte("true"),
-		},
-	).Return(nil)
+	m.records.On("CreateServiceRecord", ctx, req.Namespace, ports.ServiceRecord{
+		ReleaseID:    req.ReleaseID,
+		CatalogID:    req.CatalogID,
+		FriendlyName: req.FriendlyName,
+		Owner:        req.Username,
+		Share:        true,
+	}).Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
 	_, err := uc.Start(ctx, req)
 
 	require.NoError(t, err)
-	m.secrets.AssertExpectations(t)
+	m.records.AssertExpectations(t)
 }
 
 func TestStart_GetPackageError(t *testing.T) {
@@ -117,7 +115,7 @@ func TestStart_GetPackageError(t *testing.T) {
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "index unavailable")
-	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "CreateServiceRecord")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -131,7 +129,7 @@ func TestStart_PackageNotFound(t *testing.T) {
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "CreateServiceRecord")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -153,7 +151,7 @@ func TestStart_SharingNotAllowed(t *testing.T) {
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	m.helm.AssertNotCalled(t, "GetReleaseState")
-	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "CreateServiceRecord")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -165,7 +163,7 @@ func TestStart_ShareFalseSkipsSharingCheck(t *testing.T) {
 
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
@@ -188,7 +186,7 @@ func TestStart_AlreadyExists(t *testing.T) {
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorIs(t, err, domain.ErrAlreadyExists)
-	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "CreateServiceRecord")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
@@ -204,18 +202,18 @@ func TestStart_GetReleaseStateError(t *testing.T) {
 	_, err := uc.Start(ctx, req)
 
 	assert.ErrorContains(t, err, "helm unavailable")
-	m.secrets.AssertNotCalled(t, "CreateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "CreateServiceRecord")
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
-func TestStart_SecretError(t *testing.T) {
+func TestStart_RecordError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("k8s unavailable"))
 
 	_, err := uc.Start(ctx, req)
@@ -224,14 +222,14 @@ func TestStart_SecretError(t *testing.T) {
 	m.helm.AssertNotCalled(t, "StartInstall")
 }
 
-func TestStart_SecretAlreadyExistsDoesNotOverwriteOrInstall(t *testing.T) {
+func TestStart_RecordAlreadyExistsDoesNotOverwriteOrInstall(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	req := baseRequest()
 	pkg := resolvedPkg(req)
 
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", mock.Anything, req.Namespace, req.ReleaseID, mock.Anything).
+	m.records.On("CreateServiceRecord", mock.Anything, req.Namespace, mock.Anything).
 		Return(domain.ErrAlreadyExists)
 
 	_, err := uc.Start(ctx, req)
@@ -247,7 +245,7 @@ func TestStart_HelmError(t *testing.T) {
 
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(errors.New("invalid release name"))
@@ -264,7 +262,7 @@ func TestStart_InvokesInstallCallbacks(t *testing.T) {
 
 	m.catalog.On("GetPackage", mock.Anything, mock.Anything, mock.Anything).Return(pkg, nil)
 	notInstalled(m, req)
-	m.secrets.On("CreateOnyxiaSecret", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	m.records.On("CreateServiceRecord", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	m.helm.On("StartInstall", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
@@ -287,13 +285,10 @@ const (
 	release        = "jupyter-alice"
 )
 
-// ownedBy stubs the onyxia secret of release in ns with the given owner/share.
+// ownedBy stubs the service record of release in ns with the given owner/share.
 func ownedBy(m lifecycleMocks, ns, owner string, share bool) {
-	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, ns, release).
-		Return(map[string][]byte{
-			"owner": []byte(owner),
-			"share": []byte(strconv.FormatBool(share)),
-		}, nil)
+	m.records.On("GetServiceRecord", mock.Anything, ns, release).
+		Return(ports.ServiceRecord{ReleaseID: release, Owner: owner, Share: share}, nil)
 }
 
 func TestAuthorize_Rules(t *testing.T) {
@@ -327,20 +322,20 @@ func TestAuthorize_Rules(t *testing.T) {
 	}
 }
 
-func TestAuthorize_SecretNotFound(t *testing.T) {
+func TestAuthorize_RecordNotFound(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
-	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
-		Return(nil, domain.ErrNotFound)
+	m.records.On("GetServiceRecord", mock.Anything, groupNamespace, release).
+		Return(ports.ServiceRecord{}, domain.ErrNotFound)
 
 	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
-func TestAuthorize_SecretReadError(t *testing.T) {
+func TestAuthorize_RecordReadError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
-	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
-		Return(nil, errors.New("k8s unavailable"))
+	m.records.On("GetServiceRecord", mock.Anything, groupNamespace, release).
+		Return(ports.ServiceRecord{}, errors.New("k8s unavailable"))
 
 	_, err := uc.authorize(ctx, "alice", groupNamespace, release)
 
@@ -422,13 +417,13 @@ func TestDelete_Success(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedBy(m, groupNamespace, "alice", false)
 	m.helm.On("UninstallRelease", ctx, groupNamespace, release).Return(nil)
-	m.secrets.On("DeleteOnyxiaSecret", ctx, groupNamespace, release).Return(nil)
+	m.records.On("DeleteServiceRecord", ctx, groupNamespace, release).Return(nil)
 
 	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	require.NoError(t, err)
 	m.helm.AssertExpectations(t)
-	m.secrets.AssertExpectations(t)
+	m.records.AssertExpectations(t)
 }
 
 func TestDelete_DeniedForUnsharedForeignService(t *testing.T) {
@@ -439,7 +434,7 @@ func TestDelete_DeniedForUnsharedForeignService(t *testing.T) {
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	m.helm.AssertNotCalled(t, "UninstallRelease")
-	m.secrets.AssertNotCalled(t, "DeleteOnyxiaSecret")
+	m.records.AssertNotCalled(t, "DeleteServiceRecord")
 }
 
 func TestDelete_HelmError(t *testing.T) {
@@ -451,14 +446,14 @@ func TestDelete_HelmError(t *testing.T) {
 	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
 
 	assert.ErrorContains(t, err, "helm unavailable")
-	m.secrets.AssertNotCalled(t, "DeleteOnyxiaSecret")
+	m.records.AssertNotCalled(t, "DeleteServiceRecord")
 }
 
-func TestDelete_SecretError(t *testing.T) {
+func TestDelete_RecordError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedBy(m, groupNamespace, "alice", false)
 	m.helm.On("UninstallRelease", ctx, groupNamespace, release).Return(nil)
-	m.secrets.On("DeleteOnyxiaSecret", ctx, groupNamespace, release).
+	m.records.On("DeleteServiceRecord", ctx, groupNamespace, release).
 		Return(errors.New("k8s unavailable"))
 
 	err := uc.Delete(ctx, domain.DeleteRequest{Username: "alice", Namespace: groupNamespace, ReleaseName: release})
@@ -477,35 +472,29 @@ func sharedReq(shared bool) domain.SetSharedRequest {
 	}
 }
 
-// ownedWithCatalog stubs the onyxia secret including its catalog.
+// ownedWithCatalog stubs the service record including its catalog.
 func ownedWithCatalog(m lifecycleMocks, owner string, share bool) {
-	m.secrets.On("ReadOnyxiaSecretData", mock.Anything, groupNamespace, release).
-		Return(map[string][]byte{
-			"owner":   []byte(owner),
-			"share":   []byte(strconv.FormatBool(share)),
-			"catalog": []byte("my-catalog"),
-		}, nil)
+	m.records.On("GetServiceRecord", mock.Anything, groupNamespace, release).
+		Return(ports.ServiceRecord{ReleaseID: release, Owner: owner, Share: share, CatalogID: "my-catalog"}, nil)
 }
 
 func TestSetShared_OwnerShares(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedWithCatalog(m, "alice", false)
 	m.catalog.On("CheckSharingAllowed", ctx, "my-catalog").Return(nil)
-	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release,
-		map[string][]byte{"share": []byte("true")}).Return(nil)
+	m.records.On("SetServiceShared", ctx, groupNamespace, release, true).Return(nil)
 
 	err := uc.SetShared(ctx, sharedReq(true))
 
 	require.NoError(t, err)
 	m.catalog.AssertExpectations(t)
-	m.secrets.AssertExpectations(t)
+	m.records.AssertExpectations(t)
 }
 
 func TestSetShared_OwnerUnsharesWithoutCatalogCheck(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedWithCatalog(m, "ALICE", true)
-	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release,
-		map[string][]byte{"share": []byte("false")}).Return(nil)
+	m.records.On("SetServiceShared", ctx, groupNamespace, release, false).Return(nil)
 
 	err := uc.SetShared(ctx, sharedReq(false))
 
@@ -520,7 +509,7 @@ func TestSetShared_NonOwnerOfSharedServiceForbidden(t *testing.T) {
 	err := uc.SetShared(ctx, sharedReq(false))
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
-	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "SetServiceShared")
 }
 
 func TestSetShared_InvisibleServiceNotFound(t *testing.T) {
@@ -530,7 +519,7 @@ func TestSetShared_InvisibleServiceNotFound(t *testing.T) {
 	err := uc.SetShared(ctx, sharedReq(true))
 
 	assert.ErrorIs(t, err, domain.ErrNotFound)
-	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "SetServiceShared")
 }
 
 func TestSetShared_CatalogDisallowsSharing(t *testing.T) {
@@ -542,13 +531,13 @@ func TestSetShared_CatalogDisallowsSharing(t *testing.T) {
 	err := uc.SetShared(ctx, sharedReq(true))
 
 	assert.ErrorIs(t, err, domain.ErrForbidden)
-	m.secrets.AssertNotCalled(t, "UpdateOnyxiaSecret")
+	m.records.AssertNotCalled(t, "SetServiceShared")
 }
 
 func TestSetShared_UpdateError(t *testing.T) {
 	uc, ctx, m := setupLifecycle(t)
 	ownedWithCatalog(m, "alice", true)
-	m.secrets.On("UpdateOnyxiaSecret", ctx, groupNamespace, release, mock.Anything).
+	m.records.On("SetServiceShared", ctx, groupNamespace, release, mock.Anything).
 		Return(errors.New("k8s unavailable"))
 
 	err := uc.SetShared(ctx, sharedReq(false))

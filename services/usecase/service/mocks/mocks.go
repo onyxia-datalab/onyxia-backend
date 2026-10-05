@@ -56,50 +56,47 @@ func (m *MockReleaseGateway) GetReleaseResources(
 	return nil, args.Error(1)
 }
 
-type MockOnyxiaSecretGateway struct{ mock.Mock }
+type MockServiceRecordGateway struct{ mock.Mock }
 
-var _ ports.OnyxiaSecretGateway = (*MockOnyxiaSecretGateway)(nil)
+var _ ports.ServiceRecordGateway = (*MockServiceRecordGateway)(nil)
 
-func (m *MockOnyxiaSecretGateway) CreateOnyxiaSecret(
-	ctx context.Context,
-	namespace, name string,
-	data map[string][]byte,
-) error {
-	return m.Called(ctx, namespace, name, data).Error(0)
-}
-
-func (m *MockOnyxiaSecretGateway) UpdateOnyxiaSecret(
-	ctx context.Context,
-	namespace, name string,
-	data map[string][]byte,
-) error {
-	return m.Called(ctx, namespace, name, data).Error(0)
-}
-
-func (m *MockOnyxiaSecretGateway) DeleteOnyxiaSecret(ctx context.Context, namespace, name string) error {
-	return m.Called(ctx, namespace, name).Error(0)
-}
-
-func (m *MockOnyxiaSecretGateway) ReadOnyxiaSecretData(
-	ctx context.Context,
-	namespace, name string,
-) (map[string][]byte, error) {
-	args := m.Called(ctx, namespace, name)
-	if v := args.Get(0); v != nil {
-		return v.(map[string][]byte), args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
-func (m *MockOnyxiaSecretGateway) ListOnyxiaSecretNames(
+func (m *MockServiceRecordGateway) CreateServiceRecord(
 	ctx context.Context,
 	namespace string,
-) ([]string, error) {
+	rec ports.ServiceRecord,
+) error {
+	return m.Called(ctx, namespace, rec).Error(0)
+}
+
+func (m *MockServiceRecordGateway) GetServiceRecord(
+	ctx context.Context,
+	namespace, releaseID string,
+) (ports.ServiceRecord, error) {
+	args := m.Called(ctx, namespace, releaseID)
+	return args.Get(0).(ports.ServiceRecord), args.Error(1)
+}
+
+func (m *MockServiceRecordGateway) ListServiceRecords(
+	ctx context.Context,
+	namespace string,
+) ([]ports.ServiceRecord, error) {
 	args := m.Called(ctx, namespace)
 	if v := args.Get(0); v != nil {
-		return v.([]string), args.Error(1)
+		return v.([]ports.ServiceRecord), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+func (m *MockServiceRecordGateway) SetServiceShared(
+	ctx context.Context,
+	namespace, releaseID string,
+	share bool,
+) error {
+	return m.Called(ctx, namespace, releaseID, share).Error(0)
+}
+
+func (m *MockServiceRecordGateway) DeleteServiceRecord(ctx context.Context, namespace, releaseID string) error {
+	return m.Called(ctx, namespace, releaseID).Error(0)
 }
 
 type MockCatalogRepository struct{ mock.Mock }

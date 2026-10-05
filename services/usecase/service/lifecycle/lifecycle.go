@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strconv"
 	"strings"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -14,7 +13,7 @@ import (
 )
 
 type Lifecycle struct {
-	secrets    ports.OnyxiaSecretGateway
+	records    ports.ServiceRecordGateway
 	helm       ports.ReleaseGateway
 	catalogSvc ports.CatalogService
 	namespaces namespace.Authorizer
@@ -23,12 +22,12 @@ type Lifecycle struct {
 var _ ports.ServiceLifecycle = (*Lifecycle)(nil)
 
 func NewLifecycle(
-	secrets ports.OnyxiaSecretGateway,
+	records ports.ServiceRecordGateway,
 	helm ports.ReleaseGateway,
 	catalogSvc ports.CatalogService,
 	namespaces namespace.Authorizer,
 ) *Lifecycle {
-	return &Lifecycle{secrets: secrets, helm: helm, catalogSvc: catalogSvc, namespaces: namespaces}
+	return &Lifecycle{records: records, helm: helm, catalogSvc: catalogSvc, namespaces: namespaces}
 }
 
 func (uc *Lifecycle) Start(
@@ -49,7 +48,7 @@ func (uc *Lifecycle) Start(
 		}
 	}
 
-	// The Helm check catches pre-existing releases. CreateOnyxiaSecret below
+	// The Helm check catches pre-existing releases. CreateServiceRecord below
 	// is the atomic reservation that also protects the interval until Helm
 	// creates its release.
 	state, err := uc.helm.GetReleaseState(ctx, req.Namespace, req.ReleaseID)
@@ -65,15 +64,15 @@ func (uc *Lifecycle) Start(
 		)
 	}
 
-	secretData := map[string][]byte{
-		"catalog":      []byte(req.CatalogID),
-		"friendlyName": []byte(req.FriendlyName),
-		"owner":        []byte(req.Username),
-		"share":        []byte(strconv.FormatBool(req.Share)),
+	record := ports.ServiceRecord{
+		ReleaseID:    req.ReleaseID,
+		CatalogID:    req.CatalogID,
+		FriendlyName: req.FriendlyName,
+		Owner:        req.Username,
+		Share:        req.Share,
 	}
-
-	if err := uc.secrets.CreateOnyxiaSecret(ctx, req.Namespace, req.ReleaseID, secretData); err != nil {
-		return domain.StartResponse{}, fmt.Errorf("create onyxia secret: %w", err)
+	if err := uc.records.CreateServiceRecord(ctx, req.Namespace, record); err != nil {
+		return domain.StartResponse{}, fmt.Errorf("create service record: %w", err)
 	}
 
 	opts := ports.InstallOptions{
@@ -115,25 +114,23 @@ func (uc *Lifecycle) Start(
 // reported as ErrNotFound, exactly as GetService does. The backend talks to
 // Kubernetes with its own service account, so nothing downstream enforces
 // this per user.
-// It returns the service's onyxia secret data on success.
+// It returns the service's record on success.
 func (uc *Lifecycle) authorize(
 	ctx context.Context,
 	username, namespace, releaseName string,
-) (map[string][]byte, error) {
-	data, err := uc.secrets.ReadOnyxiaSecretData(ctx, namespace, releaseName)
+) (ports.ServiceRecord, error) {
+	rec, err := uc.records.GetServiceRecord(ctx, namespace, releaseName)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return nil, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+			return ports.ServiceRecord{}, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
 		}
-		return nil, fmt.Errorf("read onyxia secret: %w", err)
+		return ports.ServiceRecord{}, fmt.Errorf("read service record: %w", err)
 	}
 
-	owner := string(data["owner"])
-	share := string(data["share"]) == "true"
-	if !uc.namespaces.CanAccessService(username, namespace, owner, share) {
-		return nil, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
+	if !uc.namespaces.CanAccessService(username, namespace, rec.Owner, rec.Share) {
+		return ports.ServiceRecord{}, fmt.Errorf("service %q: %w", releaseName, domain.ErrNotFound)
 	}
-	return data, nil
+	return rec, nil
 }
 
 func (uc *Lifecycle) Suspend(ctx context.Context, req domain.SuspendRequest) error {
@@ -157,8 +154,8 @@ func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error
 	if err := uc.helm.UninstallRelease(ctx, req.Namespace, req.ReleaseName); err != nil {
 		return fmt.Errorf("helm uninstall: %w", err)
 	}
-	if err := uc.secrets.DeleteOnyxiaSecret(ctx, req.Namespace, req.ReleaseName); err != nil {
-		return fmt.Errorf("delete onyxia secret: %w", err)
+	if err := uc.records.DeleteServiceRecord(ctx, req.Namespace, req.ReleaseName); err != nil {
+		return fmt.Errorf("delete service record: %w", err)
 	}
 	return nil
 }
@@ -168,12 +165,12 @@ func (uc *Lifecycle) Delete(ctx context.Context, req domain.DeleteRequest) error
 // service (because it is shared) get ErrForbidden; callers who can't see it
 // get ErrNotFound, as for every other operation.
 func (uc *Lifecycle) SetShared(ctx context.Context, req domain.SetSharedRequest) error {
-	data, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName)
+	rec, err := uc.authorize(ctx, req.Username, req.Namespace, req.ReleaseName)
 	if err != nil {
 		return err
 	}
 
-	if !strings.EqualFold(string(data["owner"]), req.Username) {
+	if !strings.EqualFold(rec.Owner, req.Username) {
 		return fmt.Errorf(
 			"%w: only the owner of service %q can change its sharing",
 			domain.ErrForbidden,
@@ -182,15 +179,13 @@ func (uc *Lifecycle) SetShared(ctx context.Context, req domain.SetSharedRequest)
 	}
 
 	if req.Shared {
-		if err := uc.catalogSvc.CheckSharingAllowed(ctx, string(data["catalog"])); err != nil {
+		if err := uc.catalogSvc.CheckSharingAllowed(ctx, rec.CatalogID); err != nil {
 			return fmt.Errorf("check sharing allowed: %w", err)
 		}
 	}
 
-	if err := uc.secrets.UpdateOnyxiaSecret(ctx, req.Namespace, req.ReleaseName, map[string][]byte{
-		"share": []byte(strconv.FormatBool(req.Shared)),
-	}); err != nil {
-		return fmt.Errorf("update onyxia secret: %w", err)
+	if err := uc.records.SetServiceShared(ctx, req.Namespace, req.ReleaseName, req.Shared); err != nil {
+		return fmt.Errorf("update service record: %w", err)
 	}
 	return nil
 }
