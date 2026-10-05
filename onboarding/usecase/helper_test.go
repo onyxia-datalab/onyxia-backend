@@ -64,8 +64,6 @@ func setupUsecase(
 	quotas domain.Quotas,
 ) ports.OnboardingUsecase {
 
-	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
-
 	return NewOnboardingUsecase(
 		mockService,
 		domain.Namespace{
@@ -78,7 +76,6 @@ func setupUsecase(
 			},
 		},
 		quotas,
-		reader,
 	)
 }
 
@@ -86,8 +83,6 @@ func setupPrivateUsecase(
 	mockService *MockNamespaceService,
 	quotas domain.Quotas,
 ) *onboardingUsecase {
-	_, reader, _ := usercontext.NewTestUserContext(defaultTestUser)
-
 	return &onboardingUsecase{
 		namespaceService: mockService,
 		namespace: domain.Namespace{
@@ -98,7 +93,6 @@ func setupPrivateUsecase(
 				Static:  nil,
 			},
 		},
-		quotas:            quotas,
-		userContextReader: reader,
+		quotas: quotas,
 	}
 }

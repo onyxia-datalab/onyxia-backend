@@ -28,7 +28,7 @@ func TestOnboardSuccess(t *testing.T) {
 		Return(ports.QuotaCreated, nil)
 
 	groupName := testGroupName
-	req := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: &groupName, User: *defaultTestUser}
 	err := usecase.Onboard(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -45,7 +45,7 @@ func TestOnboardQuotasDisabled(t *testing.T) {
 	mockService.On("CreateNamespace", mock.Anything, defaultNamespace).
 		Return(ports.NamespaceCreated, nil)
 
-	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 	err := usecase.Onboard(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestOnboardCreateNamespaceFails(t *testing.T) {
 		Return(ports.NamespaceCreationResult(""), expectedError)
 
 	groupName := testGroupName
-	req := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: &groupName, User: *defaultTestUser}
 	err := usecase.Onboard(context.Background(), req)
 
 	assert.Error(t, err)
@@ -85,7 +85,7 @@ func TestOnboardApplyResourceQuotasFails(t *testing.T) {
 	mockService.On("ApplyResourceQuotas", mock.Anything, defaultNamespace, &quotas.Default).
 		Return(ports.QuotaApplicationResult(""), errors.New("failed to apply quota"))
 
-	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 	err := usecase.Onboard(context.Background(), req)
 
 	assert.Error(t, err)
@@ -111,7 +111,7 @@ func TestOnboardNamespaceAlreadyExists(t *testing.T) {
 	mockService.On("ApplyResourceQuotas", mock.Anything, defaultNamespace, &quotas.Default).
 		Return(ports.QuotaCreated, nil)
 
-	req := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	req := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 	err := usecase.Onboard(context.Background(), req)
 
 	assert.NoError(t, err)
@@ -131,10 +131,21 @@ func TestGetNamespace(t *testing.T) {
 	groupName := testGroupName
 
 	// Case 1: Group is provided
-	reqWithGroup := domain.OnboardingRequest{Group: &groupName, UserName: testUserName}
+	reqWithGroup := domain.OnboardingRequest{Group: &groupName, User: *defaultTestUser}
 	assert.Equal(t, groupNamespace, usecase.getNamespace(reqWithGroup))
 
 	// Case 2: No group, only user
-	reqWithoutGroup := domain.OnboardingRequest{Group: nil, UserName: testUserName}
+	reqWithoutGroup := domain.OnboardingRequest{Group: nil, User: *defaultTestUser}
 	assert.Equal(t, userNamespace, usecase.getNamespace(reqWithoutGroup))
+}
+
+func TestOnboardForeignGroupForbidden(t *testing.T) {
+	mockService := new(MockNamespaceService)
+	usecase := setupUsecase(mockService, domain.Quotas{})
+	otherGroup := "not-my-group"
+
+	err := usecase.Onboard(context.Background(), domain.OnboardingRequest{User: *defaultTestUser, Group: &otherGroup})
+
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+	mockService.AssertNotCalled(t, "CreateNamespace", mock.Anything, mock.Anything)
 }

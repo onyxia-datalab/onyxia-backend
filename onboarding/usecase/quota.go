@@ -88,7 +88,7 @@ func (s *onboardingUsecase) getUserQuota(
 	req domain.OnboardingRequest,
 	namespace string,
 ) *domain.Quota {
-	for _, role := range req.UserRoles {
+	for _, role := range req.User.Roles {
 		if quota, exists := s.quotas.Roles[role]; exists {
 			slog.InfoContext(ctx, "Applying role-based user quota",
 				slog.String("namespace", namespace),

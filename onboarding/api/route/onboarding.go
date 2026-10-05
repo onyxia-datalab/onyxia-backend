@@ -47,7 +47,6 @@ func SetupOnboardingController(
 			GroupEnabled: envQuotas.GroupEnabled,
 			Group:        convertBootstrapQuotaToDomain(envQuotas.Group),
 		},
-		app.UserContextReader,
 	)
 
 	return controller.NewOnboardingController(onboardingUsecase, app.UserContextReader)

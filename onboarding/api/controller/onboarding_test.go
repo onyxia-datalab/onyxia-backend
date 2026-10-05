@@ -57,21 +57,21 @@ func TestOnboardGetUserFails(t *testing.T) {
 	mockUC.AssertNotCalled(t, "Onboard")
 }
 
-func TestOnboardGroupValidationFails(t *testing.T) {
+// The controller passes the whole caller and the requested group on: the use
+// case checks the group membership.
+func TestOnboardPassesCallerAndGroup(t *testing.T) {
 	mockUC := new(MockOnboardingUsecase)
-	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&usercontext.User{
-		Username: "u",
-		Groups:   []string{"not-test-group"},
-		Roles:    []string{"r"},
-	})
+	caller := usercontext.User{Username: "u", Groups: []string{"g"}, Roles: []string{"r"}}
+	ctx, userCtxReader, _ := usercontext.NewTestUserContext(&caller)
+	group := "g"
+	mockUC.On("Onboard", mock.Anything, domain.OnboardingRequest{User: caller, Group: &group}).Return(nil)
 
 	ctrl := NewOnboardingController(mockUC, userCtxReader)
-	req := api.OnboardingRequest{Group: api.OptString{Value: "test-group", Set: true}}
+	req := api.OnboardingRequest{Group: api.OptString{Value: "g", Set: true}}
 
-	res, err := ctrl.Onboard(ctx, &req)
-	assert.Nil(t, res)
-	assert.ErrorIs(t, err, domain.ErrForbidden)
-	mockUC.AssertNotCalled(t, "Onboard")
+	_, err := ctrl.Onboard(ctx, &req)
+	assert.NoError(t, err)
+	mockUC.AssertExpectations(t)
 }
 
 // A plain usecase failure isn't one of the shared sentinels: it should pass

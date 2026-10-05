@@ -10,11 +10,15 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/onboarding/ports"
 )
 
-func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) error {
+func (s *onboardingUsecase) createNamespace(
+	ctx context.Context,
+	name string,
+	userAttributes map[string]any,
+) error {
 	result, err := s.namespaceService.CreateNamespace(
 		ctx,
 		name,
-		s.getNamespaceAnnotations(ctx),
+		s.getNamespaceAnnotations(userAttributes),
 		s.namespace.NamespaceLabels,
 	)
 
@@ -40,9 +44,9 @@ func (s *onboardingUsecase) createNamespace(ctx context.Context, name string) er
 	return nil
 }
 
-func (s *onboardingUsecase) getNamespaceAnnotations(
-	ctx context.Context,
-) map[string]string {
+// getNamespaceAnnotations builds the annotations of a namespace onboarded
+// by a user with the given attributes (token claims).
+func (s *onboardingUsecase) getNamespaceAnnotations(userAttributes map[string]any) map[string]string {
 	if !s.namespace.Annotation.Enabled {
 		return nil
 	}
@@ -56,9 +60,9 @@ func (s *onboardingUsecase) getNamespaceAnnotations(
 		annotations["onyxia_last_login_timestamp"] = fmt.Sprint(time.Now().UnixMilli())
 	}
 
-	if attributes, ok := s.userContextReader.GetAttributes(ctx); ok {
+	if userAttributes != nil {
 		for _, attr := range s.namespace.Annotation.Dynamic.UserAttributes {
-			annotations[attr] = fmt.Sprint(attributes[attr])
+			annotations[attr] = fmt.Sprint(userAttributes[attr])
 		}
 	}
 	return annotations

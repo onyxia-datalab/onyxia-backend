@@ -2,9 +2,7 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"slices"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	api "github.com/onyxia-datalab/onyxia-backend/onboarding/api/oas"
@@ -39,25 +37,14 @@ func (c *OnboardingController) Onboard(
 		return nil, domain.ErrForbidden
 	}
 
-	// Extract optional value from OptString
-	var groupPtr *string
-	if req.Group.Set { // Check if value is set
-		groupPtr = &req.Group.Value
-
-		// Check if the requested group is in user's groups
-		if !slices.Contains(user.Groups, *groupPtr) {
-			slog.ErrorContext(ctx, "Unauthorized group access",
-				slog.String("group", *groupPtr),
-				slog.Any("userGroups", user.Groups),
-			)
-			return nil, fmt.Errorf("%w: user does not have access to group: %s", domain.ErrForbidden, *groupPtr)
-		}
+	var group *string
+	if req.Group.Set {
+		group = &req.Group.Value
 	}
 
 	if err := c.OnboardingUsecase.Onboard(ctx, domain.OnboardingRequest{
-		Group:     groupPtr,
-		UserName:  user.Username,
-		UserRoles: user.Roles,
+		User:  *user,
+		Group: group,
 	}); err != nil {
 		slog.ErrorContext(ctx, "Onboarding failed", slog.Any("error", err))
 		return nil, err
