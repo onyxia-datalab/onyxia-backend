@@ -7,15 +7,18 @@ import (
 )
 
 type PackageRepository interface {
-	// Helm repo add <catalog> puis helm search repo <catalog>
-	// ou avec la config pour les OCI
+	// helm repo add <catalog>, then helm search repo <catalog>
+	// or using the appropriate configuration for OCI registries
 	ListPackages(ctx context.Context, catalogID string) ([]domain.Package, error)
-	//helm search repo <catalog>/<package>
+
+	// helm search repo <catalog>/<package>
 	GetPackage(ctx context.Context, catalogID string, name string) (domain.Package, error)
+
 	// helm search repo <catalog>/<package> --versions
-	// avec la config pour les OCI,
+	// or using the appropriate configuration for OCI registries
 	GetAvailableVersions(ctx context.Context, catalogID string, name string) ([]string, error)
-	// 	helm pull <repo>/<chart> --version <version>
+
+	// helm pull <repo>/<chart> --version <version>
 	// tar -xf <chart>-<version>.tgz <chart>/values.schema.json
 	// cat <chart>/values.schema.json
 	GetPackageSchema(
