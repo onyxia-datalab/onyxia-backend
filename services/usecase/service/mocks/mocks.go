@@ -213,13 +213,13 @@ func (m *MockWorkloadStateGateway) GetPodsForRelease(
 	return nil, args.Error(1)
 }
 
-func (m *MockWorkloadStateGateway) GetWorkloadReadiness(
+func (m *MockWorkloadStateGateway) ListPodsByRelease(
 	ctx context.Context,
 	namespace string,
-) (ports.WorkloadReadiness, error) {
+) (map[string][]ports.PodInfo, error) {
 	args := m.Called(ctx, namespace)
 	if v := args.Get(0); v != nil {
-		return v.(ports.WorkloadReadiness), args.Error(1)
+		return v.(map[string][]ports.PodInfo), args.Error(1)
 	}
 	return nil, args.Error(1)
 }

@@ -6,21 +6,15 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
 )
 
-// ManifestResource is a neutral reference to a resource declared in a Helm release manifest.
-// Kind and Name are raw values from the manifest — no Kubernetes-specific semantics.
-type ManifestResource struct {
-	Kind string
-	Name string
-}
-
 // ReleaseState is the minimal release information needed for state derivation.
 type ReleaseState struct {
 	Exists    bool
 	Suspended bool
 	// Status is empty when Exists is false.
 	Status ReleaseStatus
-	// Resources are the resources the release's manifest declares.
-	Resources []ManifestResource
+	// Message is the deployment tool's description of the last operation,
+	// e.g. why it failed.
+	Message string
 }
 
 // ReleaseStatus is the phase of a release, as reported by the deployment

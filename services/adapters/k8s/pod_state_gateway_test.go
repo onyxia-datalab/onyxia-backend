@@ -9,88 +9,40 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetWorkloadReadiness(t *testing.T) {
-	tests := []struct {
-		name      string
-		objects   []runtime.Object
-		resources []ports.ManifestResource
-		wantReady bool
-	}{
-		{
-			name: "all supported controllers are ready",
-			objects: []runtime.Object{
-				deployment("web", int32Pointer(2), 2),
-				statefulSet("database", nil, 1),
-			},
-			resources: []ports.ManifestResource{
-				{Kind: "Deployment", Name: "web"},
-				{Kind: "Service", Name: "web"},
-				{Kind: "StatefulSet", Name: "database"},
-			},
-			wantReady: true,
-		},
-		{
-			name: "deployment is not ready",
-			objects: []runtime.Object{
-				deployment("web", int32Pointer(2), 1),
-			},
-			resources: []ports.ManifestResource{{Kind: "Deployment", Name: "web"}},
-			wantReady: false,
-		},
-		{
-			name: "stateful set is not ready",
-			objects: []runtime.Object{
-				statefulSet("database", int32Pointer(1), 0),
-			},
-			resources: []ports.ManifestResource{{Kind: "StatefulSet", Name: "database"}},
-			wantReady: false,
-		},
-		{
-			name:      "unknown resources are ignored",
-			resources: []ports.ManifestResource{{Kind: "Service", Name: "web"}},
-			wantReady: true,
-		},
-		{
-			name:      "missing controller is not ready",
-			resources: []ports.ManifestResource{{Kind: "Deployment", Name: "missing"}},
-			wantReady: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gateway := NewWorkloadStateGtw(k8sfake.NewClientset(tt.objects...))
-
-			snapshot, err := gateway.GetWorkloadReadiness(context.Background(), "project")
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantReady, snapshot.AllReady(tt.resources))
-		})
-	}
-}
-
-// One snapshot serves any number of releases with two list calls in total.
-func TestGetWorkloadReadinessListsEachKindOnce(t *testing.T) {
-	cs := k8sfake.NewClientset(deployment("a", nil, 1), deployment("b", nil, 0))
+// One list call serves any number of releases; unlabelled pods and pods that
+// ran to completion are left out.
+func TestListPodsByRelease(t *testing.T) {
+	deleting := releasePod("jupyter-old", "jupyter", corev1.PodRunning)
+	deleting.DeletionTimestamp = &metav1.Time{Time: testNow}
+	deleting.Finalizers = []string{"test"} // the fake client refuses a deletion timestamp without one
+	cs := k8sfake.NewClientset(
+		releasePod("jupyter-new", "jupyter", corev1.PodRunning),
+		deleting,
+		releasePod("rstudio", "rstudio", corev1.PodPending),
+		releasePod("rstudio-evicted", "rstudio", corev1.PodFailed),
+		releasePod("init-job", "rstudio", corev1.PodSucceeded),
+		&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "unlabelled", Namespace: "project"}},
+	)
 	gateway := NewWorkloadStateGtw(cs)
 
-	snapshot, err := gateway.GetWorkloadReadiness(context.Background(), "project")
+	pods, err := gateway.ListPodsByRelease(context.Background(), "project")
+
 	require.NoError(t, err)
-	assert.True(t, snapshot.AllReady([]ports.ManifestResource{{Kind: "Deployment", Name: "a"}}))
-	assert.False(t, snapshot.AllReady([]ports.ManifestResource{{Kind: "Deployment", Name: "b"}}))
+	assert.Equal(t, map[string][]ports.PodInfo{
+		"jupyter": {{Name: "jupyter-new"}, {Name: "jupyter-old", Terminating: true}},
+		"rstudio": {{Name: "rstudio"}},
+	}, pods)
 
 	var verbs []string
 	for _, a := range cs.Actions() {
 		verbs = append(verbs, a.GetVerb()+" "+a.GetResource().Resource)
 	}
-	assert.Equal(t, []string{"list deployments", "list statefulsets"}, verbs)
+	assert.Equal(t, []string{"list pods"}, verbs)
 }
 
 func TestGetPodsForReleaseFiltersByHelmLabel(t *testing.T) {
@@ -110,6 +62,7 @@ func TestGetPodsForReleaseFiltersByHelmLabel(t *testing.T) {
 				Labels:    map[string]string{labelHelmInstance: "rstudio"},
 			},
 		},
+		releasePod("finished", "jupyter", corev1.PodSucceeded),
 	)
 	gateway := NewWorkloadStateGtw(client)
 
@@ -223,6 +176,17 @@ func TestDerivePodInfo(t *testing.T) {
 			},
 		},
 		{
+			name: "a pod being deleted stays terminating when it has an error",
+			pod: func() corev1.Pod {
+				pod := podWithStatuses("deleting", corev1.ContainerStatus{
+					State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{Reason: "CrashLoopBackOff"}},
+				})
+				pod.DeletionTimestamp = &metav1.Time{Time: testNow}
+				return pod
+			}(),
+			want: ports.PodInfo{Name: "deleting", Terminating: true, ErrorReason: domain.ServiceErrorReasonCrashLoop},
+		},
+		{
 			name: "last OOM termination is retained while container restarts",
 			pod: podWithStatuses("oom", corev1.ContainerStatus{
 				State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}},
@@ -256,24 +220,15 @@ func TestDerivePodInfo(t *testing.T) {
 	}
 }
 
-func deployment(name string, replicas *int32, readyReplicas int32) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "project"},
-		Spec:       appsv1.DeploymentSpec{Replicas: replicas},
-		Status:     appsv1.DeploymentStatus{ReadyReplicas: readyReplicas},
+func releasePod(name, release string, phase corev1.PodPhase) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "project",
+			Labels:    map[string]string{labelHelmInstance: release},
+		},
+		Status: corev1.PodStatus{Phase: phase},
 	}
-}
-
-func statefulSet(name string, replicas *int32, readyReplicas int32) *appsv1.StatefulSet {
-	return &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "project"},
-		Spec:       appsv1.StatefulSetSpec{Replicas: replicas},
-		Status:     appsv1.StatefulSetStatus{ReadyReplicas: readyReplicas},
-	}
-}
-
-func int32Pointer(value int32) *int32 {
-	return &value
 }
 
 func podNamed(name string) corev1.Pod {

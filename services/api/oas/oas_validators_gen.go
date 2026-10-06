@@ -251,6 +251,8 @@ func (s *ServiceError) Validate() error {
 
 func (s ServiceErrorReason) Validate() error {
 	switch s {
+	case "release_failed":
+		return nil
 	case "crash_loop":
 		return nil
 	case "oom_killed":
@@ -277,6 +279,8 @@ func (s ServiceStatus) Validate() error {
 	case "Error":
 		return nil
 	case "Ghost":
+		return nil
+	case "Suspending":
 		return nil
 	case "Suspended":
 		return nil

@@ -8,14 +8,18 @@ const (
 	ServiceStatusRunning     ServiceStatus = "Running"
 	ServiceStatusError       ServiceStatus = "Error"
 	ServiceStatusGhost       ServiceStatus = "Ghost"
+	ServiceStatusSuspending  ServiceStatus = "Suspending"
 	ServiceStatusSuspended   ServiceStatus = "Suspended"
 	ServiceStatusTerminating ServiceStatus = "Terminating"
 )
 
-// ServiceErrorReason identifies the root cause of an Erreur state.
+// ServiceErrorReason identifies the root cause of an Error state.
 type ServiceErrorReason string
 
 const (
+	// ServiceErrorReasonReleaseFailed: the last install or upgrade of the
+	// release failed. The other reasons come from a failing pod.
+	ServiceErrorReasonReleaseFailed   ServiceErrorReason = "release_failed"
 	ServiceErrorReasonCrashLoop       ServiceErrorReason = "crash_loop"
 	ServiceErrorReasonOOMKilled       ServiceErrorReason = "oom_killed"
 	ServiceErrorReasonImagePull       ServiceErrorReason = "image_pull"
@@ -24,7 +28,8 @@ const (
 	ServiceErrorReasonReadinessFailed ServiceErrorReason = "readiness_failed"
 )
 
-// ServiceError carries the detail of an Erreur state.
+// ServiceError carries the detail of an Error state. PodName is empty when
+// the cause is not a pod (ServiceErrorReasonReleaseFailed).
 type ServiceError struct {
 	Reason       ServiceErrorReason
 	PodName      string

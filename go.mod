@@ -23,7 +23,6 @@ require (
 	k8s.io/apimachinery v0.37.1
 	k8s.io/cli-runtime v0.37.1
 	k8s.io/client-go v0.37.1
-	sigs.k8s.io/yaml v1.6.0
 )
 
 require (
@@ -158,6 +157,7 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.21.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
 tool github.com/ogen-go/ogen/cmd/ogen

@@ -9,41 +9,78 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// --- statusFromRelease ---------------------------------------------------------
+// --- deriveStatus -----------------------------------------------------------
 
-func TestStatusFromHelm(t *testing.T) {
+func TestDeriveStatus(t *testing.T) {
+	deployed := ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}
+	suspended := ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}
+	ready := ports.PodInfo{Name: "new", Ready: true}
+	crashing := ports.PodInfo{Name: "crash", ErrorReason: domain.ServiceErrorReasonCrashLoop}
+
 	tests := []struct {
-		name        string
-		state       ports.ReleaseState
-		wantStatus  domain.ServiceStatus
-		wantDecided bool
+		name       string
+		release    ports.ReleaseState
+		pods       []ports.PodInfo
+		wantStatus domain.ServiceStatus
+		wantError  *domain.ServiceError
 	}{
-		{"ghost", ports.ReleaseState{Exists: false}, domain.ServiceStatusGhost, true},
-		{"pending-install", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, domain.ServiceStatusDeploying, true},
-		{"unknown", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}, domain.ServiceStatusDeploying, true},
-		{"failed", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}, domain.ServiceStatusError, true},
-		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, domain.ServiceStatusTerminating, true},
-		{"suspended while pending", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}, domain.ServiceStatusSuspended, true},
-		{"suspended while deployed", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, domain.ServiceStatusSuspended, true},
-		{"deployed depends on workloads", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}, "", false},
+		{"ghost", ports.ReleaseState{Exists: false}, nil, domain.ServiceStatusGhost, nil},
+		{"pending-install", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil, domain.ServiceStatusDeploying, nil},
+		{"unknown", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}, nil, domain.ServiceStatusDeploying, nil},
+		{
+			"failed release carries the deployment tool's message",
+			ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "timed out"},
+			nil,
+			domain.ServiceStatusError,
+			&domain.ServiceError{Reason: domain.ServiceErrorReasonReleaseFailed, Message: "timed out"},
+		},
+		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, nil, domain.ServiceStatusTerminating, nil},
+		{"suspended, no pod left", suspended, nil, domain.ServiceStatusSuspended, nil},
+		{"suspended, pods shutting down", suspended, []ports.PodInfo{{Name: "p", Terminating: true}}, domain.ServiceStatusSuspending, nil},
+		{"suspend in progress", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}, []ports.PodInfo{ready}, domain.ServiceStatusSuspending, nil},
+		{"deployed, no pod yet", deployed, nil, domain.ServiceStatusDeploying, nil},
+		{"deployed, all pods ready", deployed, []ports.PodInfo{ready}, domain.ServiceStatusRunning, nil},
+		{"deployed, a pod not ready", deployed, []ports.PodInfo{ready, {Name: "starting"}}, domain.ServiceStatusDeploying, nil},
+		{
+			"deployed, a pod failing",
+			deployed,
+			[]ports.PodInfo{ready, crashing},
+			domain.ServiceStatusError,
+			&domain.ServiceError{Reason: domain.ServiceErrorReasonCrashLoop, PodName: "crash"},
+		},
+		{
+			"rollout: the old pod shutting down doesn't count",
+			deployed,
+			[]ports.PodInfo{ready, {Name: "old", Terminating: true}},
+			domain.ServiceStatusRunning,
+			nil,
+		},
+		{
+			"rollout: only the pod shutting down is left",
+			deployed,
+			[]ports.PodInfo{{Name: "old", Ready: true, Terminating: true}},
+			domain.ServiceStatusDeploying,
+			nil,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, decided := statusFromRelease(tt.state)
-			assert.Equal(t, tt.wantDecided, decided)
+			status, svcErr := deriveStatus(tt.release, tt.pods)
 			assert.Equal(t, tt.wantStatus, status)
+			assert.Equal(t, tt.wantError, svcErr)
+			// The detail is present exactly when the status is Error.
+			assert.Equal(t, status == domain.ServiceStatusError, svcErr != nil)
 		})
 	}
 }
 
-// A suspend is a helm upgrade, so a suspended release is "deployed". The list
-// path used to only consult Helm for non-deployed releases and reported it
-// as Running (its workloads, scaled to 0, are trivially "ready").
-func TestListServices_SuspendedDeployedRelease(t *testing.T) {
-	svc, err := readerForHelmStatus(t, ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed})
-	assert.NoError(t, err)
-	assert.Equal(t, domain.ServiceStatusSuspended, svc.Status)
+func TestNeedsPods(t *testing.T) {
+	assert.False(t, needsPods(ports.ReleaseState{Exists: false}))
+	assert.False(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}))
+	assert.False(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}))
+	assert.True(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}))
+	assert.True(t, needsPods(ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}))
 }
 
 func TestGetService_Suspended(t *testing.T) {
@@ -51,8 +88,7 @@ func TestGetService_Suspended(t *testing.T) {
 	assert.Equal(t, domain.ServiceStatusSuspended, svc.Status)
 }
 
-// GetService must agree with ListServices on statuses the release already decides,
-// without looking at pods.
+// Statuses the release alone decides are derived without looking at pods.
 func TestGetService_ReleaseDecidedStatuses(t *testing.T) {
 	tests := []struct {
 		releaseStatus ports.ReleaseStatus
@@ -75,13 +111,13 @@ func TestGetService_ReleaseDecidedStatuses(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, svc.Status)
-			m.pods.AssertNotCalled(t, "GetPodsForRelease")
+			m.pods.AssertNotCalled(t, "GetPodsForRelease", mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
 }
 
 // --- derivePodStatus --------------------------------------------------------
-// Tested via GetService → deriveStatusWithDetail → derivePodStatus.
+// Tested via GetService → deriveStatus → derivePodStatus.
 
 func TestDerivePodStatus_NoPods(t *testing.T) {
 	svc, _ := readerForPodsGetService(t, []ports.PodInfo{})

@@ -618,8 +618,27 @@ components:
         releaseId: { type: string, description: Release identifier }
         status:
           type: string
-          enum: [Deploying, Running, Error, Ghost, Suspended, Terminating]
-          description: Current lifecycle state of the service
+          enum:
+            [
+              Deploying,
+              Running,
+              Error,
+              Ghost,
+              Suspending,
+              Suspended,
+              Terminating,
+            ]
+          description: >
+            Current lifecycle state of the service, derived the same way by
+            getService and listServices.
+            Deploying: being installed, or its pods are not all ready yet.
+            Running: all its pods are ready.
+            Error: the release failed or a pod is failing; not terminal, a
+            service may recover (e.g. after a crash loop).
+            Ghost: the service record exists but its release is gone.
+            Suspending: suspended, but some pods are still shutting down.
+            Suspended: suspended, no pod left.
+            Terminating: the release is being uninstalled.
         friendlyName: { type: string, description: Display name }
         owner: { type: string, description: Username of the service owner }
         catalogId: { type: string, description: Source catalog identifier }
@@ -633,12 +652,20 @@ components:
 
     ServiceError:
       type: object
-      required: [reason, podName]
+      description: >
+        Why a service is in Error. Returned by getService, always present when
+        the status is Error; listServices returns the status alone.
+      required: [reason]
       properties:
         reason:
           type: string
+          description: >
+            release_failed: the last install or upgrade of the release failed
+            (message holds the deployment tool's description, no podName).
+            The other reasons come from a failing pod, named by podName.
           enum:
             [
+              release_failed,
               crash_loop,
               oom_killed,
               image_pull,
@@ -646,7 +673,8 @@ components:
               unschedulable,
               readiness_failed,
             ]
-        podName: { type: string }
+        podName:
+          { type: string, description: The failing pod, for pod reasons. }
         message: { type: string }
         restartCount: { type: integer, minimum: 0 }
         exitCode: { type: integer }

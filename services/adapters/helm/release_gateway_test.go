@@ -216,11 +216,13 @@ func TestListReleaseStates(t *testing.T) {
 		{Name: "jupyter", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusSuperseded}},
 		{
 			Name: "jupyter", Namespace: "ns", Version: 2,
-			Info:     &releasev1.Info{Status: common.StatusDeployed},
-			Config:   map[string]interface{}{"global": map[string]interface{}{"suspend": true}},
-			Manifest: "---\nkind: Deployment\nmetadata:\n  name: jupyter\n---\nkind: Service\nmetadata:\n  name: jupyter\n",
+			Info:   &releasev1.Info{Status: common.StatusDeployed},
+			Config: map[string]interface{}{"global": map[string]interface{}{"suspend": true}},
 		},
-		{Name: "broken", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusFailed}},
+		{
+			Name: "broken", Namespace: "ns", Version: 1,
+			Info: &releasev1.Info{Status: common.StatusFailed, Description: "Release \"broken\" failed: timed out"},
+		},
 		{Name: "gone", Namespace: "ns", Version: 1, Info: &releasev1.Info{Status: common.StatusUninstalled}},
 	} {
 		require.NoError(t, cfg.Releases.Create(rel))
@@ -233,10 +235,10 @@ func TestListReleaseStates(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]ports.ReleaseState{
-		"jupyter": {
-			Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed,
-			Resources: []ports.ManifestResource{{Kind: "Deployment", Name: "jupyter"}, {Kind: "Service", Name: "jupyter"}},
+		"jupyter": {Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed},
+		"broken": {
+			Exists: true, Status: ports.ReleaseStatusFailed,
+			Message: "Release \"broken\" failed: timed out",
 		},
-		"broken": {Exists: true, Status: ports.ReleaseStatusFailed},
 	}, states)
 }
