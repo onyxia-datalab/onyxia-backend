@@ -17,6 +17,10 @@ type GetPackageSchemaRes interface {
 	getPackageSchemaRes()
 }
 
+type GetProjectQuotaRes interface {
+	getProjectQuotaRes()
+}
+
 type GetServiceRes interface {
 	getServiceRes()
 }
@@ -37,10 +41,6 @@ type SetServiceSuspendedRes interface {
 	setServiceSuspendedRes()
 }
 
-type WatchReleaseRes interface {
-	watchReleaseRes()
-}
-
-type WatchResourcesRes interface {
-	watchResourcesRes()
+type WatchServiceEventsRes interface {
+	watchServiceEventsRes()
 }

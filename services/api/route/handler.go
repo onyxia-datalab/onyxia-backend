@@ -2,26 +2,31 @@ package route
 
 import (
 	"context"
+	"net/http"
 
-	ht "github.com/ogen-go/ogen/http"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 )
 
 type Handler struct {
-	install      *controller.InstallController
-	catalogs     *controller.CatalogController
-	serviceQuery *controller.ServiceQueryController
+	install       *controller.InstallController
+	catalogs      *controller.CatalogController
+	serviceQuery  *controller.ServiceQueryController
+	serviceEvents *controller.ServiceEventsController
 }
 
-var _ api.Handler = (*Handler)(nil)
+var (
+	_ api.Handler    = (*Handler)(nil)
+	_ api.RawHandler = (*Handler)(nil)
+)
 
 func NewHandler(
 	install *controller.InstallController,
 	catalogs *controller.CatalogController,
 	serviceQuery *controller.ServiceQueryController,
+	serviceEvents *controller.ServiceEventsController,
 ) *Handler {
-	return &Handler{install: install, catalogs: catalogs, serviceQuery: serviceQuery}
+	return &Handler{install: install, catalogs: catalogs, serviceQuery: serviceQuery, serviceEvents: serviceEvents}
 }
 
 func (h *Handler) SetServiceSuspended(
@@ -73,18 +78,19 @@ func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, erro
 	return h.catalogs.GetMyCatalogs(ctx)
 }
 
-func (h *Handler) WatchRelease(
+func (h *Handler) WatchServiceEvents(
 	ctx context.Context,
-	p api.WatchReleaseParams,
-) (api.WatchReleaseRes, error) {
-	return nil, ht.ErrNotImplemented
+	p api.WatchServiceEventsParams,
+	w http.ResponseWriter,
+) error {
+	return h.serviceEvents.WatchServiceEvents(ctx, p, w)
 }
 
-func (h *Handler) WatchResources(
+func (h *Handler) GetProjectQuota(
 	ctx context.Context,
-	p api.WatchResourcesParams,
-) (api.WatchResourcesRes, error) {
-	return nil, ht.ErrNotImplemented
+	p api.GetProjectQuotaParams,
+) (api.GetProjectQuotaRes, error) {
+	return h.serviceEvents.GetProjectQuota(ctx, p)
 }
 
 func (h *Handler) GetMyPackage(

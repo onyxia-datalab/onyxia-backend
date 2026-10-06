@@ -157,6 +157,29 @@ func (s *Oidc) Validate() error {
 	return nil
 }
 
+func (s *ProjectQuota) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Resources == nil {
+			return errors.New("nil is invalid value")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "resources",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *Service) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -252,6 +275,8 @@ func (s *ServiceError) Validate() error {
 func (s ServiceErrorReason) Validate() error {
 	switch s {
 	case "release_failed":
+		return nil
+	case "quota_exceeded":
 		return nil
 	case "crash_loop":
 		return nil
