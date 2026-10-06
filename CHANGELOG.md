@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.23](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.22...v0.1.23) (2026-10-06)
+
+
+### Features
+
+* Enhance Services Catalog ([#50](https://github.com/onyxia-datalab/onyxia-backend/issues/50)) ([fa1e205](https://github.com/onyxia-datalab/onyxia-backend/commit/fa1e205bef10123b97e944123e4e1d7104845b00))
+
+
+### Bug Fixes
+
+* **deps:** update go minor and patch updates ([#63](https://github.com/onyxia-datalab/onyxia-backend/issues/63)) ([39cbd87](https://github.com/onyxia-datalab/onyxia-backend/commit/39cbd87df7042b003abcae607508b00b8f66ab81))
+* **services:** align the OpenAPI spec with the implementation ([#65](https://github.com/onyxia-datalab/onyxia-backend/issues/65)) ([255c662](https://github.com/onyxia-datalab/onyxia-backend/commit/255c6627e670b4f9c3f7991e43d0ff9daa9e1587))
+* **services:** derive GetService and ListServices statuses the same way ([#66](https://github.com/onyxia-datalab/onyxia-backend/issues/66)) ([ff51952](https://github.com/onyxia-datalab/onyxia-backend/commit/ff51952f5f33112e440401b39c53edcd2cd74d6c))
+
 ## [0.1.22](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.21...v0.1.22) (2026-09-15)
 
 
