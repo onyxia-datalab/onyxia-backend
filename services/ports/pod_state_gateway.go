@@ -31,4 +31,10 @@ type WorkloadStateGateway interface {
 	// ListPodsByRelease returns the live pods of the namespace grouped by
 	// release, in a constant number of calls whatever the number of releases.
 	ListPodsByRelease(ctx context.Context, namespace string) (map[string][]PodInfo, error)
+
+	// ListQuotaFailures returns, per release of the namespace, why its pods
+	// can't be created because the namespace's quota is exceeded, while that
+	// is still the case (no pod creation succeeded since). Releases without
+	// such a failure are absent.
+	ListQuotaFailures(ctx context.Context, namespace string) (map[string]string, error)
 }

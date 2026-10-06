@@ -317,8 +317,9 @@ paths:
       description: >
         Server-Sent Events (text/event-stream), one frame per event:
         "event: <name>\ndata: <JSON>\n\n" (see ServiceStreamEvent for the
-        payload of each event). Open it after an install, suspend, resume or
-        delete, or when showing a service in a transitional status.
+        payload of each event). Open it after an install, suspend or resume,
+        before a delete (once deleted, the service can no longer be opened),
+        or when showing a service in a transitional status.
 
 
         - The first event is a "status" with the current state, and a "quota"
@@ -331,9 +332,14 @@ paths:
         failure...), and "quota" each time the project's quota usage changes.
 
         - The server ends the stream with "done" once the service is stable
-        (Running, Suspended, Ghost, an Error with reason release_failed),
-        deleted, or after a maximum duration. Any other Error keeps the stream
-        open: a crash loop or an exceeded quota can resolve by itself.
+        (Running, Suspended, an Error with reason release_failed, or a Ghost
+        that lasts: the release of a starting install appears a moment after
+        the service), deleted (no pod left), or after a maximum duration (15
+        minutes). Any other Error keeps the stream open: a crash loop or an
+        exceeded quota can resolve by itself.
+
+        - The stream may also end without "done" (server shutdown, broken
+        watch): reopen it.
 
         - A comment line (": keep-alive") is sent periodically so that proxies
         keep the connection open.
@@ -555,10 +561,12 @@ components:
             Running: all its pods are ready.
             Error: the release failed or a pod is failing; not terminal, a
             service may recover (e.g. after a crash loop).
-            Ghost: the service record exists but its release is gone.
+            Ghost: the service record exists but its release is gone (and no
+            pod is left).
             Suspending: suspended, but some pods are still shutting down.
             Suspended: suspended, no pod left.
-            Terminating: the release is being uninstalled.
+            Terminating: the release is being uninstalled, or is uninstalled
+            while its pods shut down.
         friendlyName: { type: string, description: Display name }
         owner: { type: string, description: Username of the service owner }
         catalogId: { type: string, description: Source catalog identifier }

@@ -1977,8 +1977,9 @@ func (s *Server) handleSetServiceSuspendedRequest(args [1]string, argsEscaped bo
 // handleWatchServiceEventsRequest handles watchServiceEvents operation.
 //
 // Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
-// ServiceStreamEvent for the payload of each event). Open it after an install, suspend, resume or
-// delete, or when showing a service in a transitional status.
+// ServiceStreamEvent for the payload of each event). Open it after an install, suspend or resume,
+// before a delete (once deleted, the service can no longer be opened), or when showing a service in a
+// transitional status.
 //
 //   - The first event is a "status" with the current state, and a "quota" with the project's quota when
 //     there is one. A reconnection simply starts again from the current state: there is no event id to
@@ -1986,9 +1987,11 @@ func (s *Server) handleSetServiceSuspendedRequest(args [1]string, argsEscaped bo
 //   - Then "status" is sent each time the service changes, "progress" for each step Kubernetes reports
 //     (scheduling, image pull, start, probe failure...), and "quota" each time the project's quota
 //     usage changes.
-//   - The server ends the stream with "done" once the service is stable (Running, Suspended, Ghost, an
-//     Error with reason release_failed), deleted, or after a maximum duration. Any other Error keeps
-//     the stream open: a crash loop or an exceeded quota can resolve by itself.
+//   - The server ends the stream with "done" once the service is stable (Running, Suspended, an Error
+//     with reason release_failed, or a Ghost that lasts: the release of a starting install appears a
+//     moment after the service), deleted (no pod left), or after a maximum duration (15 minutes). Any
+//     other Error keeps the stream open: a crash loop or an exceeded quota can resolve by itself.
+//   - The stream may also end without "done" (server shutdown, broken watch): reopen it.
 //   - A comment line (": keep-alive") is sent periodically so that proxies keep the connection open.
 //
 // The browser's native EventSource can't send the Authorization and X-Onyxia-Project headers: use a

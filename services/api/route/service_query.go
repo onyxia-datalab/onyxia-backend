@@ -9,15 +9,19 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/usecase/service/query"
 )
 
-func SetupServiceQueryController(
+// SetupServiceReader builds the read side of the services, shared by the
+// queries and the event streams.
+func SetupServiceReader(
 	app *bootstrap.Application,
 	releaseGtw ports.ReleaseGateway,
 	namespaceAuthz namespace.Authorizer,
-) *controller.ServiceQueryController {
+) *query.Reader {
 	secretGtw := k8s.NewOnyxiaSecretGtw(app.K8sClient.Clientset())
 	podGtw := k8s.NewWorkloadStateGtw(app.K8sClient.Clientset())
 
-	serviceQueryUc := query.NewReader(secretGtw, releaseGtw, podGtw, namespaceAuthz)
+	return query.NewReader(secretGtw, releaseGtw, podGtw, namespaceAuthz)
+}
 
-	return controller.NewServiceQueryController(serviceQueryUc, app.UserContextReader)
+func SetupServiceQueryController(app *bootstrap.Application, reader *query.Reader) *controller.ServiceQueryController {
+	return controller.NewServiceQueryController(reader, app.UserContextReader)
 }

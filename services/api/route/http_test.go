@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/apperror"
+	"github.com/onyxia-datalab/onyxia-backend/internal/httputil"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
@@ -102,11 +103,46 @@ func (stubCatalog) GetPackageSchema(context.Context, *usercontext.User, string, 
 }
 func (stubCatalog) CheckSharingAllowed(context.Context, *usercontext.User, string) error { return nil }
 
+// stubEvents opens the streams the test feeds through events.
+type stubEvents struct {
+	events  chan domain.ServiceEvent
+	openErr error
+}
+
+func (s *stubEvents) Open(context.Context, usercontext.User, string, string) (<-chan domain.ServiceEvent, error) {
+	if s.openErr != nil {
+		return nil, s.openErr
+	}
+	return s.events, nil
+}
+
+type stubQuotas struct {
+	quota domain.ProjectQuota
+	err   error
+}
+
+func (s *stubQuotas) GetProjectQuota(context.Context, usercontext.User, string) (domain.ProjectQuota, error) {
+	return s.quota, s.err
+}
+
 // --- test server ---------------------------------------------------------
 
 const testNamespace = "user-alice"
 
 func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *httptest.Server {
+	t.Helper()
+	return newEventsTestServer(t, lifecycle, query, &stubEvents{}, &stubQuotas{})
+}
+
+// newEventsTestServer serves the handler like Setup does, the event stream
+// flushing included.
+func newEventsTestServer(
+	t *testing.T,
+	lifecycle *stubLifecycle,
+	query *stubQuery,
+	events *stubEvents,
+	quotas *stubQuotas,
+) *httptest.Server {
 	t.Helper()
 
 	userReader, userWriter := usercontext.NewUserContext()
@@ -115,6 +151,7 @@ func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *ht
 		controller.NewInstallController(lifecycle, userReader),
 		controller.NewCatalogController(stubCatalog{}, userReader),
 		controller.NewServiceQueryController(query, userReader),
+		controller.NewServiceEventsController(events, quotas, userReader),
 	)
 
 	srv, err := api.NewServer(
@@ -124,7 +161,7 @@ func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *ht
 	)
 	require.NoError(t, err)
 
-	ts := httptest.NewServer(srv)
+	ts := httptest.NewServer(httputil.FlushEventStreams(srv))
 	t.Cleanup(ts.Close)
 	return ts
 }

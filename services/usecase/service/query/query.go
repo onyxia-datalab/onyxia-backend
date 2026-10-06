@@ -59,18 +59,28 @@ func (uc *Reader) GetService(
 		return domain.Service{}, domain.ErrNotFound
 	}
 
-	release, err := uc.helm.GetReleaseState(ctx, namespace, releaseID)
+	return uc.readService(ctx, namespace, rec)
+}
+
+// readService derives the current state of the service rec describes.
+func (uc *Reader) readService(ctx context.Context, namespace string, rec ports.ServiceRecord) (domain.Service, error) {
+	release, err := uc.helm.GetReleaseState(ctx, namespace, rec.ReleaseID)
 	if err != nil {
 		return domain.Service{}, fmt.Errorf("get release state: %w", err)
 	}
-	var pods []ports.PodInfo
-	if needsPods(release) {
-		if pods, err = uc.pods.GetPodsForRelease(ctx, namespace, releaseID); err != nil {
+	var w workloads
+	if needsWorkloads(release) {
+		if w.pods, err = uc.pods.GetPodsForRelease(ctx, namespace, rec.ReleaseID); err != nil {
 			return domain.Service{}, fmt.Errorf("get pods: %w", err)
 		}
+		failures, err := uc.pods.ListQuotaFailures(ctx, namespace)
+		if err != nil {
+			return domain.Service{}, fmt.Errorf("list quota failures: %w", err)
+		}
+		w.quotaFailure = failures[rec.ReleaseID]
 	}
 
-	status, svcErr := deriveStatus(release, pods)
+	status, svcErr := deriveStatus(release, w)
 
 	svc := toService(namespace, rec, status)
 	svc.Error = svcErr
@@ -82,7 +92,7 @@ func (uc *Reader) GetService(
 // GetService derives but without the error detail.
 // The number of calls to the cluster does not depend on the number of
 // services: one list of the records, one of the releases and, if any service
-// needs it, one of the pods.
+// needs them, the lists ListPodsByRelease and ListQuotaFailures make.
 func (uc *Reader) ListServices(
 	ctx context.Context,
 	user usercontext.User,
@@ -113,19 +123,26 @@ func (uc *Reader) ListServices(
 	}
 
 	var podsByRelease map[string][]ports.PodInfo
-	podsFetched := false
+	var quotaFailures map[string]string
+	fetched := false
 	services := make([]domain.Service, 0, len(visible))
 	for _, rec := range visible {
-		// A record without a release yields the zero state: a Ghost.
+		// A record without a release yields the zero state.
 		release := releases[rec.ReleaseID]
-		if needsPods(release) && !podsFetched {
+		if needsWorkloads(release) && !fetched {
 			if podsByRelease, err = uc.pods.ListPodsByRelease(ctx, namespace); err != nil {
 				return nil, fmt.Errorf("list pods: %w", err)
 			}
-			podsFetched = true
+			if quotaFailures, err = uc.pods.ListQuotaFailures(ctx, namespace); err != nil {
+				return nil, fmt.Errorf("list quota failures: %w", err)
+			}
+			fetched = true
 		}
 		// The list carries the status alone; the detail is GetService's.
-		status, _ := deriveStatus(release, podsByRelease[rec.ReleaseID])
+		status, _ := deriveStatus(release, workloads{
+			pods:         podsByRelease[rec.ReleaseID],
+			quotaFailure: quotaFailures[rec.ReleaseID],
+		})
 		services = append(services, toService(namespace, rec, status))
 	}
 	return services, nil

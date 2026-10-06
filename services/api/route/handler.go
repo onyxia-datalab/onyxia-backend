@@ -3,15 +3,15 @@ package route
 import (
 	"context"
 
-	ht "github.com/ogen-go/ogen/http"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
 )
 
 type Handler struct {
-	install      *controller.InstallController
-	catalogs     *controller.CatalogController
-	serviceQuery *controller.ServiceQueryController
+	install       *controller.InstallController
+	catalogs      *controller.CatalogController
+	serviceQuery  *controller.ServiceQueryController
+	serviceEvents *controller.ServiceEventsController
 }
 
 var _ api.Handler = (*Handler)(nil)
@@ -20,8 +20,9 @@ func NewHandler(
 	install *controller.InstallController,
 	catalogs *controller.CatalogController,
 	serviceQuery *controller.ServiceQueryController,
+	serviceEvents *controller.ServiceEventsController,
 ) *Handler {
-	return &Handler{install: install, catalogs: catalogs, serviceQuery: serviceQuery}
+	return &Handler{install: install, catalogs: catalogs, serviceQuery: serviceQuery, serviceEvents: serviceEvents}
 }
 
 func (h *Handler) SetServiceSuspended(
@@ -77,14 +78,14 @@ func (h *Handler) WatchServiceEvents(
 	ctx context.Context,
 	p api.WatchServiceEventsParams,
 ) (api.WatchServiceEventsRes, error) {
-	return nil, ht.ErrNotImplemented
+	return h.serviceEvents.WatchServiceEvents(ctx, p)
 }
 
 func (h *Handler) GetProjectQuota(
 	ctx context.Context,
 	p api.GetProjectQuotaParams,
 ) (api.GetProjectQuotaRes, error) {
-	return nil, ht.ErrNotImplemented
+	return h.serviceEvents.GetProjectQuota(ctx, p)
 }
 
 func (h *Handler) GetMyPackage(

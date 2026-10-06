@@ -22,14 +22,23 @@ type queryMocks struct {
 	pods    *mocks.MockWorkloadStateGateway
 }
 
-// setupReader creates a Reader and the mocks of its gateways.
+// setupReader creates a Reader and the mocks of its gateways. No release is
+// blocked by the quota.
 func setupReader(t *testing.T) (*Reader, context.Context, queryMocks) {
+	t.Helper()
+	return setupReaderWithQuotaFailures(t, map[string]string{})
+}
+
+// setupReaderWithQuotaFailures creates a Reader whose workload gateway
+// reports quotaFailures.
+func setupReaderWithQuotaFailures(t *testing.T, quotaFailures map[string]string) (*Reader, context.Context, queryMocks) {
 	t.Helper()
 	m := queryMocks{
 		helm:    new(mocks.MockReleaseGateway),
 		records: new(mocks.MockServiceRecordGateway),
 		pods:    new(mocks.MockWorkloadStateGateway),
 	}
+	m.pods.On("ListQuotaFailures", mock.Anything, mock.Anything).Return(quotaFailures, nil).Maybe()
 	uc := NewReader(m.records, m.helm, m.pods, namespace.NewAuthorizer("user-", "projet-"))
 	return uc, context.Background(), m
 }
@@ -66,7 +75,7 @@ func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, err
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
 		Return(state, nil)
 
-	if needsPods(state) {
+	if needsWorkloads(state) {
 		m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 			Return([]ports.PodInfo{}, nil)
 	}
@@ -325,26 +334,33 @@ func TestListServices_Visibility(t *testing.T) {
 // state; only GetService carries the error detail.
 func TestGetAndListServicesAgree(t *testing.T) {
 	tests := []struct {
-		name    string
-		release ports.ReleaseState
-		pods    []ports.PodInfo
+		name         string
+		release      ports.ReleaseState
+		pods         []ports.PodInfo
+		quotaFailure string
 	}{
-		{"ghost", ports.ReleaseState{}, nil},
-		{"failed release", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "boom"}, nil},
-		{"pending", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil},
-		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, nil},
-		{"suspending", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, []ports.PodInfo{{Name: "p", Terminating: true}}},
-		{"suspended", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, nil},
-		{"deployed, no pod", deployed, nil},
-		{"deployed, ready", deployed, []ports.PodInfo{{Name: "p", Ready: true}}},
-		{"deployed, starting", deployed, []ports.PodInfo{{Name: "p"}}},
-		{"deployed, crash loop", deployed, []ports.PodInfo{{Name: "p", ErrorReason: domain.ServiceErrorReasonCrashLoop}}},
-		{"deployed, rollout", deployed, []ports.PodInfo{{Name: "new", Ready: true}, {Name: "old", Terminating: true}}},
+		{"ghost", ports.ReleaseState{}, nil, ""},
+		{"uninstalled, pods shutting down", ports.ReleaseState{}, []ports.PodInfo{{Name: "p", Terminating: true}}, ""},
+		{"blocked by the quota", deployed, nil, "exceeded quota"},
+		{"failed release", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "boom"}, nil, ""},
+		{"pending", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil, ""},
+		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, nil, ""},
+		{"suspending", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, []ports.PodInfo{{Name: "p", Terminating: true}}, ""},
+		{"suspended", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, nil, ""},
+		{"deployed, no pod", deployed, nil, ""},
+		{"deployed, ready", deployed, []ports.PodInfo{{Name: "p", Ready: true}}, ""},
+		{"deployed, starting", deployed, []ports.PodInfo{{Name: "p"}}, ""},
+		{"deployed, crash loop", deployed, []ports.PodInfo{{Name: "p", ErrorReason: domain.ServiceErrorReasonCrashLoop}}, ""},
+		{"deployed, rollout", deployed, []ports.PodInfo{{Name: "new", Ready: true}, {Name: "old", Terminating: true}}, ""},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getUC, ctx, getMocks := setupReader(t)
+			failures := map[string]string{}
+			if tt.quotaFailure != "" {
+				failures[testRelease] = tt.quotaFailure
+			}
+			getUC, ctx, getMocks := setupReaderWithQuotaFailures(t, failures)
 			getMocks.records.On("GetServiceRecord", mock.Anything, testNamespace, testRelease).
 				Return(record(testRelease, testUsername, false), nil)
 			getMocks.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
@@ -359,7 +375,7 @@ func TestGetAndListServicesAgree(t *testing.T) {
 			if tt.release.Exists {
 				releases[testRelease] = tt.release
 			}
-			listUC, ctx, listMocks := setupReader(t)
+			listUC, ctx, listMocks := setupReaderWithQuotaFailures(t, failures)
 			listFixture{
 				records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
 				releases: releases,
@@ -382,6 +398,7 @@ func TestListServices_RecordWithoutReleaseIsGhost(t *testing.T) {
 	listFixture{
 		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
 		releases: map[string]ports.ReleaseState{},
+		pods:     map[string][]ports.PodInfo{},
 	}.stub(m, testNamespace)
 
 	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/apperror"
+	"github.com/onyxia-datalab/onyxia-backend/internal/httputil"
 	"github.com/onyxia-datalab/onyxia-backend/internal/server"
 	"github.com/onyxia-datalab/onyxia-backend/services/adapters/helm"
 	middleware "github.com/onyxia-datalab/onyxia-backend/services/api/middleware"
@@ -66,9 +67,11 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, serve
 
 	installCtrl := SetupInstallController(app, releaseGtw, catalogUc, namespaceAuthz)
 	catalogCtrl := SetupCatalogController(catalogUc, app)
-	serviceQueryCtrl := SetupServiceQueryController(app, releaseGtw, namespaceAuthz)
+	reader := SetupServiceReader(app, releaseGtw, namespaceAuthz)
+	serviceQueryCtrl := SetupServiceQueryController(app, reader)
+	serviceEventsCtrl := SetupServiceEventsController(ctx, app, reader, namespaceAuthz)
 
-	h := NewHandler(installCtrl, catalogCtrl, serviceQueryCtrl)
+	h := NewHandler(installCtrl, catalogCtrl, serviceQueryCtrl, serviceEventsCtrl)
 
 	srv, err := oas.NewServer(
 		h,
@@ -80,5 +83,5 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, serve
 		return nil, nil, fmt.Errorf("failed to create api server: %w", err)
 	}
 
-	return srv, releaseGtw.WaitForInstalls, nil
+	return httputil.FlushEventStreams(srv), releaseGtw.WaitForInstalls, nil
 }

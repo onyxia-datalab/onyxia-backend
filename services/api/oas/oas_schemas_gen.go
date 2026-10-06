@@ -973,9 +973,9 @@ type Service struct {
 	// Current lifecycle state of the service, derived the same way by getService and listServices.
 	// Deploying: being installed, or its pods are not all ready yet. Running: all its pods are ready.
 	// Error: the release failed or a pod is failing; not terminal, a service may recover (e.g. after a
-	// crash loop). Ghost: the service record exists but its release is gone. Suspending: suspended, but
-	// some pods are still shutting down. Suspended: suspended, no pod left. Terminating: the release is
-	// being uninstalled.
+	// crash loop). Ghost: the service record exists but its release is gone (and no pod is left).
+	// Suspending: suspended, but some pods are still shutting down. Suspended: suspended, no pod left.
+	// Terminating: the release is being uninstalled, or is uninstalled while its pods shut down.
 	Status ServiceStatus `json:"status"`
 	// Display name.
 	FriendlyName string `json:"friendlyName"`
@@ -1326,9 +1326,9 @@ func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 // Current lifecycle state of the service, derived the same way by getService and listServices.
 // Deploying: being installed, or its pods are not all ready yet. Running: all its pods are ready.
 // Error: the release failed or a pod is failing; not terminal, a service may recover (e.g. after a
-// crash loop). Ghost: the service record exists but its release is gone. Suspending: suspended, but
-// some pods are still shutting down. Suspended: suspended, no pod left. Terminating: the release is
-// being uninstalled.
+// crash loop). Ghost: the service record exists but its release is gone (and no pod is left).
+// Suspending: suspended, but some pods are still shutting down. Suspended: suspended, no pod left.
+// Terminating: the release is being uninstalled, or is uninstalled while its pods shut down.
 type ServiceStatus string
 
 const (
