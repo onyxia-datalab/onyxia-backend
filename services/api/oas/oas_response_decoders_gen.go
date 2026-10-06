@@ -3,7 +3,6 @@
 package api
 
 import (
-	"bytes"
 	"io"
 	"mime"
 	"net/http"
@@ -1687,91 +1686,10 @@ func decodeWatchServiceEventsResponse(resp *http.Response) (res WatchServiceEven
 		}
 		switch {
 		case ct == "text/event-stream":
-			reader := resp.Body
-			b, err := io.ReadAll(reader)
-			if err != nil {
-				return res, err
-			}
-
-			response := WatchServiceEventsOK{Data: bytes.NewReader(b)}
-			var wrapper WatchServiceEventsOKHeaders
-			wrapper.Response = response
-			h := uri.NewHeaderDecoder(resp.Header)
-			// Parse "Cache-Control" header.
-			{
-				cfg := uri.HeaderParameterDecodingConfig{
-					Name:    "Cache-Control",
-					Explode: false,
-				}
-				if err := func() error {
-					if err := h.HasParam(cfg); err == nil {
-						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							var wrapperDotCacheControlVal string
-							if err := func() error {
-								val, err := d.DecodeValue()
-								if err != nil {
-									return err
-								}
-
-								c, err := conv.ToString(val)
-								if err != nil {
-									return err
-								}
-
-								wrapperDotCacheControlVal = c
-								return nil
-							}(); err != nil {
-								return err
-							}
-							wrapper.CacheControl.SetTo(wrapperDotCacheControlVal)
-							return nil
-						}); err != nil {
-							return err
-						}
-					}
-					return nil
-				}(); err != nil {
-					return res, errors.Wrap(err, "parse Cache-Control header")
-				}
-			}
-			// Parse "X-Accel-Buffering" header.
-			{
-				cfg := uri.HeaderParameterDecodingConfig{
-					Name:    "X-Accel-Buffering",
-					Explode: false,
-				}
-				if err := func() error {
-					if err := h.HasParam(cfg); err == nil {
-						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							var wrapperDotXAccelBufferingVal string
-							if err := func() error {
-								val, err := d.DecodeValue()
-								if err != nil {
-									return err
-								}
-
-								c, err := conv.ToString(val)
-								if err != nil {
-									return err
-								}
-
-								wrapperDotXAccelBufferingVal = c
-								return nil
-							}(); err != nil {
-								return err
-							}
-							wrapper.XAccelBuffering.SetTo(wrapperDotXAccelBufferingVal)
-							return nil
-						}); err != nil {
-							return err
-						}
-					}
-					return nil
-				}(); err != nil {
-					return res, errors.Wrap(err, "parse X-Accel-Buffering header")
-				}
-			}
-			return &wrapper, nil
+			// Raw response - return the http.Response directly
+			return &WatchServiceEventsOKRawTextEventStream{
+				Response: resp,
+			}, nil
 		default:
 			return res, validate.InvalidContentType(ct)
 		}

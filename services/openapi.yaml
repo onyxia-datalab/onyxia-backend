@@ -360,6 +360,9 @@ paths:
               description: "no: asks reverse proxies not to buffer the stream."
           content:
             text/event-stream:
+              # ogen generates no server side for SSE yet: the handler gets the
+              # http.ResponseWriter and writes (and flushes) the frames itself.
+              x-ogen-raw-response: true
               schema:
                 type: string
                 x-oas-doc-schema:

@@ -2125,8 +2125,6 @@ func (s *Server) handleWatchServiceEventsRequest(args [1]string, argsEscaped boo
 	}
 
 	var rawBody []byte
-
-	var response WatchServiceEventsRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
@@ -2151,9 +2149,9 @@ func (s *Server) handleWatchServiceEventsRequest(args [1]string, argsEscaped boo
 		type (
 			Request  = struct{}
 			Params   = WatchServiceEventsParams
-			Response = WatchServiceEventsRes
+			Response = struct{}
 		)
-		response, err = middleware.HookMiddleware[
+		_, err = middleware.HookMiddleware[
 			Request,
 			Params,
 			Response,
@@ -2162,24 +2160,16 @@ func (s *Server) handleWatchServiceEventsRequest(args [1]string, argsEscaped boo
 			mreq,
 			unpackWatchServiceEventsParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.WatchServiceEvents(ctx, params)
+				err = s.rh.WatchServiceEvents(ctx, params, w)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.WatchServiceEvents(ctx, params)
+		err = s.rh.WatchServiceEvents(ctx, params, w)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
 		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeWatchServiceEventsResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
 		return
 	}
 }

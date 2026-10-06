@@ -1544,7 +1544,22 @@ func (s *WatchServiceEventsOKHeaders) SetResponse(val WatchServiceEventsOK) {
 	s.Response = val
 }
 
-func (*WatchServiceEventsOKHeaders) watchServiceEventsRes() {}
+// WatchServiceEventsOKRawTextEventStream represents raw HTTP response for WatchServiceEvents text/event-stream.
+type WatchServiceEventsOKRawTextEventStream struct {
+	Response *http.Response `json:"-"`
+}
+
+// GetResponse returns the value of Response.
+func (s *WatchServiceEventsOKRawTextEventStream) GetResponse() *http.Response {
+	return s.Response
+}
+
+// SetResponse sets the value of Response.
+func (s *WatchServiceEventsOKRawTextEventStream) SetResponse(val *http.Response) {
+	s.Response = val
+}
+
+func (*WatchServiceEventsOKRawTextEventStream) watchServiceEventsRes() {}
 
 type WatchServiceEventsUnauthorized Problem
 

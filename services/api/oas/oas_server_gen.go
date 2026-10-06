@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 )
 
 // Handler handles operations described by OpenAPI v3 specification.
@@ -76,6 +77,10 @@ type Handler interface {
 	//
 	// PUT /api/services/{releaseId}/suspended
 	SetServiceSuspended(ctx context.Context, req *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error)
+}
+
+// RawHandler handles raw response operations described by OpenAPI v3 specification.
+type RawHandler interface {
 	// WatchServiceEvents implements watchServiceEvents operation.
 	//
 	// Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
@@ -100,25 +105,27 @@ type Handler interface {
 	// fetch-based SSE client.
 	//
 	// GET /api/services/{releaseId}/events
-	WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (WatchServiceEventsRes, error)
+	WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams, w http.ResponseWriter) error
 }
 
 // Server implements http server based on OpenAPI v3 specification and
 // calls Handler to handle requests.
 type Server struct {
 	h   Handler
+	rh  RawHandler
 	sec SecurityHandler
 	baseServer
 }
 
 // NewServer creates new Server.
-func NewServer(h Handler, sec SecurityHandler, opts ...ServerOption) (*Server, error) {
+func NewServer(h Handler, rh RawHandler, sec SecurityHandler, opts ...ServerOption) (*Server, error) {
 	s, err := newServerConfig(opts...).baseServer()
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
 		h:          h,
+		rh:         rh,
 		sec:        sec,
 		baseServer: s,
 	}, nil

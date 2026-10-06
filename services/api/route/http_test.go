@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/apperror"
-	"github.com/onyxia-datalab/onyxia-backend/internal/httputil"
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
@@ -134,8 +133,7 @@ func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *ht
 	return newEventsTestServer(t, lifecycle, query, &stubEvents{}, &stubQuotas{})
 }
 
-// newEventsTestServer serves the handler like Setup does, the event stream
-// flushing included.
+// newEventsTestServer serves the handler like Setup does.
 func newEventsTestServer(
 	t *testing.T,
 	lifecycle *stubLifecycle,
@@ -156,12 +154,13 @@ func newEventsTestServer(
 
 	srv, err := api.NewServer(
 		h,
+		h,
 		testSecurityHandler{writer: userWriter},
 		api.WithErrorHandler(apperror.OgenHandler),
 	)
 	require.NoError(t, err)
 
-	ts := httptest.NewServer(httputil.FlushEventStreams(srv))
+	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	return ts
 }

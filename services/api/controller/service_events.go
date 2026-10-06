@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -34,16 +34,19 @@ func NewServiceEventsController(
 	return &ServiceEventsController{events: events, quotas: quotas, userGetter: userGetter, keepAlive: keepAliveInterval}
 }
 
-// WatchServiceEvents opens the stream, so that authorization errors are
-// still answered with an HTTP error, then writes its events as SSE frames
-// while ogen copies them to the response.
+// WatchServiceEvents opens the stream first, so that authorization errors
+// are still answered with an HTTP error, then writes its events as SSE
+// frames, flushing each one so that it reaches the client right away.
+// Once the response has started, a failure can only end the stream: nil is
+// returned, so that ogen doesn't write an error into it.
 func (c *ServiceEventsController) WatchServiceEvents(
 	ctx context.Context,
 	params api.WatchServiceEventsParams,
-) (api.WatchServiceEventsRes, error) {
+	w http.ResponseWriter,
+) error {
 	user, err := callerFrom(ctx, c.userGetter)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	events, err := c.events.Open(ctx, user, params.XOnyxiaProject, params.ReleaseId)
@@ -51,52 +54,47 @@ func (c *ServiceEventsController) WatchServiceEvents(
 		if !errors.Is(err, domain.ErrNotFound) && !errors.Is(err, domain.ErrForbidden) {
 			slog.ErrorContext(ctx, "open service event stream failed", slog.Any("error", err))
 		}
-		return nil, err
+		return err
 	}
 
-	// ogen closes the reader once the response is over (e.g. the client is
-	// gone), which makes the writes fail and ends writeStream.
-	r, w := io.Pipe()
-	go c.writeStream(ctx, w, events)
+	header := w.Header()
+	header.Set("Content-Type", "text/event-stream")
+	header.Set("Cache-Control", "no-cache")
+	header.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
 
-	return &api.WatchServiceEventsOKHeaders{
-		CacheControl:    api.NewOptString("no-cache"),
-		XAccelBuffering: api.NewOptString("no"),
-		Response:        api.WatchServiceEventsOK{Data: r},
-	}, nil
-}
+	rc := http.NewResponseController(w)
+	// Send the headers right away: the first event may take a while.
+	if err := rc.Flush(); err != nil {
+		slog.ErrorContext(ctx, "flush service event stream failed", slog.Any("error", err))
+		return nil
+	}
 
-func (c *ServiceEventsController) writeStream(
-	ctx context.Context,
-	w *io.PipeWriter,
-	events <-chan domain.ServiceEvent,
-) {
 	keepAlive := time.NewTicker(c.keepAlive)
 	defer keepAlive.Stop()
 	for {
 		var frame []byte
 		select {
 		case <-ctx.Done():
-			// The client is gone: end the response even if the stream
-			// hasn't closed its channel yet.
-			_ = w.Close()
-			return
+			// The client is gone. Returning ends the request, whose context
+			// also stops the stream.
+			return nil
 		case ev, ok := <-events:
 			if !ok {
-				_ = w.Close()
-				return
+				return nil
 			}
-			var err error
 			if frame, err = encodeFrame(ev); err != nil {
 				slog.ErrorContext(ctx, "encode service event failed", slog.Any("error", err))
-				_ = w.CloseWithError(err)
-				return
+				return nil
 			}
 		case <-keepAlive.C:
 			frame = []byte(": keep-alive\n\n")
 		}
 		if _, err := w.Write(frame); err != nil {
-			return
+			return nil
+		}
+		if err := rc.Flush(); err != nil {
+			return nil
 		}
 	}
 }

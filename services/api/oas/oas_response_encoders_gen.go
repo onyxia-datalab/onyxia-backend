@@ -3,7 +3,6 @@
 package api
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/go-faster/errors"
@@ -652,55 +651,6 @@ func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.R
 
 func encodeWatchServiceEventsResponse(response WatchServiceEventsRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *WatchServiceEventsOKHeaders:
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Access-Control-Expose-Headers", "X-Accel-Buffering")
-		// Encoding response headers.
-		{
-			h := uri.NewHeaderEncoder(w.Header())
-			// Encode "Cache-Control" header.
-			{
-				cfg := uri.HeaderParameterEncodingConfig{
-					Name:    "Cache-Control",
-					Explode: false,
-				}
-				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.CacheControl.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
-				}); err != nil {
-					return errors.Wrap(err, "encode Cache-Control header")
-				}
-			}
-			// Encode "X-Accel-Buffering" header.
-			{
-				cfg := uri.HeaderParameterEncodingConfig{
-					Name:    "X-Accel-Buffering",
-					Explode: false,
-				}
-				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.XAccelBuffering.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
-				}); err != nil {
-					return errors.Wrap(err, "encode X-Accel-Buffering header")
-				}
-			}
-		}
-		w.WriteHeader(200)
-
-		writer := w
-		if closer, ok := response.Response.Data.(io.Closer); ok {
-			defer closer.Close()
-		}
-		if _, err := io.Copy(writer, response.Response); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
 	case *WatchServiceEventsUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)

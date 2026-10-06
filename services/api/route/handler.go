@@ -2,6 +2,7 @@ package route
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/api/controller"
 	api "github.com/onyxia-datalab/onyxia-backend/services/api/oas"
@@ -14,7 +15,10 @@ type Handler struct {
 	serviceEvents *controller.ServiceEventsController
 }
 
-var _ api.Handler = (*Handler)(nil)
+var (
+	_ api.Handler    = (*Handler)(nil)
+	_ api.RawHandler = (*Handler)(nil)
+)
 
 func NewHandler(
 	install *controller.InstallController,
@@ -77,8 +81,9 @@ func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, erro
 func (h *Handler) WatchServiceEvents(
 	ctx context.Context,
 	p api.WatchServiceEventsParams,
-) (api.WatchServiceEventsRes, error) {
-	return h.serviceEvents.WatchServiceEvents(ctx, p)
+	w http.ResponseWriter,
+) error {
+	return h.serviceEvents.WatchServiceEvents(ctx, p, w)
 }
 
 func (h *Handler) GetProjectQuota(

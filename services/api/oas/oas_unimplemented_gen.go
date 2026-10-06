@@ -4,6 +4,7 @@ package api
 
 import (
 	"context"
+	"net/http"
 
 	ht "github.com/ogen-go/ogen/http"
 )
@@ -12,6 +13,7 @@ import (
 type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
+var _ RawHandler = UnimplementedHandler{}
 
 // DeleteService implements deleteService operation.
 //
@@ -135,6 +137,6 @@ func (UnimplementedHandler) SetServiceSuspended(ctx context.Context, req *SetSer
 // fetch-based SSE client.
 //
 // GET /api/services/{releaseId}/events
-func (UnimplementedHandler) WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (r WatchServiceEventsRes, _ error) {
-	return r, ht.ErrNotImplemented
+func (UnimplementedHandler) WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams, w http.ResponseWriter) error {
+	return ht.ErrNotImplemented
 }
