@@ -198,13 +198,13 @@ func (c *ownerCache) owns(ctx context.Context, obj corev1.ObjectReference) bool 
 	var err error
 	opts := metav1.GetOptions{}
 	switch obj.Kind {
-	case "Pod":
+	case kindPod:
 		meta, err = c.client.CoreV1().Pods(c.namespace).Get(ctx, obj.Name, opts)
 	case kindReplicaSet:
 		meta, err = c.client.AppsV1().ReplicaSets(c.namespace).Get(ctx, obj.Name, opts)
 	case kindStatefulSet:
 		meta, err = c.client.AppsV1().StatefulSets(c.namespace).Get(ctx, obj.Name, opts)
-	case "Deployment":
+	case kindDeployment:
 		meta, err = c.client.AppsV1().Deployments(c.namespace).Get(ctx, obj.Name, opts)
 	default:
 		return false
@@ -237,7 +237,7 @@ func progressFromEvent(e corev1.Event) (progress domain.ServiceProgress, ok bool
 		Message: e.Message,
 		At:      eventTime(e),
 	}
-	if e.InvolvedObject.Kind == "Pod" {
+	if e.InvolvedObject.Kind == kindPod {
 		progress.PodName = e.InvolvedObject.Name
 	}
 

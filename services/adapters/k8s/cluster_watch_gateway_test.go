@@ -18,7 +18,7 @@ func TestProgressFromEvent(t *testing.T) {
 	at := time.Date(2026, 10, 6, 10, 0, 0, 0, time.UTC)
 	podEvent := func(eventType, reason, message string) corev1.Event {
 		return corev1.Event{
-			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "jupyter-0"},
+			InvolvedObject: corev1.ObjectReference{Kind: kindPod, Name: "jupyter-0"},
 			Type:           eventType,
 			Reason:         reason,
 			Message:        message,
@@ -101,13 +101,13 @@ func TestClusterWatch(t *testing.T) {
 	for _, e := range []*corev1.Event{
 		{
 			ObjectMeta:     metav1.ObjectMeta{Name: "other", Namespace: "project"},
-			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "rstudio-0"},
+			InvolvedObject: corev1.ObjectReference{Kind: kindPod, Name: "rstudio-0"},
 			Type:           corev1.EventTypeNormal,
 			Reason:         "Scheduled",
 		},
 		{
 			ObjectMeta:     metav1.ObjectMeta{Name: "mine", Namespace: "project"},
-			InvolvedObject: corev1.ObjectReference{Kind: "Pod", Name: "jupyter-0"},
+			InvolvedObject: corev1.ObjectReference{Kind: kindPod, Name: "jupyter-0"},
 			Type:           corev1.EventTypeNormal,
 			Reason:         "Scheduled",
 		},

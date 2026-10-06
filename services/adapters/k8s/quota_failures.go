@@ -12,9 +12,6 @@ import (
 )
 
 const (
-	kindReplicaSet  = "ReplicaSet"
-	kindStatefulSet = "StatefulSet"
-
 	reasonFailedCreate     = "FailedCreate"
 	reasonSuccessfulCreate = "SuccessfulCreate"
 )
