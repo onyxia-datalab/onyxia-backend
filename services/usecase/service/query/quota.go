@@ -11,13 +11,13 @@ import (
 )
 
 type QuotaReader struct {
-	quotas     ports.QuotaGateway
+	quotas     ports.ProjectQuotaReader
 	namespaces namespace.Authorizer
 }
 
-var _ ports.ProjectQuotaQuery = (*QuotaReader)(nil)
+var _ ports.ProjectQuotaGetter = (*QuotaReader)(nil)
 
-func NewQuotaReader(quotas ports.QuotaGateway, namespaces namespace.Authorizer) *QuotaReader {
+func NewQuotaReader(quotas ports.ProjectQuotaReader, namespaces namespace.Authorizer) *QuotaReader {
 	return &QuotaReader{quotas: quotas, namespaces: namespaces}
 }
 
@@ -29,7 +29,7 @@ func (uc *QuotaReader) GetProjectQuota(
 	if err := uc.namespaces.Check(user, namespace); err != nil {
 		return domain.ProjectQuota{}, err
 	}
-	quota, err := uc.quotas.GetProjectQuota(ctx, namespace)
+	quota, err := uc.quotas.ReadProjectQuota(ctx, namespace)
 	if err != nil {
 		return domain.ProjectQuota{}, fmt.Errorf("get project quota: %w", err)
 	}

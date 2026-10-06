@@ -12,10 +12,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 )
 
-func TestGetProjectQuotaKeepsTheMostRestrictive(t *testing.T) {
+func TestReadProjectQuotaKeepsTheMostRestrictive(t *testing.T) {
 	gateway := NewQuotaGtw(k8sfake.NewClientset(
 		resourceQuota("onyxia-quota",
 			corev1.ResourceList{"requests.memory": resource.MustParse("10Gi"), "pods": resource.MustParse("20")},
@@ -27,7 +28,7 @@ func TestGetProjectQuotaKeepsTheMostRestrictive(t *testing.T) {
 		),
 	))
 
-	quota, err := gateway.GetProjectQuota(context.Background(), "project")
+	quota, err := gateway.ReadProjectQuota(context.Background(), "project")
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.ProjectQuota{Resources: []domain.QuotaResource{
@@ -36,19 +37,19 @@ func TestGetProjectQuotaKeepsTheMostRestrictive(t *testing.T) {
 	}}, quota)
 }
 
-func TestGetProjectQuotaWithoutQuota(t *testing.T) {
-	quota, err := NewQuotaGtw(k8sfake.NewClientset()).GetProjectQuota(context.Background(), "project")
+func TestReadProjectQuotaWithoutQuota(t *testing.T) {
+	quota, err := NewQuotaGtw(k8sfake.NewClientset()).ReadProjectQuota(context.Background(), "project")
 
 	require.NoError(t, err)
 	assert.Empty(t, quota.Resources)
 }
 
 // Before the quota controller has seen a quota, only its spec is filled.
-func TestGetProjectQuotaFallsBackToTheSpec(t *testing.T) {
+func TestReadProjectQuotaFallsBackToTheSpec(t *testing.T) {
 	q := resourceQuota("new", nil, nil)
 	q.Spec.Hard = corev1.ResourceList{"limits.cpu": resource.MustParse("4")}
 
-	quota, err := NewQuotaGtw(k8sfake.NewClientset(q)).GetProjectQuota(context.Background(), "project")
+	quota, err := NewQuotaGtw(k8sfake.NewClientset(q)).ReadProjectQuota(context.Background(), "project")
 
 	require.NoError(t, err)
 	assert.Equal(t, []domain.QuotaResource{{Name: "limits.cpu", Hard: "4", Used: "0"}}, quota.Resources)
@@ -71,6 +72,9 @@ func TestListQuotaFailures(t *testing.T) {
 		workloadEvent("e5", kindStatefulSet, "rstudio", reasonFailedCreate, "admission webhook denied", t0),
 		// The workload no longer exists.
 		workloadEvent("e6", kindStatefulSet, "deleted", reasonFailedCreate, quotaMsg, t0),
+		// An earlier StatefulSet of the same name: a reinstall starts clean.
+		labelledStatefulSet("marimo", "marimo"),
+		staleWorkloadEvent("e7", kindStatefulSet, "marimo", reasonFailedCreate, quotaMsg, t0),
 	)
 
 	failures, err := NewWorkloadStateGtw(client).ListQuotaFailures(context.Background(), "project")
@@ -86,18 +90,31 @@ func resourceQuota(name string, hard, used corev1.ResourceList) *corev1.Resource
 	}
 }
 
+// objectUID is the UID of the current object of a name in these tests.
+func objectUID(name string) types.UID { return types.UID(name + "-uid") }
+
 func labelledStatefulSet(name, release string) *appsv1.StatefulSet {
 	return &appsv1.StatefulSet{ObjectMeta: metav1.ObjectMeta{
 		Name:      name,
 		Namespace: "project",
+		UID:       objectUID(name),
 		Labels:    map[string]string{labelHelmInstance: release},
 	}}
 }
 
 func workloadEvent(name, kind, object, reason, message string, at time.Time) *corev1.Event {
+	return workloadEventOf(name, kind, object, objectUID(object), reason, message, at)
+}
+
+// staleWorkloadEvent is an event of an earlier object of the same name.
+func staleWorkloadEvent(name, kind, object, reason, message string, at time.Time) *corev1.Event {
+	return workloadEventOf(name, kind, object, "previous-uid", reason, message, at)
+}
+
+func workloadEventOf(name, kind, object string, uid types.UID, reason, message string, at time.Time) *corev1.Event {
 	return &corev1.Event{
 		ObjectMeta:     metav1.ObjectMeta{Name: name, Namespace: "project"},
-		InvolvedObject: corev1.ObjectReference{Kind: kind, Name: object, Namespace: "project"},
+		InvolvedObject: corev1.ObjectReference{Kind: kind, Name: object, Namespace: "project", UID: uid},
 		Reason:         reason,
 		Message:        message,
 		Type:           corev1.EventTypeWarning,

@@ -15,7 +15,7 @@ const (
 	// ClusterChangePods: a pod of the release was created, updated or
 	// deleted (WorkloadStateGateway).
 	ClusterChangePods ClusterChangeKind = "pods"
-	// ClusterChangeQuota: the namespace's quota usage changed (QuotaGateway).
+	// ClusterChangeQuota: the namespace's quota usage changed (ProjectQuotaReader).
 	ClusterChangeQuota ClusterChangeKind = "quota"
 	// ClusterChangeProgress: the cluster reported a step of the release's
 	// workloads, carried by Progress.
@@ -30,10 +30,10 @@ type ClusterChange struct {
 	Progress *domain.ServiceProgress
 }
 
-// ClusterWatchGateway watches the cluster state of one release. The watch
+// ClusterWatcher watches the cluster state of one release. The watch
 // is pushed by the cluster (no polling) and scoped to the release and its
 // namespace's quota; it lasts only as long as ctx.
-type ClusterWatchGateway interface {
+type ClusterWatcher interface {
 	// Watch starts watching releaseID in namespace and returns once the
 	// watch is established, so that no change made after the call is
 	// missed. The channel is closed when ctx is done or the watch breaks.

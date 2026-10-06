@@ -23,7 +23,7 @@ type K8sClusterWatchGateway struct {
 	client kubernetes.Interface
 }
 
-var _ ports.ClusterWatchGateway = (*K8sClusterWatchGateway)(nil)
+var _ ports.ClusterWatcher = (*K8sClusterWatchGateway)(nil)
 
 func NewClusterWatchGtw(client kubernetes.Interface) *K8sClusterWatchGateway {
 	return &K8sClusterWatchGateway{client: client}
@@ -166,7 +166,8 @@ func (g *K8sClusterWatchGateway) forward(
 
 // ownerCache tells whether an object belongs to the release, by reading its
 // Helm instance label. Objects that no longer exist (e.g. the pods of an
-// earlier rollout, whose events linger) are not the release's.
+// earlier rollout, or the previous pod of a StatefulSet, whose events linger)
+// are not the release's.
 type ownerCache struct {
 	client    kubernetes.Interface
 	namespace string
@@ -185,8 +186,8 @@ func newOwnerCache(client kubernetes.Interface, namespace, releaseID string) *ow
 	}
 }
 
-func (c *ownerCache) owns(ctx context.Context, obj corev1.ObjectReference) bool {
-	key := corev1.ObjectReference{Kind: obj.Kind, Name: obj.Name}
+func (c *ownerCache) owns(ctx context.Context, ref corev1.ObjectReference) bool {
+	key := corev1.ObjectReference{Kind: ref.Kind, Name: ref.Name, UID: ref.UID}
 	c.mu.Lock()
 	owned, ok := c.known[key]
 	c.mu.Unlock()
@@ -194,29 +195,12 @@ func (c *ownerCache) owns(ctx context.Context, obj corev1.ObjectReference) bool 
 		return owned
 	}
 
-	var meta metav1.Object
-	var err error
-	opts := metav1.GetOptions{}
-	switch obj.Kind {
-	case kindPod:
-		meta, err = c.client.CoreV1().Pods(c.namespace).Get(ctx, obj.Name, opts)
-	case kindReplicaSet:
-		meta, err = c.client.AppsV1().ReplicaSets(c.namespace).Get(ctx, obj.Name, opts)
-	case kindStatefulSet:
-		meta, err = c.client.AppsV1().StatefulSets(c.namespace).Get(ctx, obj.Name, opts)
-	case kindDeployment:
-		meta, err = c.client.AppsV1().Deployments(c.namespace).Get(ctx, obj.Name, opts)
-	default:
+	obj, err := currentObject(ctx, c.client, c.namespace, key)
+	if err != nil {
+		// Not cached: a later event of the same object retries.
 		return false
 	}
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			// Not cached: a later event of the same object retries.
-			return false
-		}
-	} else {
-		owned = meta.GetLabels()[labelHelmInstance] == c.releaseID
-	}
+	owned = obj != nil && obj.GetLabels()[labelHelmInstance] == c.releaseID
 
 	c.mu.Lock()
 	c.known[key] = owned

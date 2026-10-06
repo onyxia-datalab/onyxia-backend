@@ -17,15 +17,15 @@ type K8sQuotaGateway struct {
 	client kubernetes.Interface
 }
 
-var _ ports.QuotaGateway = (*K8sQuotaGateway)(nil)
+var _ ports.ProjectQuotaReader = (*K8sQuotaGateway)(nil)
 
 func NewQuotaGtw(client kubernetes.Interface) *K8sQuotaGateway {
 	return &K8sQuotaGateway{client: client}
 }
 
-// GetProjectQuota merges the namespace's ResourceQuotas: for a resource
+// ReadProjectQuota merges the namespace's ResourceQuotas: for a resource
 // several of them limit, the one with the smallest limit is reported.
-func (g *K8sQuotaGateway) GetProjectQuota(ctx context.Context, namespace string) (domain.ProjectQuota, error) {
+func (g *K8sQuotaGateway) ReadProjectQuota(ctx context.Context, namespace string) (domain.ProjectQuota, error) {
 	quotas, err := g.client.CoreV1().ResourceQuotas(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return domain.ProjectQuota{}, fmt.Errorf("list resource quotas: %w", err)

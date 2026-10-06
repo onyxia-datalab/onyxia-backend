@@ -108,7 +108,7 @@ type stubEvents struct {
 	openErr error
 }
 
-func (s *stubEvents) Open(context.Context, usercontext.User, string, string) (<-chan domain.ServiceEvent, error) {
+func (s *stubEvents) Follow(context.Context, usercontext.User, string, string) (<-chan domain.ServiceEvent, error) {
 	if s.openErr != nil {
 		return nil, s.openErr
 	}

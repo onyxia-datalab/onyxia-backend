@@ -481,3 +481,45 @@ func TestListServices_ForeignNamespaceForbidden(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrForbidden)
 	m.records.AssertNotCalled(t, "ListServiceRecords", mock.Anything, mock.Anything)
 }
+
+// The quota failures only refine Deploying: failing to read them must not
+// fail the read.
+func TestQuotaFailuresErrorDoesNotFailTheRead(t *testing.T) {
+	newReader := func() (*Reader, queryMocks) {
+		m := queryMocks{
+			helm:    new(mocks.MockReleaseGateway),
+			records: new(mocks.MockServiceRecordGateway),
+			pods:    new(mocks.MockWorkloadStateGateway),
+		}
+		m.pods.On("ListQuotaFailures", mock.Anything, mock.Anything).Return(nil, errors.New("events forbidden"))
+		return NewReader(m.records, m.helm, m.pods, namespace.NewAuthorizer("user-", "projet-")), m
+	}
+
+	t.Run("GetService", func(t *testing.T) {
+		uc, m := newReader()
+		m.records.On("GetServiceRecord", mock.Anything, testNamespace, testRelease).
+			Return(record(testRelease, testUsername, false), nil)
+		m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).Return(deployed, nil)
+		m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).Return([]ports.PodInfo{}, nil)
+
+		svc, err := uc.GetService(context.Background(), testCaller, testNamespace, testRelease)
+
+		require.NoError(t, err)
+		assert.Equal(t, domain.ServiceStatusDeploying, svc.Status)
+	})
+
+	t.Run("ListServices", func(t *testing.T) {
+		uc, m := newReader()
+		listFixture{
+			records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+			releases: map[string]ports.ReleaseState{testRelease: deployed},
+			pods:     map[string][]ports.PodInfo{testRelease: {{Name: "p", Ready: true}}},
+		}.stub(m, testNamespace)
+
+		svcs, err := uc.ListServices(context.Background(), testCaller, testNamespace)
+
+		require.NoError(t, err)
+		require.Len(t, svcs, 1)
+		assert.Equal(t, domain.ServiceStatusRunning, svcs[0].Status)
+	})
+}

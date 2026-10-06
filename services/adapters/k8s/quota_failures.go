@@ -7,7 +7,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,12 +14,6 @@ const (
 	reasonFailedCreate     = "FailedCreate"
 	reasonSuccessfulCreate = "SuccessfulCreate"
 )
-
-// workloadRef identifies a workload controller that creates pods.
-type workloadRef struct {
-	kind string
-	name string
-}
 
 // ListQuotaFailures reads the namespace's pod creation events. A workload
 // controller (ReplicaSet, StatefulSet) is blocked by the quota when its last
@@ -37,11 +30,33 @@ func (g *K8sWorkloadStateGateway) ListQuotaFailures(
 		return nil, fmt.Errorf("list events: %w", err)
 	}
 
-	lastFailure := map[workloadRef]corev1.Event{}
-	lastSuccess := map[workloadRef]time.Time{}
-	for _, e := range events.Items {
-		ref := workloadRef{kind: e.InvolvedObject.Kind, name: e.InvolvedObject.Name}
-		if ref.kind != kindReplicaSet && ref.kind != kindStatefulSet {
+	failures := map[string]string{}
+	for ref, message := range quotaBlockedWorkloads(events.Items) {
+		// The events of a deleted workload outlive it: only the current
+		// object counts, not an earlier one of the same name.
+		obj, err := currentObject(ctx, g.client, namespace, ref)
+		if err != nil {
+			return nil, err
+		}
+		if obj == nil {
+			continue
+		}
+		if release := obj.GetLabels()[labelHelmInstance]; release != "" {
+			failures[release] = message
+		}
+	}
+	return failures, nil
+}
+
+// quotaBlockedWorkloads returns, for each workload controller whose last pod
+// creation was refused by a quota with no successful creation since, the
+// message of that refusal.
+func quotaBlockedWorkloads(events []corev1.Event) map[corev1.ObjectReference]string {
+	lastFailure := map[corev1.ObjectReference]corev1.Event{}
+	lastSuccess := map[corev1.ObjectReference]time.Time{}
+	for _, e := range events {
+		ref := corev1.ObjectReference{Kind: e.InvolvedObject.Kind, Name: e.InvolvedObject.Name, UID: e.InvolvedObject.UID}
+		if ref.Kind != kindReplicaSet && ref.Kind != kindStatefulSet {
 			continue
 		}
 		switch {
@@ -49,55 +64,24 @@ func (g *K8sWorkloadStateGateway) ListQuotaFailures(
 			if prev, ok := lastFailure[ref]; !ok || eventTime(e).After(eventTime(prev)) {
 				lastFailure[ref] = e
 			}
-		case e.Reason == reasonSuccessfulCreate:
-			if t := eventTime(e); t.After(lastSuccess[ref]) {
-				lastSuccess[ref] = t
-			}
+		case e.Reason == reasonSuccessfulCreate && eventTime(e).After(lastSuccess[ref]):
+			lastSuccess[ref] = eventTime(e)
 		}
 	}
 
-	failures := map[string]string{}
+	blocked := map[corev1.ObjectReference]string{}
 	for ref, e := range lastFailure {
-		if !eventTime(e).After(lastSuccess[ref]) {
-			continue
-		}
-		release, err := g.workloadRelease(ctx, namespace, ref)
-		if err != nil {
-			return nil, err
-		}
-		if release != "" {
-			failures[release] = e.Message
+		if eventTime(e).After(lastSuccess[ref]) {
+			blocked[ref] = e.Message
 		}
 	}
-	return failures, nil
+	return blocked
 }
 
 // isQuotaExceeded reports whether a pod creation failure is due to a
 // ResourceQuota, whose admission error reads "... exceeded quota: ...".
 func isQuotaExceeded(message string) bool {
 	return strings.Contains(message, "exceeded quota")
-}
-
-// workloadRelease returns the release a workload controller belongs to, or
-// "" when it no longer exists or isn't a Helm release's.
-func (g *K8sWorkloadStateGateway) workloadRelease(ctx context.Context, namespace string, ref workloadRef) (string, error) {
-	var meta metav1.Object
-	var err error
-	switch ref.kind {
-	case kindReplicaSet:
-		meta, err = g.client.AppsV1().ReplicaSets(namespace).Get(ctx, ref.name, metav1.GetOptions{})
-	case kindStatefulSet:
-		meta, err = g.client.AppsV1().StatefulSets(namespace).Get(ctx, ref.name, metav1.GetOptions{})
-	default:
-		return "", nil
-	}
-	if apierrors.IsNotFound(err) {
-		return "", nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("get %s %s: %w", ref.kind, ref.name, err)
-	}
-	return meta.GetLabels()[labelHelmInstance], nil
 }
 
 // eventTime is when an event last occurred.

@@ -27,32 +27,38 @@ type StreamSettings struct {
 // DefaultStreamSettings are the settings of the API.
 var DefaultStreamSettings = StreamSettings{MaxDuration: 15 * time.Minute, GhostGrace: 30 * time.Second}
 
-// Streamer follows services: it implements ports.ServiceEvents on top of a
+// Streamer follows services: it implements ports.ServiceFollower on top of a
 // cluster watch, reading the state back through the same path as GetService
 // on every change.
 type Streamer struct {
 	reader   *Reader
-	quotas   ports.QuotaGateway
-	watcher  ports.ClusterWatchGateway
+	quotas   ports.ProjectQuotaReader
+	watcher  ports.ClusterWatcher
 	settings StreamSettings
-	// lifetime ends every stream when it is done (at shutdown), so that a
-	// graceful shutdown doesn't wait for them; clients then reconnect.
-	lifetime context.Context
+	// shutdown ends every stream once closed, so that a graceful shutdown
+	// doesn't wait for them; clients then reconnect.
+	shutdown <-chan struct{}
 }
 
-var _ ports.ServiceEvents = (*Streamer)(nil)
+var _ ports.ServiceFollower = (*Streamer)(nil)
 
 func NewStreamer(
 	lifetime context.Context,
 	reader *Reader,
-	quotas ports.QuotaGateway,
-	watcher ports.ClusterWatchGateway,
+	quotas ports.ProjectQuotaReader,
+	watcher ports.ClusterWatcher,
 	settings StreamSettings,
 ) *Streamer {
-	return &Streamer{reader: reader, quotas: quotas, watcher: watcher, settings: settings, lifetime: lifetime}
+	return &Streamer{
+		reader:   reader,
+		quotas:   quotas,
+		watcher:  watcher,
+		settings: settings,
+		shutdown: lifetime.Done(),
+	}
 }
 
-func (s *Streamer) Open(
+func (s *Streamer) Follow(
 	ctx context.Context,
 	user usercontext.User,
 	namespace, releaseID string,
@@ -72,30 +78,27 @@ func (s *Streamer) Open(
 	}
 
 	streamCtx, cancel := context.WithTimeout(ctx, s.settings.MaxDuration)
-	stopOnShutdown := context.AfterFunc(s.lifetime, cancel)
+	go func() {
+		select {
+		case <-s.shutdown:
+			cancel()
+		case <-streamCtx.Done():
+		}
+	}()
 	// Watch before reading the state: a change made in between is then
 	// notified rather than missed.
 	changes, err := s.watcher.Watch(streamCtx, namespace, releaseID)
 	if err != nil {
-		stopOnShutdown()
 		cancel()
 		return nil, fmt.Errorf("watch service: %w", err)
 	}
 
 	out := make(chan domain.ServiceEvent)
-	st := &stream{
-		Streamer:  s,
-		clientCtx: ctx,
-		ctx:       streamCtx,
-		namespace: namespace,
-		rec:       rec,
-		out:       out,
-	}
+	st := &stream{Streamer: s, namespace: namespace, rec: rec, out: out}
 	go func() {
 		defer close(out)
 		defer cancel()
-		defer stopOnShutdown()
-		if err := st.run(changes); err != nil {
+		if err := st.run(streamCtx, ctx, changes); err != nil {
 			slog.ErrorContext(ctx, "service event stream failed",
 				slog.String("release", releaseID), slog.Any("error", err))
 		}
@@ -103,11 +106,10 @@ func (s *Streamer) Open(
 	return out, nil
 }
 
-// stream is one open stream.
+// stream is one open stream. Its methods take the stream's context: the
+// client's request context, bounded by MaxDuration and the shutdown.
 type stream struct {
 	*Streamer
-	clientCtx context.Context // the client's request
-	ctx       context.Context // clientCtx bounded by MaxDuration and shutdown
 	namespace string
 	out       chan<- domain.ServiceEvent
 	rec       ports.ServiceRecord // the last record read
@@ -118,15 +120,17 @@ type stream struct {
 	quota   domain.ProjectQuota
 }
 
-func (st *stream) run(changes <-chan ports.ClusterChange) error {
-	if err := st.refreshService(true); err != nil {
+// run follows the service until the stream ends. clientCtx is the client's
+// request context, which outlives ctx when the stream times out.
+func (st *stream) run(ctx, clientCtx context.Context, changes <-chan ports.ClusterChange) error {
+	if err := st.refreshService(ctx, true); err != nil {
 		return err
 	}
-	if err := st.refreshQuota(true); err != nil {
+	if err := st.refreshQuota(ctx, true); err != nil {
 		return err
 	}
 	if end, ok := st.ended(false); ok {
-		st.send(st.ctx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: end})
+		st.send(ctx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: end})
 		return nil
 	}
 
@@ -136,8 +140,8 @@ func (st *stream) run(changes <-chan ports.ClusterChange) error {
 
 	for {
 		select {
-		case <-st.ctx.Done():
-			st.endOnTimeout()
+		case <-ctx.Done():
+			st.endOnTimeout(ctx, clientCtx)
 			return nil
 		case <-ghostGrace.C:
 			ghostGraceOver = true
@@ -146,12 +150,12 @@ func (st *stream) run(changes <-chan ports.ClusterChange) error {
 				// The watch ended: stop without done, the client reconnects.
 				return nil
 			}
-			if err := st.apply(append([]ports.ClusterChange{change}, drain(changes)...)); err != nil {
+			if err := st.apply(ctx, append([]ports.ClusterChange{change}, drain(changes)...)); err != nil {
 				return err
 			}
 		}
 		if end, ok := st.ended(ghostGraceOver); ok {
-			st.send(st.ctx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: end})
+			st.send(ctx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: end})
 			return nil
 		}
 	}
@@ -176,7 +180,7 @@ func drain(changes <-chan ports.ClusterChange) []ports.ClusterChange {
 
 // apply sends the progress of a batch of changes, then reads back the
 // state they affect.
-func (st *stream) apply(batch []ports.ClusterChange) error {
+func (st *stream) apply(ctx context.Context, batch []ports.ClusterChange) error {
 	serviceChanged, quotaChanged := false, false
 	for _, c := range batch {
 		switch c.Kind {
@@ -187,19 +191,19 @@ func (st *stream) apply(batch []ports.ClusterChange) error {
 			// creation refused by the quota).
 			serviceChanged = true
 			if c.Progress != nil {
-				st.send(st.ctx, domain.ServiceEvent{Kind: domain.ServiceEventProgress, Progress: c.Progress})
+				st.send(ctx, domain.ServiceEvent{Kind: domain.ServiceEventProgress, Progress: c.Progress})
 			}
 		default:
 			serviceChanged = true
 		}
 	}
 	if serviceChanged {
-		if err := st.refreshService(false); err != nil {
+		if err := st.refreshService(ctx, false); err != nil {
 			return err
 		}
 	}
 	if quotaChanged {
-		return st.refreshQuota(false)
+		return st.refreshQuota(ctx, false)
 	}
 	return nil
 }
@@ -207,9 +211,9 @@ func (st *stream) apply(batch []ports.ClusterChange) error {
 // refreshService reads the service back and sends its status if it changed.
 // Once the record is gone (deleted), the last record read still describes
 // the service while its pods shut down.
-func (st *stream) refreshService(first bool) error {
+func (st *stream) refreshService(ctx context.Context, first bool) error {
 	if !st.deleted {
-		rec, err := st.reader.records.GetServiceRecord(st.ctx, st.namespace, st.rec.ReleaseID)
+		rec, err := st.reader.records.GetServiceRecord(ctx, st.namespace, st.rec.ReleaseID)
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
 			st.deleted = true
@@ -220,7 +224,7 @@ func (st *stream) refreshService(first bool) error {
 		}
 	}
 
-	svc, err := st.reader.readService(st.ctx, st.namespace, st.rec)
+	svc, err := st.reader.readService(ctx, st.namespace, st.rec)
 	if err != nil {
 		return err
 	}
@@ -231,15 +235,15 @@ func (st *stream) refreshService(first bool) error {
 	}
 	if first || !reflect.DeepEqual(svc, st.service) {
 		st.service = svc
-		st.send(st.ctx, domain.ServiceEvent{Kind: domain.ServiceEventStatus, Service: &svc})
+		st.send(ctx, domain.ServiceEvent{Kind: domain.ServiceEventStatus, Service: &svc})
 	}
 	return nil
 }
 
 // refreshQuota reads the project's quota back and sends it if it changed.
 // A project without quota gets no quota event.
-func (st *stream) refreshQuota(first bool) error {
-	quota, err := st.quotas.GetProjectQuota(st.ctx, st.namespace)
+func (st *stream) refreshQuota(ctx context.Context, first bool) error {
+	quota, err := st.quotas.ReadProjectQuota(ctx, st.namespace)
 	if err != nil {
 		return fmt.Errorf("get project quota: %w", err)
 	}
@@ -248,7 +252,7 @@ func (st *stream) refreshQuota(first bool) error {
 	}
 	if first || !reflect.DeepEqual(quota, st.quota) {
 		st.quota = quota
-		st.send(st.ctx, domain.ServiceEvent{Kind: domain.ServiceEventQuota, Quota: &quota})
+		st.send(ctx, domain.ServiceEvent{Kind: domain.ServiceEventQuota, Quota: &quota})
 	}
 	return nil
 }
@@ -274,9 +278,18 @@ func (st *stream) ended(ghostGraceOver bool) (domain.StreamEndReason, bool) {
 
 // endOnTimeout sends done when the stream reached its maximum duration
 // while the client is still there. A client gone or a shutdown gets nothing.
-func (st *stream) endOnTimeout() {
-	if errors.Is(st.ctx.Err(), context.DeadlineExceeded) && st.clientCtx.Err() == nil && st.lifetime.Err() == nil {
-		st.send(st.clientCtx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: domain.StreamEndTimeout})
+func (st *stream) endOnTimeout(ctx, clientCtx context.Context) {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) && clientCtx.Err() == nil && !st.shuttingDown() {
+		st.send(clientCtx, domain.ServiceEvent{Kind: domain.ServiceEventDone, End: domain.StreamEndTimeout})
+	}
+}
+
+func (s *Streamer) shuttingDown() bool {
+	select {
+	case <-s.shutdown:
+		return true
+	default:
+		return false
 	}
 }
 

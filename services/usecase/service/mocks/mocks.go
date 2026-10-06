@@ -235,20 +235,20 @@ func (m *MockWorkloadStateGateway) ListQuotaFailures(
 	return nil, args.Error(1)
 }
 
-type MockQuotaGateway struct{ mock.Mock }
+type MockProjectQuotaReader struct{ mock.Mock }
 
-var _ ports.QuotaGateway = (*MockQuotaGateway)(nil)
+var _ ports.ProjectQuotaReader = (*MockProjectQuotaReader)(nil)
 
-func (m *MockQuotaGateway) GetProjectQuota(ctx context.Context, namespace string) (domain.ProjectQuota, error) {
+func (m *MockProjectQuotaReader) ReadProjectQuota(ctx context.Context, namespace string) (domain.ProjectQuota, error) {
 	args := m.Called(ctx, namespace)
 	return args.Get(0).(domain.ProjectQuota), args.Error(1)
 }
 
-type MockClusterWatchGateway struct{ mock.Mock }
+type MockClusterWatcher struct{ mock.Mock }
 
-var _ ports.ClusterWatchGateway = (*MockClusterWatchGateway)(nil)
+var _ ports.ClusterWatcher = (*MockClusterWatcher)(nil)
 
-func (m *MockClusterWatchGateway) Watch(
+func (m *MockClusterWatcher) Watch(
 	ctx context.Context,
 	namespace, releaseID string,
 ) (<-chan ports.ClusterChange, error) {

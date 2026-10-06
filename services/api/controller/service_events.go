@@ -20,15 +20,15 @@ import (
 const keepAliveInterval = 15 * time.Second
 
 type ServiceEventsController struct {
-	events     ports.ServiceEvents
-	quotas     ports.ProjectQuotaQuery
+	events     ports.ServiceFollower
+	quotas     ports.ProjectQuotaGetter
 	userGetter usercontext.UserGetter
 	keepAlive  time.Duration
 }
 
 func NewServiceEventsController(
-	events ports.ServiceEvents,
-	quotas ports.ProjectQuotaQuery,
+	events ports.ServiceFollower,
+	quotas ports.ProjectQuotaGetter,
 	userGetter usercontext.UserGetter,
 ) *ServiceEventsController {
 	return &ServiceEventsController{events: events, quotas: quotas, userGetter: userGetter, keepAlive: keepAliveInterval}
@@ -49,7 +49,7 @@ func (c *ServiceEventsController) WatchServiceEvents(
 		return err
 	}
 
-	events, err := c.events.Open(ctx, user, params.XOnyxiaProject, params.ReleaseId)
+	events, err := c.events.Follow(ctx, user, params.XOnyxiaProject, params.ReleaseId)
 	if err != nil {
 		if !errors.Is(err, domain.ErrNotFound) && !errors.Is(err, domain.ErrForbidden) {
 			slog.ErrorContext(ctx, "open service event stream failed", slog.Any("error", err))

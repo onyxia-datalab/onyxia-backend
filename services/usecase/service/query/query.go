@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
 	"github.com/onyxia-datalab/onyxia-backend/services/domain"
@@ -73,11 +74,7 @@ func (uc *Reader) readService(ctx context.Context, namespace string, rec ports.S
 		if w.pods, err = uc.pods.GetPodsForRelease(ctx, namespace, rec.ReleaseID); err != nil {
 			return domain.Service{}, fmt.Errorf("get pods: %w", err)
 		}
-		failures, err := uc.pods.ListQuotaFailures(ctx, namespace)
-		if err != nil {
-			return domain.Service{}, fmt.Errorf("list quota failures: %w", err)
-		}
-		w.quotaFailure = failures[rec.ReleaseID]
+		w.quotaFailure = uc.quotaFailures(ctx, namespace)[rec.ReleaseID]
 	}
 
 	status, svcErr := deriveStatus(release, w)
@@ -107,12 +104,7 @@ func (uc *Reader) ListServices(
 		return nil, fmt.Errorf("list service records: %w", err)
 	}
 
-	visible := make([]ports.ServiceRecord, 0, len(records))
-	for _, rec := range records {
-		if uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
-			visible = append(visible, rec)
-		}
-	}
+	visible := uc.visibleRecords(user, namespace, records)
 	if len(visible) == 0 {
 		return []domain.Service{}, nil
 	}
@@ -133,9 +125,7 @@ func (uc *Reader) ListServices(
 			if podsByRelease, err = uc.pods.ListPodsByRelease(ctx, namespace); err != nil {
 				return nil, fmt.Errorf("list pods: %w", err)
 			}
-			if quotaFailures, err = uc.pods.ListQuotaFailures(ctx, namespace); err != nil {
-				return nil, fmt.Errorf("list quota failures: %w", err)
-			}
+			quotaFailures = uc.quotaFailures(ctx, namespace)
 			fetched = true
 		}
 		// The list carries the status alone; the detail is GetService's.
@@ -146,6 +136,34 @@ func (uc *Reader) ListServices(
 		services = append(services, toService(namespace, rec, status))
 	}
 	return services, nil
+}
+
+// visibleRecords keeps the records of the services user may see.
+func (uc *Reader) visibleRecords(
+	user usercontext.User,
+	namespace string,
+	records []ports.ServiceRecord,
+) []ports.ServiceRecord {
+	visible := make([]ports.ServiceRecord, 0, len(records))
+	for _, rec := range records {
+		if uc.namespaces.CanAccessService(user.Username, namespace, rec.Owner, rec.Share) {
+			visible = append(visible, rec)
+		}
+	}
+	return visible
+}
+
+// quotaFailures returns the releases of the namespace whose pods the quota
+// refuses. It only refines a Deploying status, so failing to read it is
+// logged rather than failing the read: the status stays Deploying.
+func (uc *Reader) quotaFailures(ctx context.Context, namespace string) map[string]string {
+	failures, err := uc.pods.ListQuotaFailures(ctx, namespace)
+	if err != nil {
+		slog.WarnContext(ctx, "list quota failures failed",
+			slog.String("namespace", namespace), slog.Any("error", err))
+		return nil
+	}
+	return failures
 }
 
 func toService(namespace string, rec ports.ServiceRecord, status domain.ServiceStatus) domain.Service {

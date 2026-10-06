@@ -134,6 +134,18 @@ func TestClusterWatch(t *testing.T) {
 	}
 }
 
+// A StatefulSet's pod keeps its name across restarts: the events of the
+// previous pod are not the current one's.
+func TestOwnerCacheTellsObjectsOfTheSameNameApart(t *testing.T) {
+	pod := releasePod("jupyter-0", "jupyter", corev1.PodRunning)
+	pod.UID = "current"
+	owners := newOwnerCache(k8sfake.NewClientset(pod), "project", "jupyter")
+
+	assert.True(t, owners.owns(context.Background(), corev1.ObjectReference{Kind: kindPod, Name: "jupyter-0", UID: "current"}))
+	assert.False(t, owners.owns(context.Background(), corev1.ObjectReference{Kind: kindPod, Name: "jupyter-0", UID: "previous"}))
+	assert.False(t, owners.owns(context.Background(), corev1.ObjectReference{Kind: kindPod, Name: "rstudio-0", UID: "current"}))
+}
+
 func nextChange(t *testing.T, changes <-chan ports.ClusterChange) ports.ClusterChange {
 	t.Helper()
 	select {

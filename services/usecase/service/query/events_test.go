@@ -92,7 +92,7 @@ func (f fakeWorkloads) ListQuotaFailures(context.Context, string) (map[string]st
 	return map[string]string{testRelease: f.c.quotaFailure}, nil
 }
 
-func (c *fakeCluster) GetProjectQuota(context.Context, string) (domain.ProjectQuota, error) {
+func (c *fakeCluster) ReadProjectQuota(context.Context, string) (domain.ProjectQuota, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.quota, nil
@@ -138,7 +138,7 @@ func openStream(t *testing.T, c *fakeCluster, settings StreamSettings) <-chan do
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	events, err := newTestStreamer(context.Background(), c, settings).Open(ctx, testCaller, testNamespace, testRelease)
+	events, err := newTestStreamer(context.Background(), c, settings).Follow(ctx, testCaller, testNamespace, testRelease)
 	require.NoError(t, err)
 	return events
 }
@@ -327,7 +327,7 @@ func TestStream_ShutdownClosesWithoutDone(t *testing.T) {
 	lifetime, shutdown := context.WithCancel(context.Background())
 	c := newFakeCluster(deployedRelease, startingPod)
 	events, err := newTestStreamer(lifetime, c, testStreamSettings).
-		Open(context.Background(), testCaller, testNamespace, testRelease)
+		Follow(context.Background(), testCaller, testNamespace, testRelease)
 	require.NoError(t, err)
 	requireStatus(t, events, domain.ServiceStatusDeploying)
 
@@ -339,7 +339,7 @@ func TestStream_ClientGoneClosesTheStream(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := newFakeCluster(deployedRelease, startingPod)
 	events, err := newTestStreamer(context.Background(), c, testStreamSettings).
-		Open(ctx, testCaller, testNamespace, testRelease)
+		Follow(ctx, testCaller, testNamespace, testRelease)
 	require.NoError(t, err)
 	requireStatus(t, events, domain.ServiceStatusDeploying)
 
@@ -351,7 +351,7 @@ func TestStream_Authorization(t *testing.T) {
 	t.Run("foreign namespace", func(t *testing.T) {
 		c := newFakeCluster(deployedRelease)
 		_, err := newTestStreamer(context.Background(), c, testStreamSettings).
-			Open(context.Background(), testCaller, "user-bob", testRelease)
+			Follow(context.Background(), testCaller, "user-bob", testRelease)
 		assert.ErrorIs(t, err, domain.ErrForbidden)
 	})
 	t.Run("unshared service of another owner", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestStream_Authorization(t *testing.T) {
 		rec := record(testRelease, "bob", false)
 		c.record = &rec
 		_, err := newTestStreamer(context.Background(), c, testStreamSettings).
-			Open(context.Background(), testCaller, testNamespace, testRelease)
+			Follow(context.Background(), testCaller, testNamespace, testRelease)
 		assert.ErrorIs(t, err, domain.ErrNotFound)
 		select {
 		case <-c.watched:
@@ -371,7 +371,7 @@ func TestStream_Authorization(t *testing.T) {
 		c := newFakeCluster(deployedRelease)
 		c.record = nil
 		_, err := newTestStreamer(context.Background(), c, testStreamSettings).
-			Open(context.Background(), testCaller, testNamespace, testRelease)
+			Follow(context.Background(), testCaller, testNamespace, testRelease)
 		assert.ErrorIs(t, err, domain.ErrNotFound)
 	})
 }
