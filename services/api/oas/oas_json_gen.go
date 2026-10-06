@@ -2615,8 +2615,10 @@ func (s *ServiceError) encodeFields(e *jx.Encoder) {
 		s.Reason.Encode(e)
 	}
 	{
-		e.FieldStart("podName")
-		e.Str(s.PodName)
+		if s.PodName.Set {
+			e.FieldStart("podName")
+			s.PodName.Encode(e)
+		}
 	}
 	{
 		if s.Message.Set {
@@ -2680,11 +2682,9 @@ func (s *ServiceError) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"reason\"")
 			}
 		case "podName":
-			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				v, err := d.Str()
-				s.PodName = string(v)
-				if err != nil {
+				s.PodName.Reset()
+				if err := s.PodName.Decode(d); err != nil {
 					return err
 				}
 				return nil
@@ -2751,7 +2751,7 @@ func (s *ServiceError) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -2813,6 +2813,8 @@ func (s *ServiceErrorReason) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch ServiceErrorReason(v) {
+	case ServiceErrorReasonReleaseFailed:
+		*s = ServiceErrorReasonReleaseFailed
 	case ServiceErrorReasonCrashLoop:
 		*s = ServiceErrorReasonCrashLoop
 	case ServiceErrorReasonOomKilled:
@@ -3107,6 +3109,8 @@ func (s *ServiceStatus) Decode(d *jx.Decoder) error {
 		*s = ServiceStatusError
 	case ServiceStatusGhost:
 		*s = ServiceStatusGhost
+	case ServiceStatusSuspending:
+		*s = ServiceStatusSuspending
 	case ServiceStatusSuspended:
 		*s = ServiceStatusSuspended
 	case ServiceStatusTerminating:

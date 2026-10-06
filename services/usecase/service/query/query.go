@@ -59,10 +59,18 @@ func (uc *Reader) GetService(
 		return domain.Service{}, domain.ErrNotFound
 	}
 
-	status, svcErr, err := uc.deriveStatusWithDetail(ctx, namespace, releaseID)
+	release, err := uc.helm.GetReleaseState(ctx, namespace, releaseID)
 	if err != nil {
-		return domain.Service{}, fmt.Errorf("derive status: %w", err)
+		return domain.Service{}, fmt.Errorf("get release state: %w", err)
 	}
+	var pods []ports.PodInfo
+	if needsPods(release) {
+		if pods, err = uc.pods.GetPodsForRelease(ctx, namespace, releaseID); err != nil {
+			return domain.Service{}, fmt.Errorf("get pods: %w", err)
+		}
+	}
+
+	status, svcErr := deriveStatus(release, pods)
 
 	svc := toService(namespace, rec, status)
 	svc.Error = svcErr
@@ -70,11 +78,11 @@ func (uc *Reader) GetService(
 }
 
 // ListServices returns services visible to the current user
-// (see namespace.Authorizer.CanAccessService).
-// Pod queries are skipped — status is derived from the release state and the
-// workload controllers only. The number of calls to the cluster does not
-// depend on the number of services: one list of the records, one of the
-// releases and, if any service needs it, one snapshot of the workloads.
+// (see namespace.Authorizer.CanAccessService), with the same status
+// GetService derives but without the error detail.
+// The number of calls to the cluster does not depend on the number of
+// services: one list of the records, one of the releases and, if any service
+// needs it, one of the pods.
 func (uc *Reader) ListServices(
 	ctx context.Context,
 	user usercontext.User,
@@ -104,23 +112,20 @@ func (uc *Reader) ListServices(
 		return nil, fmt.Errorf("list release states: %w", err)
 	}
 
-	var workloads ports.WorkloadReadiness // fetched on first need
+	var podsByRelease map[string][]ports.PodInfo
+	podsFetched := false
 	services := make([]domain.Service, 0, len(visible))
 	for _, rec := range visible {
 		// A record without a release yields the zero state: a Ghost.
 		release := releases[rec.ReleaseID]
-		status, decided := statusFromRelease(release)
-		if !decided {
-			if workloads == nil {
-				if workloads, err = uc.pods.GetWorkloadReadiness(ctx, namespace); err != nil {
-					return nil, fmt.Errorf("get workload readiness: %w", err)
-				}
+		if needsPods(release) && !podsFetched {
+			if podsByRelease, err = uc.pods.ListPodsByRelease(ctx, namespace); err != nil {
+				return nil, fmt.Errorf("list pods: %w", err)
 			}
-			status = domain.ServiceStatusDeploying
-			if workloads.AllReady(release.Resources) {
-				status = domain.ServiceStatusRunning
-			}
+			podsFetched = true
 		}
+		// The list carries the status alone; the detail is GetService's.
+		status, _ := deriveStatus(release, podsByRelease[rec.ReleaseID])
 		services = append(services, toService(namespace, rec, status))
 	}
 	return services, nil
@@ -136,27 +141,4 @@ func toService(namespace string, rec ports.ServiceRecord, status domain.ServiceS
 		Share:        rec.Share,
 		Status:       status,
 	}
-}
-
-// deriveStatusWithDetail applies the full derivation including pod queries.
-func (uc *Reader) deriveStatusWithDetail(
-	ctx context.Context,
-	namespace, releaseID string,
-) (domain.ServiceStatus, *domain.ServiceError, error) {
-	releaseState, err := uc.helm.GetReleaseState(ctx, namespace, releaseID)
-	if err != nil {
-		return "", nil, err
-	}
-
-	if status, decided := statusFromRelease(releaseState); decided {
-		return status, nil, nil
-	}
-
-	podInfos, err := uc.pods.GetPodsForRelease(ctx, namespace, releaseID)
-	if err != nil {
-		return "", nil, err
-	}
-
-	status, svcErr := derivePodStatus(podInfos)
-	return status, svcErr, nil
 }

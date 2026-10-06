@@ -56,8 +56,7 @@ func record(releaseID, owner string, share bool) ports.ServiceRecord {
 	}
 }
 
-// readerForState drives GetService through the Helm-state path.
-// Covers Ghost (Exists=false) and Suspended (both decided by statusFromRelease).
+// readerForState drives GetService for a release without pods.
 func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
 	t.Helper()
 	uc, ctx, m := setupReader(t)
@@ -67,30 +66,12 @@ func readerForState(t *testing.T, state ports.ReleaseState) (domain.Service, err
 	m.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
 		Return(state, nil)
 
-	if state.Exists && !state.Suspended {
+	if needsPods(state) {
 		m.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
 			Return([]ports.PodInfo{}, nil)
 	}
 
 	return uc.GetService(ctx, testCaller, testNamespace, testRelease)
-}
-
-// readerForHelmStatus drives ListServices for a release whose status Helm
-// alone decides (see statusFromRelease): no workload mock is set up.
-func readerForHelmStatus(t *testing.T, state ports.ReleaseState) (domain.Service, error) {
-	t.Helper()
-	uc, ctx, m := setupReader(t)
-
-	m.records.On("ListServiceRecords", mock.Anything, testNamespace).
-		Return([]ports.ServiceRecord{record(testRelease, testUsername, false)}, nil)
-	m.helm.On("ListReleaseStates", mock.Anything, testNamespace).
-		Return(map[string]ports.ReleaseState{testRelease: state}, nil)
-
-	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
-	if err != nil || len(svcs) == 0 {
-		return domain.Service{}, err
-	}
-	return svcs[0], nil
 }
 
 // readerForPodsGetService drives GetService through the pod-status path.
@@ -265,9 +246,9 @@ func TestGetService_ForeignNamespaceForbidden(t *testing.T) {
 
 // listFixture stubs the namespace listings ListServices reads.
 type listFixture struct {
-	records   []ports.ServiceRecord
-	releases  map[string]ports.ReleaseState
-	workloads ports.WorkloadReadiness
+	records  []ports.ServiceRecord
+	releases map[string]ports.ReleaseState
+	pods     map[string][]ports.PodInfo
 }
 
 func (f listFixture) stub(m queryMocks, ns string) {
@@ -275,20 +256,12 @@ func (f listFixture) stub(m queryMocks, ns string) {
 	if f.releases != nil {
 		m.helm.On("ListReleaseStates", mock.Anything, ns).Return(f.releases, nil)
 	}
-	if f.workloads != nil {
-		m.pods.On("GetWorkloadReadiness", mock.Anything, ns).Return(f.workloads, nil)
+	if f.pods != nil {
+		m.pods.On("ListPodsByRelease", mock.Anything, ns).Return(f.pods, nil)
 	}
 }
 
-var deployedWithWeb = ports.ReleaseState{
-	Exists:    true,
-	Status:    ports.ReleaseStatusDeployed,
-	Resources: []ports.ManifestResource{{Kind: "Deployment", Name: "web"}},
-}
-
-func readiness(ready bool) ports.WorkloadReadiness {
-	return ports.WorkloadReadinessFunc(func([]ports.ManifestResource) bool { return ready })
-}
+var deployed = ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}
 
 func TestListServices_Empty(t *testing.T) {
 	uc, ctx, m := setupReader(t)
@@ -328,9 +301,9 @@ func TestListServices_Visibility(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			uc, ctx, m := setupReader(t)
 			listFixture{
-				records:   []ports.ServiceRecord{record("svc", tt.owner, tt.share)},
-				releases:  map[string]ports.ReleaseState{"svc": deployedWithWeb},
-				workloads: readiness(true),
+				records:  []ports.ServiceRecord{record("svc", tt.owner, tt.share)},
+				releases: map[string]ports.ReleaseState{"svc": deployed},
+				pods:     map[string][]ports.PodInfo{"svc": {{Name: "p", Ready: true}}},
 			}.stub(m, tt.namespace)
 
 			svcs, err := uc.ListServices(ctx, testCaller, tt.namespace)
@@ -348,29 +321,59 @@ func TestListServices_Visibility(t *testing.T) {
 	}
 }
 
-func TestListServices_DeployedReleaseFollowsWorkloads(t *testing.T) {
-	for _, ready := range []bool{true, false} {
-		uc, ctx, m := setupReader(t)
-		var gotResources []ports.ManifestResource
-		listFixture{
-			records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
-			releases: map[string]ports.ReleaseState{testRelease: deployedWithWeb},
-			workloads: ports.WorkloadReadinessFunc(func(r []ports.ManifestResource) bool {
-				gotResources = r
-				return ready
-			}),
-		}.stub(m, testNamespace)
+// GetService and ListServices derive the same status from the same cluster
+// state; only GetService carries the error detail.
+func TestGetAndListServicesAgree(t *testing.T) {
+	tests := []struct {
+		name    string
+		release ports.ReleaseState
+		pods    []ports.PodInfo
+	}{
+		{"ghost", ports.ReleaseState{}, nil},
+		{"failed release", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "boom"}, nil},
+		{"pending", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil},
+		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, nil},
+		{"suspending", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, []ports.PodInfo{{Name: "p", Terminating: true}}},
+		{"suspended", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusDeployed}, nil},
+		{"deployed, no pod", deployed, nil},
+		{"deployed, ready", deployed, []ports.PodInfo{{Name: "p", Ready: true}}},
+		{"deployed, starting", deployed, []ports.PodInfo{{Name: "p"}}},
+		{"deployed, crash loop", deployed, []ports.PodInfo{{Name: "p", ErrorReason: domain.ServiceErrorReasonCrashLoop}}},
+		{"deployed, rollout", deployed, []ports.PodInfo{{Name: "new", Ready: true}, {Name: "old", Terminating: true}}},
+	}
 
-		svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getUC, ctx, getMocks := setupReader(t)
+			getMocks.records.On("GetServiceRecord", mock.Anything, testNamespace, testRelease).
+				Return(record(testRelease, testUsername, false), nil)
+			getMocks.helm.On("GetReleaseState", mock.Anything, testNamespace, testRelease).
+				Return(tt.release, nil)
+			getMocks.pods.On("GetPodsForRelease", mock.Anything, testNamespace, testRelease).
+				Return(tt.pods, nil).Maybe()
 
-		require.NoError(t, err)
-		require.Len(t, svcs, 1)
-		want := domain.ServiceStatusDeploying
-		if ready {
-			want = domain.ServiceStatusRunning
-		}
-		assert.Equal(t, want, svcs[0].Status)
-		assert.Equal(t, deployedWithWeb.Resources, gotResources)
+			got, err := getUC.GetService(ctx, testCaller, testNamespace, testRelease)
+			require.NoError(t, err)
+
+			releases := map[string]ports.ReleaseState{}
+			if tt.release.Exists {
+				releases[testRelease] = tt.release
+			}
+			listUC, ctx, listMocks := setupReader(t)
+			listFixture{
+				records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
+				releases: releases,
+				pods:     map[string][]ports.PodInfo{testRelease: tt.pods},
+			}.stub(listMocks, testNamespace)
+
+			listed, err := listUC.ListServices(ctx, testCaller, testNamespace)
+			require.NoError(t, err)
+			require.Len(t, listed, 1)
+
+			assert.Equal(t, got.Status, listed[0].Status)
+			assert.Equal(t, got.Status == domain.ServiceStatusError, got.Error != nil)
+			assert.Nil(t, listed[0].Error)
+		})
 	}
 }
 
@@ -389,7 +392,7 @@ func TestListServices_RecordWithoutReleaseIsGhost(t *testing.T) {
 }
 
 // The number of calls doesn't grow with the number of services: one list of
-// releases and one workload snapshot, fetched only when a service needs it.
+// releases and one of the pods, fetched only when a service needs it.
 func TestListServices_ConstantNumberOfCalls(t *testing.T) {
 	uc, ctx, m := setupReader(t)
 	listFixture{
@@ -400,10 +403,10 @@ func TestListServices_ConstantNumberOfCalls(t *testing.T) {
 			record("pending", testUsername, false),
 		},
 		releases: map[string]ports.ReleaseState{
-			"a": deployedWithWeb, "b": deployedWithWeb, "c": deployedWithWeb,
+			"a": deployed, "b": deployed, "c": deployed,
 			"pending": {Exists: true, Status: ports.ReleaseStatusPending},
 		},
-		workloads: readiness(true),
+		pods: map[string][]ports.PodInfo{},
 	}.stub(m, testNamespace)
 
 	svcs, err := uc.ListServices(ctx, testCaller, testNamespace)
@@ -411,11 +414,12 @@ func TestListServices_ConstantNumberOfCalls(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, svcs, 4)
 	m.helm.AssertNumberOfCalls(t, "ListReleaseStates", 1)
-	m.pods.AssertNumberOfCalls(t, "GetWorkloadReadiness", 1)
+	m.pods.AssertNumberOfCalls(t, "ListPodsByRelease", 1)
+	m.pods.AssertNotCalled(t, "GetPodsForRelease", mock.Anything, mock.Anything, mock.Anything)
 	m.helm.AssertNotCalled(t, "GetReleaseState", mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestListServices_NoWorkloadCallWhenReleasesDecide(t *testing.T) {
+func TestListServices_NoPodCallWhenReleasesDecide(t *testing.T) {
 	uc, ctx, m := setupReader(t)
 	listFixture{
 		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
@@ -426,7 +430,7 @@ func TestListServices_NoWorkloadCallWhenReleasesDecide(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.ServiceStatusDeploying, svcs[0].Status)
-	m.pods.AssertNotCalled(t, "GetWorkloadReadiness", mock.Anything, mock.Anything)
+	m.pods.AssertNotCalled(t, "ListPodsByRelease", mock.Anything, mock.Anything)
 }
 
 func TestListServices_ReleasesListError(t *testing.T) {
@@ -439,13 +443,13 @@ func TestListServices_ReleasesListError(t *testing.T) {
 	assert.ErrorContains(t, err, "helm down")
 }
 
-func TestListServices_WorkloadReadinessError(t *testing.T) {
+func TestListServices_PodsListError(t *testing.T) {
 	uc, ctx, m := setupReader(t)
 	listFixture{
 		records:  []ports.ServiceRecord{record(testRelease, testUsername, false)},
-		releases: map[string]ports.ReleaseState{testRelease: deployedWithWeb},
+		releases: map[string]ports.ReleaseState{testRelease: deployed},
 	}.stub(m, testNamespace)
-	m.pods.On("GetWorkloadReadiness", mock.Anything, testNamespace).Return(nil, errors.New("k8s down"))
+	m.pods.On("ListPodsByRelease", mock.Anything, testNamespace).Return(nil, errors.New("k8s down"))
 
 	_, err := uc.ListServices(ctx, testCaller, testNamespace)
 

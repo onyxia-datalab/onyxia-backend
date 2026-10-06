@@ -5,30 +5,55 @@ import (
 	"github.com/onyxia-datalab/onyxia-backend/services/ports"
 )
 
-// statusFromRelease returns the status when the release state alone decides
-// it. decided is false for an existing, non-suspended, deployed release: its
-// status then depends on the workloads, which GetService and ListServices
-// inspect at different levels of detail. Both paths go through this function
-// so they never disagree on a status the release already decides.
-func statusFromRelease(releaseState ports.ReleaseState) (status domain.ServiceStatus, decided bool) {
-	if !releaseState.Exists {
-		return domain.ServiceStatusGhost, true
+// needsPods reports whether deriveStatus needs the release's pods: only a
+// suspended or deployed release depends on them. Callers skip the pod query
+// otherwise.
+func needsPods(release ports.ReleaseState) bool {
+	return release.Exists && (release.Suspended || release.Status == ports.ReleaseStatusDeployed)
+}
+
+// deriveStatus is the single derivation of a service's status: GetService
+// and ListServices both go through it, so they can't disagree. pods are the
+// release's live pods; they are only read when needsPods(release).
+// The ServiceError is non-nil exactly when the status is Error.
+func deriveStatus(release ports.ReleaseState, pods []ports.PodInfo) (domain.ServiceStatus, *domain.ServiceError) {
+	if !release.Exists {
+		return domain.ServiceStatusGhost, nil
 	}
 	// A suspended release is still deployed (suspension is an upgrade), so
 	// this must be checked before looking at the status.
-	if releaseState.Suspended {
-		return domain.ServiceStatusSuspended, true
+	if release.Suspended {
+		if len(pods) > 0 {
+			return domain.ServiceStatusSuspending, nil
+		}
+		return domain.ServiceStatusSuspended, nil
 	}
-	switch releaseState.Status {
+	switch release.Status {
 	case ports.ReleaseStatusDeployed:
-		return "", false
+		return derivePodStatus(activePods(pods))
 	case ports.ReleaseStatusFailed:
-		return domain.ServiceStatusError, true
+		return domain.ServiceStatusError, &domain.ServiceError{
+			Reason:  domain.ServiceErrorReasonReleaseFailed,
+			Message: release.Message,
+		}
 	case ports.ReleaseStatusUninstalling:
-		return domain.ServiceStatusTerminating, true
+		return domain.ServiceStatusTerminating, nil
 	default: // pending, unknown
-		return domain.ServiceStatusDeploying, true
+		return domain.ServiceStatusDeploying, nil
 	}
+}
+
+// activePods leaves out the pods being deleted: during a rollout the old pod
+// shuts down while its replacement starts, and only the latter tells whether
+// the service is up.
+func activePods(pods []ports.PodInfo) []ports.PodInfo {
+	active := make([]ports.PodInfo, 0, len(pods))
+	for _, pod := range pods {
+		if !pod.Terminating {
+			active = append(active, pod)
+		}
+	}
+	return active
 }
 
 // derivePodStatus maps pod states to a ServiceStatus.

@@ -950,7 +950,12 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 type Service struct {
 	// Release identifier.
 	ReleaseId string `json:"releaseId"`
-	// Current lifecycle state of the service.
+	// Current lifecycle state of the service, derived the same way by getService and listServices.
+	// Deploying: being installed, or its pods are not all ready yet. Running: all its pods are ready.
+	// Error: the release failed or a pod is failing; not terminal, a service may recover (e.g. after a
+	// crash loop). Ghost: the service record exists but its release is gone. Suspending: suspended, but
+	// some pods are still shutting down. Suspended: suspended, no pod left. Terminating: the release is
+	// being uninstalled.
 	Status ServiceStatus `json:"status"`
 	// Display name.
 	FriendlyName string `json:"friendlyName"`
@@ -1035,15 +1040,20 @@ func (s *Service) SetError(val OptServiceError) {
 
 func (*Service) getServiceRes() {}
 
+// Why a service is in Error. Returned by getService, always present when the status is Error;
+// listServices returns the status alone.
 // Ref: #/components/schemas/ServiceError
 type ServiceError struct {
-	Reason       ServiceErrorReason `json:"reason"`
-	PodName      string             `json:"podName"`
-	Message      OptString          `json:"message"`
-	RestartCount OptInt             `json:"restartCount"`
-	ExitCode     OptInt             `json:"exitCode"`
-	Image        OptString          `json:"image"`
-	Limit        OptString          `json:"limit"`
+	// Release_failed: the last install or upgrade of the release failed (message holds the deployment
+	// tool's description, no podName). The other reasons come from a failing pod, named by podName.
+	Reason ServiceErrorReason `json:"reason"`
+	// The failing pod.
+	PodName      OptString `json:"podName"`
+	Message      OptString `json:"message"`
+	RestartCount OptInt    `json:"restartCount"`
+	ExitCode     OptInt    `json:"exitCode"`
+	Image        OptString `json:"image"`
+	Limit        OptString `json:"limit"`
 }
 
 // GetReason returns the value of Reason.
@@ -1052,7 +1062,7 @@ func (s *ServiceError) GetReason() ServiceErrorReason {
 }
 
 // GetPodName returns the value of PodName.
-func (s *ServiceError) GetPodName() string {
+func (s *ServiceError) GetPodName() OptString {
 	return s.PodName
 }
 
@@ -1087,7 +1097,7 @@ func (s *ServiceError) SetReason(val ServiceErrorReason) {
 }
 
 // SetPodName sets the value of PodName.
-func (s *ServiceError) SetPodName(val string) {
+func (s *ServiceError) SetPodName(val OptString) {
 	s.PodName = val
 }
 
@@ -1116,9 +1126,12 @@ func (s *ServiceError) SetLimit(val OptString) {
 	s.Limit = val
 }
 
+// Release_failed: the last install or upgrade of the release failed (message holds the deployment
+// tool's description, no podName). The other reasons come from a failing pod, named by podName.
 type ServiceErrorReason string
 
 const (
+	ServiceErrorReasonReleaseFailed   ServiceErrorReason = "release_failed"
 	ServiceErrorReasonCrashLoop       ServiceErrorReason = "crash_loop"
 	ServiceErrorReasonOomKilled       ServiceErrorReason = "oom_killed"
 	ServiceErrorReasonImagePull       ServiceErrorReason = "image_pull"
@@ -1130,6 +1143,7 @@ const (
 // AllValues returns all ServiceErrorReason values.
 func (ServiceErrorReason) AllValues() []ServiceErrorReason {
 	return []ServiceErrorReason{
+		ServiceErrorReasonReleaseFailed,
 		ServiceErrorReasonCrashLoop,
 		ServiceErrorReasonOomKilled,
 		ServiceErrorReasonImagePull,
@@ -1142,6 +1156,8 @@ func (ServiceErrorReason) AllValues() []ServiceErrorReason {
 // MarshalText implements encoding.TextMarshaler.
 func (s ServiceErrorReason) MarshalText() ([]byte, error) {
 	switch s {
+	case ServiceErrorReasonReleaseFailed:
+		return []byte(s), nil
 	case ServiceErrorReasonCrashLoop:
 		return []byte(s), nil
 	case ServiceErrorReasonOomKilled:
@@ -1162,6 +1178,9 @@ func (s ServiceErrorReason) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *ServiceErrorReason) UnmarshalText(data []byte) error {
 	switch ServiceErrorReason(data) {
+	case ServiceErrorReasonReleaseFailed:
+		*s = ServiceErrorReasonReleaseFailed
+		return nil
 	case ServiceErrorReasonCrashLoop:
 		*s = ServiceErrorReasonCrashLoop
 		return nil
@@ -1273,7 +1292,12 @@ func (s *ServiceInstallRequestOptions) init() ServiceInstallRequestOptions {
 	return m
 }
 
-// Current lifecycle state of the service.
+// Current lifecycle state of the service, derived the same way by getService and listServices.
+// Deploying: being installed, or its pods are not all ready yet. Running: all its pods are ready.
+// Error: the release failed or a pod is failing; not terminal, a service may recover (e.g. after a
+// crash loop). Ghost: the service record exists but its release is gone. Suspending: suspended, but
+// some pods are still shutting down. Suspended: suspended, no pod left. Terminating: the release is
+// being uninstalled.
 type ServiceStatus string
 
 const (
@@ -1281,6 +1305,7 @@ const (
 	ServiceStatusRunning     ServiceStatus = "Running"
 	ServiceStatusError       ServiceStatus = "Error"
 	ServiceStatusGhost       ServiceStatus = "Ghost"
+	ServiceStatusSuspending  ServiceStatus = "Suspending"
 	ServiceStatusSuspended   ServiceStatus = "Suspended"
 	ServiceStatusTerminating ServiceStatus = "Terminating"
 )
@@ -1292,6 +1317,7 @@ func (ServiceStatus) AllValues() []ServiceStatus {
 		ServiceStatusRunning,
 		ServiceStatusError,
 		ServiceStatusGhost,
+		ServiceStatusSuspending,
 		ServiceStatusSuspended,
 		ServiceStatusTerminating,
 	}
@@ -1307,6 +1333,8 @@ func (s ServiceStatus) MarshalText() ([]byte, error) {
 	case ServiceStatusError:
 		return []byte(s), nil
 	case ServiceStatusGhost:
+		return []byte(s), nil
+	case ServiceStatusSuspending:
 		return []byte(s), nil
 	case ServiceStatusSuspended:
 		return []byte(s), nil
@@ -1331,6 +1359,9 @@ func (s *ServiceStatus) UnmarshalText(data []byte) error {
 		return nil
 	case ServiceStatusGhost:
 		*s = ServiceStatusGhost
+		return nil
+	case ServiceStatusSuspending:
+		*s = ServiceStatusSuspending
 		return nil
 	case ServiceStatusSuspended:
 		*s = ServiceStatusSuspended

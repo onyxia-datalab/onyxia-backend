@@ -8,8 +8,11 @@ import (
 
 // PodInfo is the minimal pod state needed to derive the service status.
 type PodInfo struct {
-	Name         string
-	Ready        bool
+	Name  string
+	Ready bool
+	// Terminating is true once the pod is being deleted: it still runs but
+	// no longer counts towards the service's readiness.
+	Terminating  bool
 	ErrorReason  domain.ServiceErrorReason // empty string means no error
 	RestartCount int32
 	ExitCode     int32
@@ -18,26 +21,14 @@ type PodInfo struct {
 	Limit        string
 }
 
-// WorkloadStateGateway provides Kubernetes workload state.
+// WorkloadStateGateway provides the state of the pods of releases. Only live
+// pods are returned: pods that ran to completion (succeeded or failed) are
+// left out.
 type WorkloadStateGateway interface {
-	// GetPodsForRelease returns pod-level detail for error diagnosis (used by GetService).
+	// GetPodsForRelease returns the live pods of one release.
 	GetPodsForRelease(ctx context.Context, namespace, releaseID string) ([]PodInfo, error)
 
-	// GetWorkloadReadiness snapshots the readiness of the namespace's
-	// workloads in a constant number of calls, so that the readiness of many
-	// releases can be checked without a request per release.
-	GetWorkloadReadiness(ctx context.Context, namespace string) (WorkloadReadiness, error)
+	// ListPodsByRelease returns the live pods of the namespace grouped by
+	// release, in a constant number of calls whatever the number of releases.
+	ListPodsByRelease(ctx context.Context, namespace string) (map[string][]PodInfo, error)
 }
-
-// WorkloadReadiness is a snapshot of a namespace's workload readiness.
-type WorkloadReadiness interface {
-	// AllReady reports whether every workload controller among resources is
-	// ready. The implementation decides which kinds are controllers; other
-	// kinds are ignored. A declared controller that doesn't exist is not ready.
-	AllReady(resources []ManifestResource) bool
-}
-
-// WorkloadReadinessFunc adapts a function to WorkloadReadiness.
-type WorkloadReadinessFunc func(resources []ManifestResource) bool
-
-func (f WorkloadReadinessFunc) AllReady(resources []ManifestResource) bool { return f(resources) }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/onyxia-datalab/onyxia-backend/services/bootstrap/env"
@@ -20,7 +19,6 @@ import (
 	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/client-go/rest"
-	sigsyaml "sigs.k8s.io/yaml"
 )
 
 type Helm struct {
@@ -267,33 +265,6 @@ func globalSuspendSupported(chartValues map[string]interface{}) bool {
 	return ok
 }
 
-// parseManifestResources splits a multi-document YAML manifest and extracts
-// the Kind and metadata.name of each resource.
-func parseManifestResources(manifest string) []ports.ManifestResource {
-	var resources []ports.ManifestResource
-
-	type meta struct {
-		Kind     string `json:"kind"`
-		Metadata struct {
-			Name string `json:"name"`
-		} `json:"metadata"`
-	}
-
-	for _, doc := range strings.Split(manifest, "\n---") {
-		doc = strings.TrimSpace(doc)
-		if doc == "" {
-			continue
-		}
-		var m meta
-		if err := sigsyaml.Unmarshal([]byte(doc), &m); err != nil || m.Kind == "" || m.Metadata.Name == "" {
-			continue
-		}
-		resources = append(resources, ports.ManifestResource{Kind: m.Kind, Name: m.Metadata.Name})
-	}
-
-	return resources
-}
-
 // GetReleaseState returns ReleaseState{Exists: false} (no error) when the
 // release is not found.
 func (h *Helm) GetReleaseState(
@@ -354,13 +325,14 @@ func releaseState(rel release.Releaser) ports.ReleaseState {
 		return ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}
 	}
 
-	status := ports.ReleaseStatusUnknown
+	status, message := ports.ReleaseStatusUnknown, ""
 	if r.Info != nil {
 		if r.Info.Status == common.StatusUninstalled {
 			// Uninstalled with --keep-history: only the history remains.
 			return ports.ReleaseState{Exists: false}
 		}
 		status = releaseStatus(r.Info.Status)
+		message = r.Info.Description
 	}
 
 	suspended := false
@@ -374,7 +346,7 @@ func releaseState(rel release.Releaser) ports.ReleaseState {
 		Exists:    true,
 		Suspended: suspended,
 		Status:    status,
-		Resources: parseManifestResources(r.Manifest),
+		Message:   message,
 	}
 }
 

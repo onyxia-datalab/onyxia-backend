@@ -13,67 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// GetWorkloadReadiness lists the Deployments and StatefulSets of the
-// namespace once; the returned snapshot answers for any number of releases.
-func (g *K8sWorkloadStateGateway) GetWorkloadReadiness(
-	ctx context.Context,
-	namespace string,
-) (ports.WorkloadReadiness, error) {
-	snapshot := workloadSnapshot{}
-
-	deployments, err := g.client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("list deployments: %w", err)
-	}
-	for _, d := range deployments.Items {
-		snapshot[ports.ManifestResource{Kind: kindDeployment, Name: d.Name}] =
-			replicasReady(d.Spec.Replicas, d.Status.ReadyReplicas)
-	}
-
-	statefulSets, err := g.client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("list statefulsets: %w", err)
-	}
-	for _, s := range statefulSets.Items {
-		snapshot[ports.ManifestResource{Kind: kindStatefulSet, Name: s.Name}] =
-			replicasReady(s.Spec.Replicas, s.Status.ReadyReplicas)
-	}
-
-	return snapshot, nil
-}
-
-const (
-	kindDeployment  = "Deployment"
-	kindStatefulSet = "StatefulSet"
-)
-
-// workloadSnapshot maps each workload controller of a namespace to its
-// readiness.
-type workloadSnapshot map[ports.ManifestResource]bool
-
-// AllReady implements ports.WorkloadReadiness: only Deployments and
-// StatefulSets are considered, and one missing from the namespace (not
-// created yet, or deleted) is not ready.
-func (s workloadSnapshot) AllReady(resources []ports.ManifestResource) bool {
-	for _, r := range resources {
-		if r.Kind != kindDeployment && r.Kind != kindStatefulSet {
-			continue
-		}
-		if !s[r] {
-			return false
-		}
-	}
-	return true
-}
-
-func replicasReady(replicas *int32, readyReplicas int32) bool {
-	desiredReplicas := int32(1)
-	if replicas != nil {
-		desiredReplicas = *replicas
-	}
-	return readyReplicas >= desiredReplicas
-}
-
 var _ ports.WorkloadStateGateway = (*K8sWorkloadStateGateway)(nil)
 
 // labelHelmInstance is the standard Helm label used to associate pods with a release.
@@ -111,9 +50,43 @@ func (g *K8sWorkloadStateGateway) GetPodsForRelease(
 	now := time.Now()
 	infos := make([]ports.PodInfo, 0, len(list.Items))
 	for _, pod := range list.Items {
-		infos = append(infos, derivePodInfo(pod, now))
+		if isLive(pod) {
+			infos = append(infos, derivePodInfo(pod, now))
+		}
 	}
 	return infos, nil
+}
+
+// ListPodsByRelease lists the namespace's pods carrying the Helm instance
+// label once, and groups the live ones by release.
+func (g *K8sWorkloadStateGateway) ListPodsByRelease(
+	ctx context.Context,
+	namespace string,
+) (map[string][]ports.PodInfo, error) {
+	list, err := g.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: labelHelmInstance,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	byRelease := make(map[string][]ports.PodInfo)
+	for _, pod := range list.Items {
+		if !isLive(pod) {
+			continue
+		}
+		release := pod.Labels[labelHelmInstance]
+		byRelease[release] = append(byRelease[release], derivePodInfo(pod, now))
+	}
+	return byRelease, nil
+}
+
+// isLive reports whether a pod is still running or about to: a succeeded or
+// failed pod (a finished Job, an evicted pod awaiting garbage collection)
+// says nothing about the service's current state.
+func isLive(pod corev1.Pod) bool {
+	return pod.Status.Phase != corev1.PodSucceeded && pod.Status.Phase != corev1.PodFailed
 }
 
 // readinessGracePeriod is how long a running container may stay not ready
@@ -124,7 +97,7 @@ const readinessGracePeriod = 5 * time.Minute
 // derivePodInfo inspects a pod's conditions and container statuses to produce a PodInfo.
 // Error priority (highest first): CrashLoopBackOff > OOMKilled > ImagePull > ConfigError > Unschedulable > ReadinessFailed.
 func derivePodInfo(pod corev1.Pod, now time.Time) ports.PodInfo {
-	info := ports.PodInfo{Name: pod.Name}
+	info := ports.PodInfo{Name: pod.Name, Terminating: pod.DeletionTimestamp != nil}
 
 	updatePodError(&info, unschedulableError(pod.Status.Conditions))
 	for _, status := range pod.Status.ContainerStatuses {
@@ -205,6 +178,7 @@ func updatePodError(info *ports.PodInfo, candidate ports.PodInfo) {
 		return
 	}
 	candidate.Name = info.Name
+	candidate.Terminating = info.Terminating
 	*info = candidate
 }
 

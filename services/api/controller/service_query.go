@@ -80,15 +80,18 @@ func toAPIService(svc domain.Service) *api.Service {
 	}
 
 	if svc.Error != nil {
-		out.Error = api.NewOptServiceError(api.ServiceError{
+		apiErr := api.ServiceError{
 			Reason:       toAPIErrorReason(svc.Error.Reason),
-			PodName:      svc.Error.PodName,
 			Message:      api.NewOptString(svc.Error.Message),
 			RestartCount: api.NewOptInt(int(svc.Error.RestartCount)),
 			ExitCode:     api.NewOptInt(int(svc.Error.ExitCode)),
 			Image:        api.NewOptString(svc.Error.Image),
 			Limit:        api.NewOptString(svc.Error.Limit),
-		})
+		}
+		if svc.Error.PodName != "" {
+			apiErr.PodName = api.NewOptString(svc.Error.PodName)
+		}
+		out.Error = api.NewOptServiceError(apiErr)
 	}
 
 	return out
@@ -104,6 +107,8 @@ func toAPIStatus(s domain.ServiceStatus) api.ServiceStatus {
 		return api.ServiceStatusError
 	case domain.ServiceStatusGhost:
 		return api.ServiceStatusGhost
+	case domain.ServiceStatusSuspending:
+		return api.ServiceStatusSuspending
 	case domain.ServiceStatusSuspended:
 		return api.ServiceStatusSuspended
 	case domain.ServiceStatusTerminating:
@@ -115,6 +120,8 @@ func toAPIStatus(s domain.ServiceStatus) api.ServiceStatus {
 
 func toAPIErrorReason(r domain.ServiceErrorReason) api.ServiceErrorReason {
 	switch r {
+	case domain.ServiceErrorReasonReleaseFailed:
+		return api.ServiceErrorReasonReleaseFailed
 	case domain.ServiceErrorReasonCrashLoop:
 		return api.ServiceErrorReasonCrashLoop
 	case domain.ServiceErrorReasonOOMKilled:
