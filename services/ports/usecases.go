@@ -55,3 +55,23 @@ type ServiceQuery interface {
 	GetService(ctx context.Context, user usercontext.User, namespace, releaseID string) (domain.Service, error)
 	ListServices(ctx context.Context, user usercontext.User, namespace string) ([]domain.Service, error)
 }
+
+// ServiceEvents streams the changes of a service. It applies the same
+// namespace and visibility rules as ServiceQuery.
+type ServiceEvents interface {
+	// Open checks that user may see the service and starts following it. The
+	// returned channel first delivers the current state (a status event, then
+	// a quota event when the project has a quota), then the changes, and ends
+	// with a done event once the service is stable, deleted, or the maximum
+	// duration is reached. It is closed after the done event, or without one
+	// when ctx is done or following the service fails: the caller may then
+	// open a new stream, which starts again from the current state.
+	// Authorization errors are returned by Open itself, before any event.
+	Open(ctx context.Context, user usercontext.User, namespace, releaseID string) (<-chan domain.ServiceEvent, error)
+}
+
+// ProjectQuotaQuery reads the resource quota of a project. It returns
+// ErrForbidden when the caller may not act in the namespace.
+type ProjectQuotaQuery interface {
+	GetProjectQuota(ctx context.Context, user usercontext.User, namespace string) (domain.ProjectQuota, error)
+}

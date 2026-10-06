@@ -73,17 +73,17 @@ func (h *Handler) GetMyCatalogs(ctx context.Context) (api.GetMyCatalogsRes, erro
 	return h.catalogs.GetMyCatalogs(ctx)
 }
 
-func (h *Handler) WatchRelease(
+func (h *Handler) WatchServiceEvents(
 	ctx context.Context,
-	p api.WatchReleaseParams,
-) (api.WatchReleaseRes, error) {
+	p api.WatchServiceEventsParams,
+) (api.WatchServiceEventsRes, error) {
 	return nil, ht.ErrNotImplemented
 }
 
-func (h *Handler) WatchResources(
+func (h *Handler) GetProjectQuota(
 	ctx context.Context,
-	p api.WatchResourcesParams,
-) (api.WatchResourcesRes, error) {
+	p api.GetProjectQuotaParams,
+) (api.GetProjectQuotaRes, error) {
 	return nil, ht.ErrNotImplemented
 }
 

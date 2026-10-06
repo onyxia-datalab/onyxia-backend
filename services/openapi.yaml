@@ -13,7 +13,12 @@ tags:
   - name: services
     description: Service lifecycle (install)
   - name: events
-    description: Event streams (SSE)
+    description: >
+      Event streams (SSE), opened while a service is changing and closed by the
+      server once it is stable. There is no polling to do: load the state once
+      (listServices, getProjectQuota), then follow the services being changed.
+  - name: quotas
+    description: Resource quotas of the project
   - name: catalogs
     description: Service catalogs
 
@@ -188,10 +193,11 @@ paths:
       operationId: installService
       summary: Trigger service installation (async)
       description: >
-        Starts an install for the given releaseId and returns 202 with the URLs
-        of its SSE streams. The releaseId is reserved by the first install: a
-        second install with the same releaseId gets 409, whether the first one
-        is still running or done.
+        Starts an install for the given releaseId and returns 202 as soon as
+        the package is resolved; the install goes on in the background. Follow
+        it with the service's event stream (watchServiceEvents). The releaseId
+        is reserved by the first install: a second install with the same
+        releaseId gets 409, whether the first one is still running or done.
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - $ref: "#/components/parameters/onyxiaProject"
@@ -217,17 +223,8 @@ paths:
           description: Accepted – installation running
           headers:
             Location:
-              description: Canonical location for watch release stream
+              description: The service's location (getService), e.g. /api/services/jupyter-python-626146.
               schema: { type: string, format: uri-reference }
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/InstallAccepted" }
-              examples:
-                default:
-                  value:
-                    eventsUrl:
-                      release: /api/services/events/jupyter-python-626146/watch-release
-                      resources: /api/services/events/jupyter-python-626146/watch-resources
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -246,6 +243,10 @@ paths:
       tags: [services]
       operationId: setServiceSuspended
       summary: Suspend or resume a service
+      description: >
+        Returns once the release is updated; its pods then stop or start in
+        the background (Suspending, Deploying). Follow it with the service's
+        event stream (watchServiceEvents).
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - $ref: "#/components/parameters/onyxiaProject"
@@ -308,68 +309,86 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/services/events/{releaseId}/watch-release:
+  /api/services/{releaseId}/events:
     get:
       tags: [events]
-      operationId: watchRelease
-      summary: Release-level status stream (SSE)
+      operationId: watchServiceEvents
+      summary: Follow a service while it changes (SSE)
       description: >
-        Server-Sent Events (text/event-stream).
-        Emits: "status", "log" (optional), and "done".
-      parameters:
-        - $ref: "#/components/parameters/releaseId"
-        - $ref: "#/components/parameters/onyxiaProject"
-        - $ref: "#/components/parameters/lastEventId"
-      responses:
-        "200":
-          description: SSE stream
-          headers:
-            Cache-Control: { schema: { type: string }, description: no-cache }
-            Connection: { schema: { type: string }, description: keep-alive }
-          content:
-            text/event-stream:
-              schema:
-                type: string
-                x-oas-doc-schema:
-                  $ref: "#/components/schemas/SSEFrameRelease"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "404":
-          $ref: "#/components/responses/NotFound"
+        Server-Sent Events (text/event-stream), one frame per event:
+        "event: <name>\ndata: <JSON>\n\n" (see ServiceStreamEvent for the
+        payload of each event). Open it after an install, suspend, resume or
+        delete, or when showing a service in a transitional status.
 
-  /api/services/events/{releaseId}/watch-resources:
-    get:
-      tags: [events]
-      operationId: watchResources
-      summary: Kubernetes resources status stream (SSE)
-      description: >
-        Server-Sent Events (text/event-stream). Filters resources by
-        labelSelector: app.kubernetes.io/instance={releaseId}. Emits: "resource"
-        (add/update/delete), "progress" (aggregated readiness), "done".
+
+        - The first event is a "status" with the current state, and a "quota"
+        with the project's quota when there is one. A reconnection simply
+        starts again from the current state: there is no event id to resume
+        from.
+
+        - Then "status" is sent each time the service changes, "progress" for
+        each step Kubernetes reports (scheduling, image pull, start, probe
+        failure...), and "quota" each time the project's quota usage changes.
+
+        - The server ends the stream with "done" once the service is stable
+        (Running, Suspended, Ghost, an Error with reason release_failed),
+        deleted, or after a maximum duration. Any other Error keeps the stream
+        open: a crash loop or an exceeded quota can resolve by itself.
+
+        - A comment line (": keep-alive") is sent periodically so that proxies
+        keep the connection open.
+
+
+        The browser's native EventSource can't send the Authorization and
+        X-Onyxia-Project headers: use a fetch-based SSE client.
       parameters:
         - $ref: "#/components/parameters/releaseId"
         - $ref: "#/components/parameters/onyxiaProject"
-        - $ref: "#/components/parameters/lastEventId"
       responses:
         "200":
           description: SSE stream
           headers:
             Cache-Control: { schema: { type: string }, description: no-cache }
-            Connection: { schema: { type: string }, description: keep-alive }
+            X-Accel-Buffering:
+              schema: { type: string }
+              description: "no: asks reverse proxies not to buffer the stream."
           content:
             text/event-stream:
               schema:
                 type: string
                 x-oas-doc-schema:
-                  $ref: "#/components/schemas/SSEFrameResources"
+                  $ref: "#/components/schemas/ServiceStreamEvent"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/services/project/quota:
+    get:
+      tags: [quotas]
+      operationId: getProjectQuota
+      summary: Get the resource quota of the project and its usage
+      description: >
+        Initial load only: while a service changes, its event stream pushes
+        the quota updates.
+      parameters:
+        - $ref: "#/components/parameters/onyxiaProject"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectQuota" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
 components:
   parameters:
@@ -388,12 +407,6 @@ components:
         minLength: 1
         pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
       description: Logical release identifier
-    lastEventId:
-      in: header
-      name: Last-Event-Id
-      required: false
-      schema: { type: string }
-      description: Resume SSE from a specific event id (client reconnection)
 
   responses:
     UnprocessableEntity:
@@ -506,99 +519,6 @@ components:
           type: string
           description: Display name of the service. The package name when absent.
 
-    InstallAccepted:
-      type: object
-      required: [eventsUrl]
-      properties:
-        eventsUrl:
-          type: object
-          required: [release, resources]
-          properties:
-            release:
-              {
-                type: string,
-                example: /events/jupyter-python-626146/watch-release,
-              }
-            resources:
-              {
-                type: string,
-                example: /events/jupyter-python-626146/watch-resources,
-              }
-
-    SSEFrameRelease:
-      type: object
-      required: [event, data]
-      properties:
-        id:
-          {
-            type: string,
-            description: Optional event id for Last-Event-ID resume.,
-          }
-        event:
-          type: string
-          description: Release stream event name
-          enum: [status, log, done]
-        data: { $ref: "#/components/schemas/ReleaseEventData" }
-      description: >
-        Wire format per frame:
-        "id: <id>\n" (optional) + "event: <event>\n" + "data: <JSON(data)>\n\n".
-
-    ReleaseEventData:
-      type: object
-      description: >
-        Payload for /watch-release events.
-      properties:
-        status: { type: string, description: Free-form status. }
-        phase:
-          type: string
-          enum:
-            [
-              pending,
-              installing,
-              upgrading,
-              deployed,
-              failed,
-              uninstalling,
-              deleted,
-              unknown,
-            ]
-        revision: { type: integer, minimum: 1 }
-        msg: { type: string }
-        error: { type: string }
-
-    SSEFrameResources:
-      type: object
-      required: [event, data]
-      properties:
-        id: { type: string }
-        event:
-          type: string
-          enum: [status, resource, progress, done]
-        data: { $ref: "#/components/schemas/ResourcesEventData" }
-
-    ResourcesEventData:
-      type: object
-      properties:
-        status: { type: string }
-        kind: { type: string, example: Pod }
-        name: { type: string }
-        namespace: { type: string }
-        action: { type: string, enum: [add, update, delete] }
-        podsReady: { type: integer, minimum: 0 }
-        podsTotal: { type: integer, minimum: 0 }
-        jobsComplete: { type: integer, minimum: 0 }
-        jobsTotal: { type: integer, minimum: 0 }
-        deploymentsReady: { type: integer, minimum: 0 }
-        deploymentsTotal: { type: integer, minimum: 0 }
-        statefulSetsReady: { type: integer, minimum: 0 }
-        statefulSetsTotal: { type: integer, minimum: 0 }
-        daemonSetsReady: { type: integer, minimum: 0 }
-        daemonSetsTotal: { type: integer, minimum: 0 }
-        message: { type: string }
-        done: { type: boolean }
-        failed: { type: boolean }
-        error: { type: string }
-
     LocalizedString:
       description: A string or a map of localized strings by language code
       oneOf:
@@ -662,10 +582,13 @@ components:
           description: >
             release_failed: the last install or upgrade of the release failed
             (message holds the deployment tool's description, no podName).
+            quota_exceeded: a pod can't be created because the project's quota
+            is exceeded (no podName); it resolves once resources are freed.
             The other reasons come from a failing pod, named by podName.
           enum:
             [
               release_failed,
+              quota_exceeded,
               crash_loop,
               oom_killed,
               image_pull,
@@ -680,6 +603,116 @@ components:
         exitCode: { type: integer }
         image: { type: string }
         limit: { type: string }
+
+    ServiceStreamEvent:
+      description: >
+        An event of the service's stream: "event" is the SSE event name and
+        "data" the JSON payload.
+      oneOf:
+        - type: object
+          required: [event, data]
+          properties:
+            event: { type: string, const: status }
+            data: { $ref: "#/components/schemas/Service" }
+        - type: object
+          required: [event, data]
+          properties:
+            event: { type: string, const: progress }
+            data: { $ref: "#/components/schemas/ServiceProgress" }
+        - type: object
+          required: [event, data]
+          properties:
+            event: { type: string, const: quota }
+            data: { $ref: "#/components/schemas/ProjectQuota" }
+        - type: object
+          required: [event, data]
+          properties:
+            event: { type: string, const: done }
+            data: { $ref: "#/components/schemas/StreamEnd" }
+
+    ServiceProgress:
+      type: object
+      description: >
+        A step of the service reported by Kubernetes, to show what is going on
+        while the status stays Deploying (pulling a large image can take
+        minutes).
+      required: [step, level, at]
+      properties:
+        step:
+          type: string
+          description: >
+            scheduled: a pod was placed on a node.
+            scheduling_failed: no node can host a pod yet (resources,
+            constraints); Kubernetes keeps retrying.
+            pulling_image / image_pulled: a container image is being
+            downloaded / is ready.
+            started: a container started.
+            probe_failed: a readiness or liveness probe failed.
+            creation_failed: a pod could not be created, e.g. the project's
+            quota is exceeded.
+            other: any other step, described by message.
+          enum:
+            [
+              scheduled,
+              scheduling_failed,
+              pulling_image,
+              image_pulled,
+              started,
+              probe_failed,
+              creation_failed,
+              other,
+            ]
+        level:
+          type: string
+          enum: [info, warning]
+        podName: { type: string, description: The pod concerned, if any. }
+        image: { type: string, description: For the image steps. }
+        message:
+          { type: string, description: Kubernetes' description of the step. }
+        at: { type: string, format: date-time }
+
+    StreamEnd:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          description: >
+            stable: the service reached a stable status (the last "status"
+            event).
+            deleted: the service no longer exists.
+            timeout: the stream reached its maximum duration while the service
+            was still changing; reopen it to keep following.
+          enum: [stable, deleted, timeout]
+
+    ProjectQuota:
+      type: object
+      description: >
+        The resource quota of the project. When several Kubernetes resource
+        quotas limit the same resource, the most restrictive one is reported.
+        Empty when the project has no quota.
+      required: [resources]
+      properties:
+        resources:
+          type: array
+          items: { $ref: "#/components/schemas/QuotaResource" }
+
+    QuotaResource:
+      type: object
+      required: [name, hard, used]
+      properties:
+        name:
+          type: string
+          description: The limited resource, as configured by the administrator.
+          example: requests.memory
+        hard:
+          type: string
+          description: The limit, as a Kubernetes quantity.
+          example: 10Gi
+        used:
+          type: string
+          description: The current usage, as a Kubernetes quantity.
+          example: 2560Mi
 
     Problem:
       type: object

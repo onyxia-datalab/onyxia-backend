@@ -56,6 +56,12 @@ type Invoker interface {
 	//
 	// GET /api/services/catalogs/{catalogId}/packages/{packageName}/versions/{version}/schema
 	GetPackageSchema(ctx context.Context, params GetPackageSchemaParams) (GetPackageSchemaRes, error)
+	// GetProjectQuota invokes getProjectQuota operation.
+	//
+	// Initial load only: while a service changes, its event stream pushes the quota updates.
+	//
+	// GET /api/services/project/quota
+	GetProjectQuota(ctx context.Context, params GetProjectQuotaParams) (GetProjectQuotaRes, error)
 	// GetService invokes getService operation.
 	//
 	// Get the current state of a service.
@@ -64,8 +70,9 @@ type Invoker interface {
 	GetService(ctx context.Context, params GetServiceParams) (GetServiceRes, error)
 	// InstallService invokes installService operation.
 	//
-	// Starts an install for the given releaseId and returns 202 with the URLs of its SSE streams. The
-	// releaseId is reserved by the first install: a second install with the same releaseId gets 409,
+	// Starts an install for the given releaseId and returns 202 as soon as the package is resolved; the
+	// install goes on in the background. Follow it with the service's event stream (watchServiceEvents).
+	// The releaseId is reserved by the first install: a second install with the same releaseId gets 409,
 	// whether the first one is still running or done.
 	//
 	// PUT /api/services/{releaseId}
@@ -85,24 +92,33 @@ type Invoker interface {
 	SetServiceShared(ctx context.Context, request *SetServiceSharedReq, params SetServiceSharedParams) (SetServiceSharedRes, error)
 	// SetServiceSuspended invokes setServiceSuspended operation.
 	//
-	// Suspend or resume a service.
+	// Returns once the release is updated; its pods then stop or start in the background (Suspending,
+	// Deploying). Follow it with the service's event stream (watchServiceEvents).
 	//
 	// PUT /api/services/{releaseId}/suspended
 	SetServiceSuspended(ctx context.Context, request *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error)
-	// WatchRelease invokes watchRelease operation.
+	// WatchServiceEvents invokes watchServiceEvents operation.
 	//
-	// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
+	// Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
+	// ServiceStreamEvent for the payload of each event). Open it after an install, suspend, resume or
+	// delete, or when showing a service in a transitional status.
 	//
-	// GET /api/services/events/{releaseId}/watch-release
-	WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error)
-	// WatchResources invokes watchResources operation.
+	//  - The first event is a "status" with the current state, and a "quota" with the project's quota when
+	//    there is one. A reconnection simply starts again from the current state: there is no event id to
+	//    resume from.
+	//  - Then "status" is sent each time the service changes, "progress" for each step Kubernetes reports
+	//    (scheduling, image pull, start, probe failure...), and "quota" each time the project's quota
+	//    usage changes.
+	//  - The server ends the stream with "done" once the service is stable (Running, Suspended, Ghost, an
+	//    Error with reason release_failed), deleted, or after a maximum duration. Any other Error keeps
+	//    the stream open: a crash loop or an exceeded quota can resolve by itself.
+	//  - A comment line (": keep-alive") is sent periodically so that proxies keep the connection open.
 	//
-	// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
-	// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
-	// (aggregated readiness), "done".
+	// The browser's native EventSource can't send the Authorization and X-Onyxia-Project headers: use a
+	// fetch-based SSE client.
 	//
-	// GET /api/services/events/{releaseId}/watch-resources
-	WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error)
+	// GET /api/services/{releaseId}/events
+	WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (WatchServiceEventsRes, error)
 }
 
 // Client implements OAS client.
@@ -728,6 +744,133 @@ func (c *Client) sendGetPackageSchema(ctx context.Context, params GetPackageSche
 	return result, nil
 }
 
+// GetProjectQuota invokes getProjectQuota operation.
+//
+// Initial load only: while a service changes, its event stream pushes the quota updates.
+//
+// GET /api/services/project/quota
+func (c *Client) GetProjectQuota(ctx context.Context, params GetProjectQuotaParams) (GetProjectQuotaRes, error) {
+	res, err := c.sendGetProjectQuota(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetProjectQuota(ctx context.Context, params GetProjectQuotaParams) (res GetProjectQuotaRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getProjectQuota"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/api/services/project/quota"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetProjectQuotaOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/api/services/project/quota"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "X-Onyxia-Project",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:Oidc"
+			switch err := c.securityOidc(ctx, GetProjectQuotaOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Oidc\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetProjectQuotaResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // GetService invokes getService operation.
 //
 // Get the current state of a service.
@@ -875,8 +1018,9 @@ func (c *Client) sendGetService(ctx context.Context, params GetServiceParams) (r
 
 // InstallService invokes installService operation.
 //
-// Starts an install for the given releaseId and returns 202 with the URLs of its SSE streams. The
-// releaseId is reserved by the first install: a second install with the same releaseId gets 409,
+// Starts an install for the given releaseId and returns 202 as soon as the package is resolved; the
+// install goes on in the background. Follow it with the service's event stream (watchServiceEvents).
+// The releaseId is reserved by the first install: a second install with the same releaseId gets 409,
 // whether the first one is still running or done.
 //
 // PUT /api/services/{releaseId}
@@ -1302,7 +1446,8 @@ func (c *Client) sendSetServiceShared(ctx context.Context, request *SetServiceSh
 
 // SetServiceSuspended invokes setServiceSuspended operation.
 //
-// Suspend or resume a service.
+// Returns once the release is updated; its pods then stop or start in the background (Suspending,
+// Deploying). Follow it with the service's event stream (watchServiceEvents).
 //
 // PUT /api/services/{releaseId}/suspended
 func (c *Client) SetServiceSuspended(ctx context.Context, request *SetServiceSuspendedReq, params SetServiceSuspendedParams) (SetServiceSuspendedRes, error) {
@@ -1449,21 +1594,37 @@ func (c *Client) sendSetServiceSuspended(ctx context.Context, request *SetServic
 	return result, nil
 }
 
-// WatchRelease invokes watchRelease operation.
+// WatchServiceEvents invokes watchServiceEvents operation.
 //
-// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
+// Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
+// ServiceStreamEvent for the payload of each event). Open it after an install, suspend, resume or
+// delete, or when showing a service in a transitional status.
 //
-// GET /api/services/events/{releaseId}/watch-release
-func (c *Client) WatchRelease(ctx context.Context, params WatchReleaseParams) (WatchReleaseRes, error) {
-	res, err := c.sendWatchRelease(ctx, params)
+//   - The first event is a "status" with the current state, and a "quota" with the project's quota when
+//     there is one. A reconnection simply starts again from the current state: there is no event id to
+//     resume from.
+//   - Then "status" is sent each time the service changes, "progress" for each step Kubernetes reports
+//     (scheduling, image pull, start, probe failure...), and "quota" each time the project's quota
+//     usage changes.
+//   - The server ends the stream with "done" once the service is stable (Running, Suspended, Ghost, an
+//     Error with reason release_failed), deleted, or after a maximum duration. Any other Error keeps
+//     the stream open: a crash loop or an exceeded quota can resolve by itself.
+//   - A comment line (": keep-alive") is sent periodically so that proxies keep the connection open.
+//
+// The browser's native EventSource can't send the Authorization and X-Onyxia-Project headers: use a
+// fetch-based SSE client.
+//
+// GET /api/services/{releaseId}/events
+func (c *Client) WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (WatchServiceEventsRes, error) {
+	res, err := c.sendWatchServiceEvents(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams) (res WatchReleaseRes, err error) {
+func (c *Client) sendWatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (res WatchServiceEventsRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("watchRelease"),
+		otelogen.OperationID("watchServiceEvents"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/api/services/events/{releaseId}/watch-release"),
+		semconv.URLTemplateKey.String("/api/services/{releaseId}/events"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -1479,7 +1640,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, WatchReleaseOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, WatchServiceEventsOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -1497,7 +1658,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [3]string
-	pathParts[0] = "/api/services/events/"
+	pathParts[0] = "/api/services/"
 	{
 		// Encode "releaseId" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -1516,7 +1677,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 		}
 		pathParts[1] = encoded
 	}
-	pathParts[2] = "/watch-release"
+	pathParts[2] = "/events"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -1538,27 +1699,13 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 			return res, errors.Wrap(err, "encode header")
 		}
 	}
-	{
-		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "Last-Event-Id",
-			Explode: false,
-		}
-		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.LastEventID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode header")
-		}
-	}
 
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
 			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, WatchReleaseOperation, r); {
+			switch err := c.securityOidc(ctx, WatchServiceEventsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -1601,169 +1748,7 @@ func (c *Client) sendWatchRelease(ctx context.Context, params WatchReleaseParams
 	}()
 
 	stage = "DecodeResponse"
-	result, err := decodeWatchReleaseResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
-// WatchResources invokes watchResources operation.
-//
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
-// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
-// (aggregated readiness), "done".
-//
-// GET /api/services/events/{releaseId}/watch-resources
-func (c *Client) WatchResources(ctx context.Context, params WatchResourcesParams) (WatchResourcesRes, error) {
-	res, err := c.sendWatchResources(ctx, params)
-	return res, err
-}
-
-func (c *Client) sendWatchResources(ctx context.Context, params WatchResourcesParams) (res WatchResourcesRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("watchResources"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/api/services/events/{releaseId}/watch-resources"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, WatchResourcesOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [3]string
-	pathParts[0] = "/api/services/events/"
-	{
-		// Encode "releaseId" parameter.
-		e := uri.NewPathEncoder(uri.PathEncoderConfig{
-			Param:   "releaseId",
-			Style:   uri.PathStyleSimple,
-			Explode: false,
-		})
-		if err := func() error {
-			return e.EncodeValue(conv.StringToString(params.ReleaseId))
-		}(); err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		encoded, err := e.Result()
-		if err != nil {
-			return res, errors.Wrap(err, "encode path")
-		}
-		pathParts[1] = encoded
-	}
-	pathParts[2] = "/watch-resources"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	stage = "EncodeHeaderParams"
-	h := uri.NewHeaderEncoder(r.Header)
-	{
-		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "X-Onyxia-Project",
-			Explode: false,
-		}
-		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			return e.EncodeValue(conv.StringToString(params.XOnyxiaProject))
-		}); err != nil {
-			return res, errors.Wrap(err, "encode header")
-		}
-	}
-	{
-		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "Last-Event-Id",
-			Explode: false,
-		}
-		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.LastEventID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode header")
-		}
-	}
-
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			stage = "Security:Oidc"
-			switch err := c.securityOidc(ctx, WatchResourcesOperation, r); {
-			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
-			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
-				// Skip this security.
-			default:
-				return res, errors.Wrap(err, "security \"Oidc\"")
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
-		}
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer func() {
-		// Drain the body to EOF before closing, so the underlying
-		// connection can be reused by the Transport regardless of the
-		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
-		_, _ = io.Copy(io.Discard, body)
-		_ = body.Close()
-	}()
-
-	stage = "DecodeResponse"
-	result, err := decodeWatchResourcesResponse(resp)
+	result, err := decodeWatchServiceEventsResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

@@ -231,6 +231,62 @@ func encodeGetPackageSchemaResponse(response GetPackageSchemaRes, w http.Respons
 	}
 }
 
+func encodeGetProjectQuotaResponse(response GetProjectQuotaRes, w http.ResponseWriter, span trace.Span) error {
+	switch response := response.(type) {
+	case *ProjectQuota:
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(200)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetProjectQuotaUnauthorized:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(401)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetProjectQuotaForbidden:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(403)
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	case *GetProjectQuotaInternalServerError:
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.WriteHeader(500)
+		span.SetStatus(codes.Error, http.StatusText(500))
+
+		e := new(jx.Encoder)
+		response.Encode(e)
+		if _, err := e.WriteTo(w); err != nil {
+			return errors.Wrap(err, "write")
+		}
+
+		return nil
+
+	default:
+		return errors.Errorf("unexpected response type: %T", response)
+	}
+}
+
 func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *Service:
@@ -301,8 +357,7 @@ func encodeGetServiceResponse(response GetServiceRes, w http.ResponseWriter, spa
 
 func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *InstallAcceptedHeaders:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	case *InstallServiceAccepted:
 		w.Header().Set("Access-Control-Expose-Headers", "Location")
 		// Encoding response headers.
 		{
@@ -324,12 +379,6 @@ func encodeInstallServiceResponse(response InstallServiceRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(202)
-
-		e := new(jx.Encoder)
-		response.Response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
 
 		return nil
 
@@ -601,11 +650,11 @@ func encodeSetServiceSuspendedResponse(response SetServiceSuspendedRes, w http.R
 	}
 }
 
-func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter, span trace.Span) error {
+func encodeWatchServiceEventsResponse(response WatchServiceEventsRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *WatchReleaseOKHeaders:
+	case *WatchServiceEventsOKHeaders:
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Access-Control-Expose-Headers", "Connection")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Accel-Buffering")
 		// Encoding response headers.
 		{
 			h := uri.NewHeaderEncoder(w.Header())
@@ -624,19 +673,19 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 					return errors.Wrap(err, "encode Cache-Control header")
 				}
 			}
-			// Encode "Connection" header.
+			// Encode "X-Accel-Buffering" header.
 			{
 				cfg := uri.HeaderParameterEncodingConfig{
-					Name:    "Connection",
+					Name:    "X-Accel-Buffering",
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.Connection.Get(); ok {
+					if val, ok := response.XAccelBuffering.Get(); ok {
 						return e.EncodeValue(conv.StringToString(val))
 					}
 					return nil
 				}); err != nil {
-					return errors.Wrap(err, "encode Connection header")
+					return errors.Wrap(err, "encode X-Accel-Buffering header")
 				}
 			}
 		}
@@ -652,7 +701,7 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 
 		return nil
 
-	case *WatchReleaseUnauthorized:
+	case *WatchServiceEventsUnauthorized:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(401)
 
@@ -664,7 +713,7 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 
 		return nil
 
-	case *WatchReleaseForbidden:
+	case *WatchServiceEventsForbidden:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(403)
 
@@ -676,7 +725,7 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 
 		return nil
 
-	case *WatchReleaseNotFound:
+	case *WatchServiceEventsNotFound:
 		w.Header().Set("Content-Type", "application/problem+json")
 		w.WriteHeader(404)
 
@@ -688,89 +737,10 @@ func encodeWatchReleaseResponse(response WatchReleaseRes, w http.ResponseWriter,
 
 		return nil
 
-	default:
-		return errors.Errorf("unexpected response type: %T", response)
-	}
-}
-
-func encodeWatchResourcesResponse(response WatchResourcesRes, w http.ResponseWriter, span trace.Span) error {
-	switch response := response.(type) {
-	case *WatchResourcesOKHeaders:
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Access-Control-Expose-Headers", "Connection")
-		// Encoding response headers.
-		{
-			h := uri.NewHeaderEncoder(w.Header())
-			// Encode "Cache-Control" header.
-			{
-				cfg := uri.HeaderParameterEncodingConfig{
-					Name:    "Cache-Control",
-					Explode: false,
-				}
-				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.CacheControl.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
-				}); err != nil {
-					return errors.Wrap(err, "encode Cache-Control header")
-				}
-			}
-			// Encode "Connection" header.
-			{
-				cfg := uri.HeaderParameterEncodingConfig{
-					Name:    "Connection",
-					Explode: false,
-				}
-				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					if val, ok := response.Connection.Get(); ok {
-						return e.EncodeValue(conv.StringToString(val))
-					}
-					return nil
-				}); err != nil {
-					return errors.Wrap(err, "encode Connection header")
-				}
-			}
-		}
-		w.WriteHeader(200)
-
-		writer := w
-		if closer, ok := response.Response.Data.(io.Closer); ok {
-			defer closer.Close()
-		}
-		if _, err := io.Copy(writer, response.Response); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *WatchResourcesUnauthorized:
+	case *WatchServiceEventsInternalServerError:
 		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(401)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *WatchResourcesForbidden:
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(403)
-
-		e := new(jx.Encoder)
-		response.Encode(e)
-		if _, err := e.WriteTo(w); err != nil {
-			return errors.Wrap(err, "write")
-		}
-
-		return nil
-
-	case *WatchResourcesNotFound:
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(404)
+		w.WriteHeader(500)
+		span.SetStatus(codes.Error, http.StatusText(500))
 
 		e := new(jx.Encoder)
 		response.Encode(e)

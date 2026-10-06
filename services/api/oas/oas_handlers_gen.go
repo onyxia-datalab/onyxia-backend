@@ -786,6 +786,193 @@ func (s *Server) handleGetPackageSchemaRequest(args [3]string, argsEscaped bool,
 	}
 }
 
+// handleGetProjectQuotaRequest handles getProjectQuota operation.
+//
+// Initial load only: while a service changes, its event stream pushes the quota updates.
+//
+// GET /api/services/project/quota
+func (s *Server) handleGetProjectQuotaRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getProjectQuota"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/api/services/project/quota"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), GetProjectQuotaOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(attrs...)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: GetProjectQuotaOperation,
+			ID:   "getProjectQuota",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOidc(ctx, GetProjectQuotaOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Oidc",
+					Err:              err,
+				}
+				defer recordError("Security:Oidc", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeGetProjectQuotaParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response GetProjectQuotaRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    GetProjectQuotaOperation,
+			OperationSummary: "Get the resource quota of the project and its usage",
+			OperationID:      "getProjectQuota",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "X-Onyxia-Project",
+					In:   "header",
+				}: params.XOnyxiaProject,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = GetProjectQuotaParams
+			Response = GetProjectQuotaRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackGetProjectQuotaParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.GetProjectQuota(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.GetProjectQuota(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeGetProjectQuotaResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleGetServiceRequest handles getService operation.
 //
 // Get the current state of a service.
@@ -979,8 +1166,9 @@ func (s *Server) handleGetServiceRequest(args [1]string, argsEscaped bool, w htt
 
 // handleInstallServiceRequest handles installService operation.
 //
-// Starts an install for the given releaseId and returns 202 with the URLs of its SSE streams. The
-// releaseId is reserved by the first install: a second install with the same releaseId gets 409,
+// Starts an install for the given releaseId and returns 202 as soon as the package is resolved; the
+// install goes on in the background. Follow it with the service's event stream (watchServiceEvents).
+// The releaseId is reserved by the first install: a second install with the same releaseId gets 409,
 // whether the first one is still running or done.
 //
 // PUT /api/services/{releaseId}
@@ -1581,7 +1769,8 @@ func (s *Server) handleSetServiceSharedRequest(args [1]string, argsEscaped bool,
 
 // handleSetServiceSuspendedRequest handles setServiceSuspended operation.
 //
-// Suspend or resume a service.
+// Returns once the release is updated; its pods then stop or start in the background (Suspending,
+// Deploying). Follow it with the service's event stream (watchServiceEvents).
 //
 // PUT /api/services/{releaseId}/suspended
 func (s *Server) handleSetServiceSuspendedRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -1785,24 +1974,40 @@ func (s *Server) handleSetServiceSuspendedRequest(args [1]string, argsEscaped bo
 	}
 }
 
-// handleWatchReleaseRequest handles watchRelease operation.
+// handleWatchServiceEventsRequest handles watchServiceEvents operation.
 //
-// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
+// Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
+// ServiceStreamEvent for the payload of each event). Open it after an install, suspend, resume or
+// delete, or when showing a service in a transitional status.
 //
-// GET /api/services/events/{releaseId}/watch-release
-func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+//   - The first event is a "status" with the current state, and a "quota" with the project's quota when
+//     there is one. A reconnection simply starts again from the current state: there is no event id to
+//     resume from.
+//   - Then "status" is sent each time the service changes, "progress" for each step Kubernetes reports
+//     (scheduling, image pull, start, probe failure...), and "quota" each time the project's quota
+//     usage changes.
+//   - The server ends the stream with "done" once the service is stable (Running, Suspended, Ghost, an
+//     Error with reason release_failed), deleted, or after a maximum duration. Any other Error keeps
+//     the stream open: a crash loop or an exceeded quota can resolve by itself.
+//   - A comment line (": keep-alive") is sent periodically so that proxies keep the connection open.
+//
+// The browser's native EventSource can't send the Authorization and X-Onyxia-Project headers: use a
+// fetch-based SSE client.
+//
+// GET /api/services/{releaseId}/events
+func (s *Server) handleWatchServiceEventsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("watchRelease"),
+		otelogen.OperationID("watchServiceEvents"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/api/services/events/{releaseId}/watch-release"),
+		semconv.HTTPRouteKey.String("/api/services/{releaseId}/events"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchReleaseOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchServiceEventsOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -1857,15 +2062,15 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: WatchReleaseOperation,
-			ID:   "watchRelease",
+			Name: WatchServiceEventsOperation,
+			ID:   "watchServiceEvents",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOidc(ctx, WatchReleaseOperation, r)
+			sctx, ok, err := s.securityOidc(ctx, WatchServiceEventsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -1905,7 +2110,7 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 			return
 		}
 	}
-	params, err := decodeWatchReleaseParams(args, argsEscaped, r)
+	params, err := decodeWatchServiceEventsParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -1918,13 +2123,13 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 
 	var rawBody []byte
 
-	var response WatchReleaseRes
+	var response WatchServiceEventsRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    WatchReleaseOperation,
-			OperationSummary: "Release-level status stream (SSE)",
-			OperationID:      "watchRelease",
+			OperationName:    WatchServiceEventsOperation,
+			OperationSummary: "Follow a service while it changes (SSE)",
+			OperationID:      "watchServiceEvents",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -1936,18 +2141,14 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 					Name: "X-Onyxia-Project",
 					In:   "header",
 				}: params.XOnyxiaProject,
-				{
-					Name: "Last-Event-Id",
-					In:   "header",
-				}: params.LastEventID,
 			},
 			Raw: r,
 		}
 
 		type (
 			Request  = struct{}
-			Params   = WatchReleaseParams
-			Response = WatchReleaseRes
+			Params   = WatchServiceEventsParams
+			Response = WatchServiceEventsRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -1956,14 +2157,14 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 		](
 			m,
 			mreq,
-			unpackWatchReleaseParams,
+			unpackWatchServiceEventsParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.WatchRelease(ctx, params)
+				response, err = s.h.WatchServiceEvents(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.WatchRelease(ctx, params)
+		response, err = s.h.WatchServiceEvents(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -1971,204 +2172,7 @@ func (s *Server) handleWatchReleaseRequest(args [1]string, argsEscaped bool, w h
 		return
 	}
 
-	if err := encodeWatchReleaseResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
-// handleWatchResourcesRequest handles watchResources operation.
-//
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
-// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
-// (aggregated readiness), "done".
-//
-// GET /api/services/events/{releaseId}/watch-resources
-func (s *Server) handleWatchResourcesRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("watchResources"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/api/services/events/{releaseId}/watch-resources"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), WatchResourcesOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(attrs...)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err          error
-		opErrContext = ogenerrors.OperationContext{
-			Name: WatchResourcesOperation,
-			ID:   "watchResources",
-		}
-	)
-	{
-		type bitset = [1]uint8
-		var satisfied bitset
-		{
-			sctx, ok, err := s.securityOidc(ctx, WatchResourcesOperation, r)
-			if err != nil {
-				err = &ogenerrors.SecurityError{
-					OperationContext: opErrContext,
-					Security:         "Oidc",
-					Err:              err,
-				}
-				defer recordError("Security:Oidc", err)
-				s.cfg.ErrorHandler(ctx, w, r, err)
-				return
-			}
-			if ok {
-				satisfied[0] |= 1 << 0
-				ctx = sctx
-			}
-		}
-
-		if ok := func() bool {
-		nextRequirement:
-			for _, requirement := range []bitset{
-				{0b00000001},
-			} {
-				for i, mask := range requirement {
-					if satisfied[i]&mask != mask {
-						continue nextRequirement
-					}
-				}
-				return true
-			}
-			return false
-		}(); !ok {
-			err = &ogenerrors.SecurityError{
-				OperationContext: opErrContext,
-				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
-			}
-			defer recordError("Security", err)
-			s.cfg.ErrorHandler(ctx, w, r, err)
-			return
-		}
-	}
-	params, err := decodeWatchResourcesParams(args, argsEscaped, r)
-	if err != nil {
-		err = &ogenerrors.DecodeParamsError{
-			OperationContext: opErrContext,
-			Err:              err,
-		}
-		defer recordError("DecodeParams", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	var rawBody []byte
-
-	var response WatchResourcesRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    WatchResourcesOperation,
-			OperationSummary: "Kubernetes resources status stream (SSE)",
-			OperationID:      "watchResources",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params: middleware.Parameters{
-				{
-					Name: "releaseId",
-					In:   "path",
-				}: params.ReleaseId,
-				{
-					Name: "X-Onyxia-Project",
-					In:   "header",
-				}: params.XOnyxiaProject,
-				{
-					Name: "Last-Event-Id",
-					In:   "header",
-				}: params.LastEventID,
-			},
-			Raw: r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = WatchResourcesParams
-			Response = WatchResourcesRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			unpackWatchResourcesParams,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.WatchResources(ctx, params)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.WatchResources(ctx, params)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeWatchResourcesResponse(response, w, span); err != nil {
+	if err := encodeWatchServiceEventsResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

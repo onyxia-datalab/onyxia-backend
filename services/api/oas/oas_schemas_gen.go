@@ -262,6 +262,18 @@ type GetPackageSchemaUnauthorized Problem
 
 func (*GetPackageSchemaUnauthorized) getPackageSchemaRes() {}
 
+type GetProjectQuotaForbidden Problem
+
+func (*GetProjectQuotaForbidden) getProjectQuotaRes() {}
+
+type GetProjectQuotaInternalServerError Problem
+
+func (*GetProjectQuotaInternalServerError) getProjectQuotaRes() {}
+
+type GetProjectQuotaUnauthorized Problem
+
+func (*GetProjectQuotaUnauthorized) getProjectQuotaRes() {}
+
 type GetServiceForbidden Problem
 
 func (*GetServiceForbidden) getServiceRes() {}
@@ -278,73 +290,22 @@ type GetServiceUnauthorized Problem
 
 func (*GetServiceUnauthorized) getServiceRes() {}
 
-// Ref: #/components/schemas/InstallAccepted
-type InstallAccepted struct {
-	EventsUrl InstallAcceptedEventsUrl `json:"eventsUrl"`
-}
-
-// GetEventsUrl returns the value of EventsUrl.
-func (s *InstallAccepted) GetEventsUrl() InstallAcceptedEventsUrl {
-	return s.EventsUrl
-}
-
-// SetEventsUrl sets the value of EventsUrl.
-func (s *InstallAccepted) SetEventsUrl(val InstallAcceptedEventsUrl) {
-	s.EventsUrl = val
-}
-
-type InstallAcceptedEventsUrl struct {
-	Release   string `json:"release"`
-	Resources string `json:"resources"`
-}
-
-// GetRelease returns the value of Release.
-func (s *InstallAcceptedEventsUrl) GetRelease() string {
-	return s.Release
-}
-
-// GetResources returns the value of Resources.
-func (s *InstallAcceptedEventsUrl) GetResources() string {
-	return s.Resources
-}
-
-// SetRelease sets the value of Release.
-func (s *InstallAcceptedEventsUrl) SetRelease(val string) {
-	s.Release = val
-}
-
-// SetResources sets the value of Resources.
-func (s *InstallAcceptedEventsUrl) SetResources(val string) {
-	s.Resources = val
-}
-
-// InstallAcceptedHeaders wraps InstallAccepted with response headers.
-type InstallAcceptedHeaders struct {
+// InstallServiceAccepted is response for InstallService operation.
+type InstallServiceAccepted struct {
 	Location OptString
-	Response InstallAccepted
 }
 
 // GetLocation returns the value of Location.
-func (s *InstallAcceptedHeaders) GetLocation() OptString {
+func (s *InstallServiceAccepted) GetLocation() OptString {
 	return s.Location
 }
 
-// GetResponse returns the value of Response.
-func (s *InstallAcceptedHeaders) GetResponse() InstallAccepted {
-	return s.Response
-}
-
 // SetLocation sets the value of Location.
-func (s *InstallAcceptedHeaders) SetLocation(val OptString) {
+func (s *InstallServiceAccepted) SetLocation(val OptString) {
 	s.Location = val
 }
 
-// SetResponse sets the value of Response.
-func (s *InstallAcceptedHeaders) SetResponse(val InstallAccepted) {
-	s.Response = val
-}
-
-func (*InstallAcceptedHeaders) installServiceRes() {}
+func (*InstallServiceAccepted) installServiceRes() {}
 
 type InstallServiceBadRequest Problem
 
@@ -946,6 +907,65 @@ func (s *ProblemAdditional) init() ProblemAdditional {
 	return m
 }
 
+// The resource quota of the project. When several Kubernetes resource quotas limit the same resource,
+// the most restrictive one is reported. Empty when the project has no quota.
+// Ref: #/components/schemas/ProjectQuota
+type ProjectQuota struct {
+	Resources []QuotaResource `json:"resources"`
+}
+
+// GetResources returns the value of Resources.
+func (s *ProjectQuota) GetResources() []QuotaResource {
+	return s.Resources
+}
+
+// SetResources sets the value of Resources.
+func (s *ProjectQuota) SetResources(val []QuotaResource) {
+	s.Resources = val
+}
+
+func (*ProjectQuota) getProjectQuotaRes() {}
+
+// Ref: #/components/schemas/QuotaResource
+type QuotaResource struct {
+	// The limited resource, as configured by the administrator.
+	Name string `json:"name"`
+	// The limit, as a Kubernetes quantity.
+	Hard string `json:"hard"`
+	// The current usage, as a Kubernetes quantity.
+	Used string `json:"used"`
+}
+
+// GetName returns the value of Name.
+func (s *QuotaResource) GetName() string {
+	return s.Name
+}
+
+// GetHard returns the value of Hard.
+func (s *QuotaResource) GetHard() string {
+	return s.Hard
+}
+
+// GetUsed returns the value of Used.
+func (s *QuotaResource) GetUsed() string {
+	return s.Used
+}
+
+// SetName sets the value of Name.
+func (s *QuotaResource) SetName(val string) {
+	s.Name = val
+}
+
+// SetHard sets the value of Hard.
+func (s *QuotaResource) SetHard(val string) {
+	s.Hard = val
+}
+
+// SetUsed sets the value of Used.
+func (s *QuotaResource) SetUsed(val string) {
+	s.Used = val
+}
+
 // Ref: #/components/schemas/Service
 type Service struct {
 	// Release identifier.
@@ -1045,7 +1065,9 @@ func (*Service) getServiceRes() {}
 // Ref: #/components/schemas/ServiceError
 type ServiceError struct {
 	// Release_failed: the last install or upgrade of the release failed (message holds the deployment
-	// tool's description, no podName). The other reasons come from a failing pod, named by podName.
+	// tool's description, no podName). quota_exceeded: a pod can't be created because the project's quota
+	// is exceeded (no podName); it resolves once resources are freed. The other reasons come from a
+	// failing pod, named by podName.
 	Reason ServiceErrorReason `json:"reason"`
 	// The failing pod.
 	PodName      OptString `json:"podName"`
@@ -1127,11 +1149,14 @@ func (s *ServiceError) SetLimit(val OptString) {
 }
 
 // Release_failed: the last install or upgrade of the release failed (message holds the deployment
-// tool's description, no podName). The other reasons come from a failing pod, named by podName.
+// tool's description, no podName). quota_exceeded: a pod can't be created because the project's quota
+// is exceeded (no podName); it resolves once resources are freed. The other reasons come from a
+// failing pod, named by podName.
 type ServiceErrorReason string
 
 const (
 	ServiceErrorReasonReleaseFailed   ServiceErrorReason = "release_failed"
+	ServiceErrorReasonQuotaExceeded   ServiceErrorReason = "quota_exceeded"
 	ServiceErrorReasonCrashLoop       ServiceErrorReason = "crash_loop"
 	ServiceErrorReasonOomKilled       ServiceErrorReason = "oom_killed"
 	ServiceErrorReasonImagePull       ServiceErrorReason = "image_pull"
@@ -1144,6 +1169,7 @@ const (
 func (ServiceErrorReason) AllValues() []ServiceErrorReason {
 	return []ServiceErrorReason{
 		ServiceErrorReasonReleaseFailed,
+		ServiceErrorReasonQuotaExceeded,
 		ServiceErrorReasonCrashLoop,
 		ServiceErrorReasonOomKilled,
 		ServiceErrorReasonImagePull,
@@ -1157,6 +1183,8 @@ func (ServiceErrorReason) AllValues() []ServiceErrorReason {
 func (s ServiceErrorReason) MarshalText() ([]byte, error) {
 	switch s {
 	case ServiceErrorReasonReleaseFailed:
+		return []byte(s), nil
+	case ServiceErrorReasonQuotaExceeded:
 		return []byte(s), nil
 	case ServiceErrorReasonCrashLoop:
 		return []byte(s), nil
@@ -1180,6 +1208,9 @@ func (s *ServiceErrorReason) UnmarshalText(data []byte) error {
 	switch ServiceErrorReason(data) {
 	case ServiceErrorReasonReleaseFailed:
 		*s = ServiceErrorReasonReleaseFailed
+		return nil
+	case ServiceErrorReasonQuotaExceeded:
+		*s = ServiceErrorReasonQuotaExceeded
 		return nil
 	case ServiceErrorReasonCrashLoop:
 		*s = ServiceErrorReasonCrashLoop
@@ -1450,132 +1481,71 @@ type SetServiceSuspendedUnprocessableEntity Problem
 
 func (*SetServiceSuspendedUnprocessableEntity) setServiceSuspendedRes() {}
 
-type WatchReleaseForbidden Problem
+type WatchServiceEventsForbidden Problem
 
-func (*WatchReleaseForbidden) watchReleaseRes() {}
+func (*WatchServiceEventsForbidden) watchServiceEventsRes() {}
 
-type WatchReleaseNotFound Problem
+type WatchServiceEventsInternalServerError Problem
 
-func (*WatchReleaseNotFound) watchReleaseRes() {}
+func (*WatchServiceEventsInternalServerError) watchServiceEventsRes() {}
 
-type WatchReleaseOK struct {
+type WatchServiceEventsNotFound Problem
+
+func (*WatchServiceEventsNotFound) watchServiceEventsRes() {}
+
+type WatchServiceEventsOK struct {
 	Data io.Reader
 }
 
 // Read reads data from the Data reader.
 //
 // Kept to satisfy the io.Reader interface.
-func (s WatchReleaseOK) Read(p []byte) (n int, err error) {
+func (s WatchServiceEventsOK) Read(p []byte) (n int, err error) {
 	if s.Data == nil {
 		return 0, io.EOF
 	}
 	return s.Data.Read(p)
 }
 
-// WatchReleaseOKHeaders wraps WatchReleaseOK with response headers.
-type WatchReleaseOKHeaders struct {
-	CacheControl OptString
-	Connection   OptString
-	Response     WatchReleaseOK
+// WatchServiceEventsOKHeaders wraps WatchServiceEventsOK with response headers.
+type WatchServiceEventsOKHeaders struct {
+	CacheControl    OptString
+	XAccelBuffering OptString
+	Response        WatchServiceEventsOK
 }
 
 // GetCacheControl returns the value of CacheControl.
-func (s *WatchReleaseOKHeaders) GetCacheControl() OptString {
+func (s *WatchServiceEventsOKHeaders) GetCacheControl() OptString {
 	return s.CacheControl
 }
 
-// GetConnection returns the value of Connection.
-func (s *WatchReleaseOKHeaders) GetConnection() OptString {
-	return s.Connection
+// GetXAccelBuffering returns the value of XAccelBuffering.
+func (s *WatchServiceEventsOKHeaders) GetXAccelBuffering() OptString {
+	return s.XAccelBuffering
 }
 
 // GetResponse returns the value of Response.
-func (s *WatchReleaseOKHeaders) GetResponse() WatchReleaseOK {
+func (s *WatchServiceEventsOKHeaders) GetResponse() WatchServiceEventsOK {
 	return s.Response
 }
 
 // SetCacheControl sets the value of CacheControl.
-func (s *WatchReleaseOKHeaders) SetCacheControl(val OptString) {
+func (s *WatchServiceEventsOKHeaders) SetCacheControl(val OptString) {
 	s.CacheControl = val
 }
 
-// SetConnection sets the value of Connection.
-func (s *WatchReleaseOKHeaders) SetConnection(val OptString) {
-	s.Connection = val
+// SetXAccelBuffering sets the value of XAccelBuffering.
+func (s *WatchServiceEventsOKHeaders) SetXAccelBuffering(val OptString) {
+	s.XAccelBuffering = val
 }
 
 // SetResponse sets the value of Response.
-func (s *WatchReleaseOKHeaders) SetResponse(val WatchReleaseOK) {
+func (s *WatchServiceEventsOKHeaders) SetResponse(val WatchServiceEventsOK) {
 	s.Response = val
 }
 
-func (*WatchReleaseOKHeaders) watchReleaseRes() {}
+func (*WatchServiceEventsOKHeaders) watchServiceEventsRes() {}
 
-type WatchReleaseUnauthorized Problem
+type WatchServiceEventsUnauthorized Problem
 
-func (*WatchReleaseUnauthorized) watchReleaseRes() {}
-
-type WatchResourcesForbidden Problem
-
-func (*WatchResourcesForbidden) watchResourcesRes() {}
-
-type WatchResourcesNotFound Problem
-
-func (*WatchResourcesNotFound) watchResourcesRes() {}
-
-type WatchResourcesOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s WatchResourcesOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-// WatchResourcesOKHeaders wraps WatchResourcesOK with response headers.
-type WatchResourcesOKHeaders struct {
-	CacheControl OptString
-	Connection   OptString
-	Response     WatchResourcesOK
-}
-
-// GetCacheControl returns the value of CacheControl.
-func (s *WatchResourcesOKHeaders) GetCacheControl() OptString {
-	return s.CacheControl
-}
-
-// GetConnection returns the value of Connection.
-func (s *WatchResourcesOKHeaders) GetConnection() OptString {
-	return s.Connection
-}
-
-// GetResponse returns the value of Response.
-func (s *WatchResourcesOKHeaders) GetResponse() WatchResourcesOK {
-	return s.Response
-}
-
-// SetCacheControl sets the value of CacheControl.
-func (s *WatchResourcesOKHeaders) SetCacheControl(val OptString) {
-	s.CacheControl = val
-}
-
-// SetConnection sets the value of Connection.
-func (s *WatchResourcesOKHeaders) SetConnection(val OptString) {
-	s.Connection = val
-}
-
-// SetResponse sets the value of Response.
-func (s *WatchResourcesOKHeaders) SetResponse(val WatchResourcesOK) {
-	s.Response = val
-}
-
-func (*WatchResourcesOKHeaders) watchResourcesRes() {}
-
-type WatchResourcesUnauthorized Problem
-
-func (*WatchResourcesUnauthorized) watchResourcesRes() {}
+func (*WatchServiceEventsUnauthorized) watchServiceEventsRes() {}

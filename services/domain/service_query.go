@@ -18,8 +18,13 @@ type ServiceErrorReason string
 
 const (
 	// ServiceErrorReasonReleaseFailed: the last install or upgrade of the
-	// release failed. The other reasons come from a failing pod.
-	ServiceErrorReasonReleaseFailed   ServiceErrorReason = "release_failed"
+	// release failed.
+	ServiceErrorReasonReleaseFailed ServiceErrorReason = "release_failed"
+	// ServiceErrorReasonQuotaExceeded: a pod can't be created because the
+	// project's quota is exceeded.
+	ServiceErrorReasonQuotaExceeded ServiceErrorReason = "quota_exceeded"
+
+	// The other reasons come from a failing pod.
 	ServiceErrorReasonCrashLoop       ServiceErrorReason = "crash_loop"
 	ServiceErrorReasonOOMKilled       ServiceErrorReason = "oom_killed"
 	ServiceErrorReasonImagePull       ServiceErrorReason = "image_pull"
@@ -29,7 +34,8 @@ const (
 )
 
 // ServiceError carries the detail of an Error state. PodName is empty when
-// the cause is not a pod (ServiceErrorReasonReleaseFailed).
+// the cause is not a pod (ServiceErrorReasonReleaseFailed,
+// ServiceErrorReasonQuotaExceeded).
 type ServiceError struct {
 	Reason       ServiceErrorReason
 	PodName      string

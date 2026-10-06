@@ -52,6 +52,15 @@ func (UnimplementedHandler) GetPackageSchema(ctx context.Context, params GetPack
 	return r, ht.ErrNotImplemented
 }
 
+// GetProjectQuota implements getProjectQuota operation.
+//
+// Initial load only: while a service changes, its event stream pushes the quota updates.
+//
+// GET /api/services/project/quota
+func (UnimplementedHandler) GetProjectQuota(ctx context.Context, params GetProjectQuotaParams) (r GetProjectQuotaRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetService implements getService operation.
 //
 // Get the current state of a service.
@@ -63,8 +72,9 @@ func (UnimplementedHandler) GetService(ctx context.Context, params GetServicePar
 
 // InstallService implements installService operation.
 //
-// Starts an install for the given releaseId and returns 202 with the URLs of its SSE streams. The
-// releaseId is reserved by the first install: a second install with the same releaseId gets 409,
+// Starts an install for the given releaseId and returns 202 as soon as the package is resolved; the
+// install goes on in the background. Follow it with the service's event stream (watchServiceEvents).
+// The releaseId is reserved by the first install: a second install with the same releaseId gets 409,
 // whether the first one is still running or done.
 //
 // PUT /api/services/{releaseId}
@@ -93,29 +103,35 @@ func (UnimplementedHandler) SetServiceShared(ctx context.Context, req *SetServic
 
 // SetServiceSuspended implements setServiceSuspended operation.
 //
-// Suspend or resume a service.
+// Returns once the release is updated; its pods then stop or start in the background (Suspending,
+// Deploying). Follow it with the service's event stream (watchServiceEvents).
 //
 // PUT /api/services/{releaseId}/suspended
 func (UnimplementedHandler) SetServiceSuspended(ctx context.Context, req *SetServiceSuspendedReq, params SetServiceSuspendedParams) (r SetServiceSuspendedRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
-// WatchRelease implements watchRelease operation.
+// WatchServiceEvents implements watchServiceEvents operation.
 //
-// Server-Sent Events (text/event-stream). Emits: "status", "log" (optional), and "done".
+// Server-Sent Events (text/event-stream), one frame per event: "event: \ndata: \n\n" (see
+// ServiceStreamEvent for the payload of each event). Open it after an install, suspend, resume or
+// delete, or when showing a service in a transitional status.
 //
-// GET /api/services/events/{releaseId}/watch-release
-func (UnimplementedHandler) WatchRelease(ctx context.Context, params WatchReleaseParams) (r WatchReleaseRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// WatchResources implements watchResources operation.
+//   - The first event is a "status" with the current state, and a "quota" with the project's quota when
+//     there is one. A reconnection simply starts again from the current state: there is no event id to
+//     resume from.
+//   - Then "status" is sent each time the service changes, "progress" for each step Kubernetes reports
+//     (scheduling, image pull, start, probe failure...), and "quota" each time the project's quota
+//     usage changes.
+//   - The server ends the stream with "done" once the service is stable (Running, Suspended, Ghost, an
+//     Error with reason release_failed), deleted, or after a maximum duration. Any other Error keeps
+//     the stream open: a crash loop or an exceeded quota can resolve by itself.
+//   - A comment line (": keep-alive") is sent periodically so that proxies keep the connection open.
 //
-// Server-Sent Events (text/event-stream). Filters resources by labelSelector:
-// app.kubernetes.io/instance={releaseId}. Emits: "resource" (add/update/delete), "progress"
-// (aggregated readiness), "done".
+// The browser's native EventSource can't send the Authorization and X-Onyxia-Project headers: use a
+// fetch-based SSE client.
 //
-// GET /api/services/events/{releaseId}/watch-resources
-func (UnimplementedHandler) WatchResources(ctx context.Context, params WatchResourcesParams) (r WatchResourcesRes, _ error) {
+// GET /api/services/{releaseId}/events
+func (UnimplementedHandler) WatchServiceEvents(ctx context.Context, params WatchServiceEventsParams) (r WatchServiceEventsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
