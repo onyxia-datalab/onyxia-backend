@@ -45,6 +45,23 @@ func (m *MockNamespaceService) ApplyResourceQuotas(
 	return args.Get(0).(ports.QuotaApplicationResult), args.Error(1)
 }
 
+// ---------- ResourceApplier mock ----------
+type MockResourceApplier struct{ mock.Mock }
+
+var _ ports.ResourceApplier = (*MockResourceApplier)(nil)
+
+func (m *MockResourceApplier) CheckResource(resource domain.Resource) error {
+	return m.Called(resource).Error(0)
+}
+
+func (m *MockResourceApplier) ApplyResource(
+	ctx context.Context,
+	namespace string,
+	resource domain.Resource,
+) error {
+	return m.Called(ctx, namespace, resource).Error(0)
+}
+
 // ---------- Usercontext helpers ----------
 
 var defaultTestUser = &usercontext.User{
@@ -66,6 +83,7 @@ func setupUsecase(
 
 	return NewOnboardingUsecase(
 		mockService,
+		new(MockResourceApplier),
 		domain.Namespace{
 			NamespacePrefix:      namespacePrefix,
 			GroupNamespacePrefix: groupNamespacePref,
@@ -76,6 +94,7 @@ func setupUsecase(
 			},
 		},
 		quotas,
+		nil,
 	)
 }
 

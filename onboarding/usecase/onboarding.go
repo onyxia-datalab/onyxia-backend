@@ -11,24 +11,31 @@ import (
 
 type onboardingUsecase struct {
 	namespaceService ports.NamespaceService
+	resourceApplier  ports.ResourceApplier
 	namespace        domain.Namespace
 	quotas           domain.Quotas
+	resources        []domain.Resource
 }
 
 func NewOnboardingUsecase(
 	namespaceService ports.NamespaceService,
+	resourceApplier ports.ResourceApplier,
 	namespace domain.Namespace,
 	quotas domain.Quotas,
+	resources []domain.Resource,
 ) *onboardingUsecase {
 	return &onboardingUsecase{
 		namespaceService: namespaceService,
+		resourceApplier:  resourceApplier,
 		namespace:        namespace,
 		quotas:           quotas,
+		resources:        resources,
 	}
 }
 
-// Onboard creates the namespace and applies its quota. A group namespace can
-// only be onboarded by a member of the group (ErrForbidden otherwise).
+// Onboard creates the namespace, applies its quota and the resources
+// configured by the platform admin. A group namespace can only be onboarded
+// by a member of the group (ErrForbidden otherwise).
 func (s *onboardingUsecase) Onboard(ctx context.Context, req domain.OnboardingRequest) error {
 	if req.Group != nil && !slices.Contains(req.User.Groups, *req.Group) {
 		return fmt.Errorf("%w: user %q is not a member of group %q", domain.ErrForbidden, req.User.Username, *req.Group)
@@ -41,6 +48,10 @@ func (s *onboardingUsecase) Onboard(ctx context.Context, req domain.OnboardingRe
 	}
 
 	if err := s.applyQuotas(ctx, namespace, req); err != nil {
+		return err
+	}
+
+	if err := s.applyResources(ctx, namespace, req); err != nil {
 		return err
 	}
 

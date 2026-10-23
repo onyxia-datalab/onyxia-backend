@@ -24,7 +24,10 @@ func Setup(ctx context.Context, app *bootstrap.Application) (http.Handler, error
 		return nil, fmt.Errorf("failed to initialize OIDC middleware: %w", err)
 	}
 
-	onboardingController := SetupOnboardingController(app)
+	onboardingController, err := SetupOnboardingController(app)
+	if err != nil {
+		return nil, err
+	}
 
 	handler := NewHandler(onboardingController)
 
