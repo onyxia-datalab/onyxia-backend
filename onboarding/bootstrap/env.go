@@ -2,9 +2,18 @@ package bootstrap
 
 import (
 	_ "embed"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/configloader"
 	"github.com/onyxia-datalab/onyxia-backend/internal/server"
+	"github.com/onyxia-datalab/onyxia-backend/onboarding/domain"
 )
 
 //go:embed env.default.yaml
@@ -61,6 +70,10 @@ type Onboarding struct {
 	GroupNamespacePrefix string            `mapstructure:"groupNamespacePrefix" json:"groupNamespacePrefix"`
 	Annotation           Annotation        `mapstructure:"annotations"          json:"annotations"`
 	Quotas               Quotas            `mapstructure:"quotas"               json:"quotas"`
+	// NamespaceResources are YAML manifests, one object per entry. They are kept as
+	// strings because Viper lowercases every key it loads, which would
+	// break fields such as apiVersion.
+	NamespaceResources []string `mapstructure:"namespaceResources" json:"namespaceResources"`
 }
 
 type Env struct {
@@ -72,5 +85,63 @@ type Env struct {
 }
 
 func NewEnv() (Env, error) {
-	return configloader.Load[Env](defaultConfig, "env.onboarding.yaml")
+	env, err := configloader.Load[Env](defaultConfig, "env.onboarding.yaml")
+	if err != nil {
+		return env, err
+	}
+	if _, err := ParseResources(env.Onboarding.NamespaceResources); err != nil {
+		return env, err
+	}
+	return env, nil
+}
+
+// ParseResources parses the configured manifests and rejects, at startup
+// rather than at the first onboarding, those that can never be applied.
+// Whether their kind exists and is namespaced is checked against the
+// cluster by the adapter.
+func ParseResources(manifests []string) ([]domain.Resource, error) {
+	resources := make([]domain.Resource, 0, len(manifests))
+	for i, manifest := range manifests {
+		resource, err := parseResource(manifest)
+		if err != nil {
+			return nil, fmt.Errorf("invalid onboarding.namespaceResources[%d]: %w", i, err)
+		}
+		resources = append(resources, resource)
+	}
+	return resources, nil
+}
+
+func parseResource(manifest string) (domain.Resource, error) {
+	decoder := yaml.NewYAMLOrJSONDecoder(strings.NewReader(manifest), 4096)
+
+	var raw json.RawMessage
+	if err := decoder.Decode(&raw); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+	}
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+		return nil, errors.New("a manifest must contain exactly one object")
+	}
+
+	// Unlike a plain json.Unmarshal, keeps integers as int64.
+	obj := &unstructured.Unstructured{}
+	if err := obj.UnmarshalJSON(raw); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest: %w", err)
+	}
+
+	switch {
+	case obj.GetAPIVersion() == "":
+		return nil, errors.New("apiVersion is required")
+	case obj.GetName() == "":
+		return nil, errors.New("metadata.name is required")
+	case obj.GetNamespace() != "":
+		return nil, errors.New("metadata.namespace must not be set: resources are always applied in the onboarded namespace")
+	}
+
+	resource := domain.Resource(obj.Object)
+	if unknown := resource.UnknownPlaceholders(); len(unknown) > 0 {
+		return nil, fmt.Errorf("unknown placeholders %v: use ${onyxia.%s}, ${onyxia.%s} or ${onyxia.%s}", unknown,
+			domain.PlaceholderNamespace, domain.PlaceholderUsername, domain.PlaceholderGroup)
+	}
+	return resource, nil
 }
