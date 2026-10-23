@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/onyxia-datalab/onyxia-backend/internal/usercontext"
@@ -169,4 +170,167 @@ func TestInstallServicePropagatesNotFound(t *testing.T) {
 	assert.Nil(t, res)
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 	assert.NotErrorIs(t, err, domain.ErrInvalidInput)
+}
+
+func TestInstallServiceBuildsStartRequest(t *testing.T) {
+	caller := usercontext.User{Username: "alice"}
+	ctx, users, _ := usercontext.NewTestUserContext(&caller)
+	var captured domain.StartRequest
+	ctrl := NewInstallController(&lifecycleStub{start: func(_ context.Context, req domain.StartRequest) error {
+		captured = req
+		return nil
+	}}, users)
+
+	_, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
+		CatalogId:    "catalog",
+		PackageName:  "jupyter",
+		FriendlyName: api.NewOptString("My notebook"),
+		Share:        api.NewOptBool(true),
+		Options: api.ServiceInstallRequestOptions{
+			"replicas":  []byte(`2`),
+			"resources": []byte(`{"cpu":"1"}`),
+		},
+	}, api.InstallServiceParams{ReleaseId: "release-id", XOnyxiaProject: "user-alice"})
+
+	require.NoError(t, err)
+	assert.Equal(t, caller, captured.User)
+	assert.Equal(t, "catalog", captured.CatalogID)
+	assert.Equal(t, "jupyter", captured.PackageName)
+	assert.Equal(t, "My notebook", captured.FriendlyName)
+	assert.True(t, captured.Share)
+	assert.Equal(t, map[string]interface{}{
+		"replicas":  float64(2),
+		"resources": map[string]interface{}{"cpu": "1"},
+	}, captured.Values)
+}
+
+func TestInstallServiceDefaultsFriendlyNameToPackageName(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+	var captured domain.StartRequest
+	ctrl := NewInstallController(&lifecycleStub{start: func(_ context.Context, req domain.StartRequest) error {
+		captured = req
+		return nil
+	}}, users)
+
+	_, err := ctrl.InstallService(ctx, &api.ServiceInstallRequest{
+		CatalogId:   "catalog",
+		PackageName: "jupyter",
+		Options:     api.ServiceInstallRequestOptions{},
+	}, api.InstallServiceParams{})
+
+	require.NoError(t, err)
+	assert.Equal(t, "jupyter", captured.FriendlyName)
+	assert.False(t, captured.Share)
+}
+
+func TestInstallServiceRejectsInvalidInput(t *testing.T) {
+	tests := []struct {
+		name string
+		req  *api.ServiceInstallRequest
+	}{
+		{name: "no body"},
+		{name: "no package", req: &api.ServiceInstallRequest{CatalogId: "catalog", Options: api.ServiceInstallRequestOptions{}}},
+		{name: "no catalog", req: &api.ServiceInstallRequest{PackageName: "jupyter", Options: api.ServiceInstallRequestOptions{}}},
+		{name: "no options", req: &api.ServiceInstallRequest{CatalogId: "catalog", PackageName: "jupyter"}},
+		{name: "malformed option", req: &api.ServiceInstallRequest{
+			CatalogId:   "catalog",
+			PackageName: "jupyter",
+			Options:     api.ServiceInstallRequestOptions{"bad": []byte(`{`)},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+			started := false
+			ctrl := NewInstallController(&lifecycleStub{start: func(context.Context, domain.StartRequest) error {
+				started = true
+				return nil
+			}}, users)
+
+			res, err := ctrl.InstallService(ctx, tt.req, api.InstallServiceParams{})
+
+			assert.Nil(t, res)
+			assert.ErrorIs(t, err, domain.ErrInvalidInput)
+			assert.False(t, started)
+		})
+	}
+}
+
+func TestInstallServiceWithoutUserIsForbidden(t *testing.T) {
+	users, _ := usercontext.NewUserContext()
+	ctrl := NewInstallController(&lifecycleStub{}, users)
+
+	res, err := ctrl.InstallService(context.Background(), &api.ServiceInstallRequest{}, api.InstallServiceParams{})
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestSetServiceSuspended(t *testing.T) {
+	boom := errors.New("boom")
+	tests := []struct {
+		name      string
+		suspended bool
+		stub      *lifecycleStub
+		wantErr   error
+	}{
+		{name: "suspend", suspended: true, stub: &lifecycleStub{}},
+		{name: "resume", suspended: false, stub: &lifecycleStub{}},
+		{name: "suspend failure", suspended: true, stub: &lifecycleStub{suspendErr: boom}, wantErr: boom},
+		{name: "resume failure", suspended: false, stub: &lifecycleStub{resumeErr: boom}, wantErr: boom},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+			ctrl := NewInstallController(tt.stub, users)
+
+			res, err := ctrl.SetServiceSuspended(
+				ctx,
+				&api.SetServiceSuspendedReq{Suspended: tt.suspended},
+				api.SetServiceSuspendedParams{ReleaseId: "release-id", XOnyxiaProject: "user-alice"},
+			)
+
+			if tt.wantErr != nil {
+				assert.Nil(t, res)
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.IsType(t, &api.SetServiceSuspendedNoContent{}, res)
+		})
+	}
+}
+
+func TestSetServiceSuspendedWithoutUserIsForbidden(t *testing.T) {
+	users, _ := usercontext.NewUserContext()
+	ctrl := NewInstallController(&lifecycleStub{}, users)
+
+	res, err := ctrl.SetServiceSuspended(
+		context.Background(),
+		&api.SetServiceSuspendedReq{Suspended: true},
+		api.SetServiceSuspendedParams{},
+	)
+
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
+}
+
+func TestDeleteService(t *testing.T) {
+	ctx, users, _ := usercontext.NewTestUserContext(&usercontext.User{Username: "alice"})
+
+	res, err := NewInstallController(&lifecycleStub{}, users).
+		DeleteService(ctx, api.DeleteServiceParams{ReleaseId: "release-id", XOnyxiaProject: "user-alice"})
+	require.NoError(t, err)
+	assert.IsType(t, &api.DeleteServiceNoContent{}, res)
+
+	res, err = NewInstallController(&lifecycleStub{deleteErr: domain.ErrNotFound}, users).
+		DeleteService(ctx, api.DeleteServiceParams{})
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrNotFound)
+
+	anonymous, _ := usercontext.NewUserContext()
+	res, err = NewInstallController(&lifecycleStub{}, anonymous).
+		DeleteService(context.Background(), api.DeleteServiceParams{})
+	assert.Nil(t, res)
+	assert.ErrorIs(t, err, domain.ErrForbidden)
 }
