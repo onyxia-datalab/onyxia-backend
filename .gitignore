@@ -12,6 +12,9 @@ Dockerfile.cross
 # Test binary, built with `go test -c`
 *.test
 
+# Coverage profile
+cover.out
+
 # Env
 env.yaml
 env.*.yaml

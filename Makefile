@@ -90,10 +90,10 @@ lint:
 	@$(GOBIN)/golangci-lint run --timeout=1m ./...
 
 .PHONY: test
-## test: Run all unit tests
+## test: Run all unit tests (extra go test flags via ARGS, e.g. make test ARGS="-cover")
 test:
 	@echo "✅ Running tests..."
-	go test ./...
+	go test $(ARGS) ./...
 
 # --- BUILD -------------------------------------------------------------------
 
