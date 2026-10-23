@@ -228,7 +228,10 @@ func TestVerifyProof_PrivateJWK(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = VerifyProof(raw, "POST", "https://example.com/api/resource", token, now, nil)
-	assert.ErrorContains(t, err, "public")
+	// go-jose >= 4.1.6 rejects private JWK headers at parse time; our own
+	// IsPublic check remains as defense in depth.
+	require.Error(t, err)
+	assert.Regexp(t, "private parameters|must be public", err.Error())
 }
 
 func TestJTICache_Eviction(t *testing.T) {
