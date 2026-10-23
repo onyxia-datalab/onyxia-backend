@@ -18,55 +18,99 @@ func TestDeriveStatus(t *testing.T) {
 	crashing := ports.PodInfo{Name: "crash", ErrorReason: domain.ServiceErrorReasonCrashLoop}
 
 	tests := []struct {
-		name       string
-		release    ports.ReleaseState
-		pods       []ports.PodInfo
-		wantStatus domain.ServiceStatus
-		wantError  *domain.ServiceError
+		name         string
+		release      ports.ReleaseState
+		pods         []ports.PodInfo
+		quotaFailure string
+		wantStatus   domain.ServiceStatus
+		wantError    *domain.ServiceError
 	}{
-		{"ghost", ports.ReleaseState{Exists: false}, nil, domain.ServiceStatusGhost, nil},
-		{"pending-install", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, nil, domain.ServiceStatusDeploying, nil},
-		{"unknown", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}, nil, domain.ServiceStatusDeploying, nil},
+		{name: "ghost", release: ports.ReleaseState{}, wantStatus: domain.ServiceStatusGhost},
 		{
-			"failed release carries the deployment tool's message",
-			ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "timed out"},
-			nil,
-			domain.ServiceStatusError,
-			&domain.ServiceError{Reason: domain.ServiceErrorReasonReleaseFailed, Message: "timed out"},
+			name:       "release uninstalled, pods shutting down",
+			release:    ports.ReleaseState{},
+			pods:       []ports.PodInfo{{Name: "p", Terminating: true}},
+			wantStatus: domain.ServiceStatusTerminating,
 		},
-		{"uninstalling", ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, nil, domain.ServiceStatusTerminating, nil},
-		{"suspended, no pod left", suspended, nil, domain.ServiceStatusSuspended, nil},
-		{"suspended, pods shutting down", suspended, []ports.PodInfo{{Name: "p", Terminating: true}}, domain.ServiceStatusSuspending, nil},
-		{"suspend in progress", ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}, []ports.PodInfo{ready}, domain.ServiceStatusSuspending, nil},
-		{"deployed, no pod yet", deployed, nil, domain.ServiceStatusDeploying, nil},
-		{"deployed, all pods ready", deployed, []ports.PodInfo{ready}, domain.ServiceStatusRunning, nil},
-		{"deployed, a pod not ready", deployed, []ports.PodInfo{ready, {Name: "starting"}}, domain.ServiceStatusDeploying, nil},
+		{name: "pending-install", release: ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}, wantStatus: domain.ServiceStatusDeploying},
+		{name: "unknown", release: ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUnknown}, wantStatus: domain.ServiceStatusDeploying},
 		{
-			"deployed, a pod failing",
-			deployed,
-			[]ports.PodInfo{ready, crashing},
-			domain.ServiceStatusError,
-			&domain.ServiceError{Reason: domain.ServiceErrorReasonCrashLoop, PodName: "crash"},
+			name:       "failed release carries the deployment tool's message",
+			release:    ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed, Message: "timed out"},
+			wantStatus: domain.ServiceStatusError,
+			wantError:  &domain.ServiceError{Reason: domain.ServiceErrorReasonReleaseFailed, Message: "timed out"},
 		},
+		{name: "uninstalling", release: ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusUninstalling}, wantStatus: domain.ServiceStatusTerminating},
+		{name: "suspended, no pod left", release: suspended, wantStatus: domain.ServiceStatusSuspended},
 		{
-			"rollout: the old pod shutting down doesn't count",
-			deployed,
-			[]ports.PodInfo{ready, {Name: "old", Terminating: true}},
-			domain.ServiceStatusRunning,
-			nil,
+			name:       "suspended, pods shutting down",
+			release:    suspended,
+			pods:       []ports.PodInfo{{Name: "p", Terminating: true}},
+			wantStatus: domain.ServiceStatusSuspending,
 		},
 		{
-			"rollout: only the pod shutting down is left",
-			deployed,
-			[]ports.PodInfo{{Name: "old", Ready: true, Terminating: true}},
-			domain.ServiceStatusDeploying,
-			nil,
+			name:       "suspend in progress",
+			release:    ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending},
+			pods:       []ports.PodInfo{ready},
+			wantStatus: domain.ServiceStatusSuspending,
+		},
+		{name: "deployed, no pod yet", release: deployed, wantStatus: domain.ServiceStatusDeploying},
+		{name: "deployed, all pods ready", release: deployed, pods: []ports.PodInfo{ready}, wantStatus: domain.ServiceStatusRunning},
+		{
+			name:       "deployed, a pod not ready",
+			release:    deployed,
+			pods:       []ports.PodInfo{ready, {Name: "starting"}},
+			wantStatus: domain.ServiceStatusDeploying,
+		},
+		{
+			name:       "deployed, a pod failing",
+			release:    deployed,
+			pods:       []ports.PodInfo{ready, crashing},
+			wantStatus: domain.ServiceStatusError,
+			wantError:  &domain.ServiceError{Reason: domain.ServiceErrorReasonCrashLoop, PodName: "crash"},
+		},
+		{
+			name:       "rollout: the old pod shutting down doesn't count",
+			release:    deployed,
+			pods:       []ports.PodInfo{ready, {Name: "old", Terminating: true}},
+			wantStatus: domain.ServiceStatusRunning,
+		},
+		{
+			name:       "rollout: only the pod shutting down is left",
+			release:    deployed,
+			pods:       []ports.PodInfo{{Name: "old", Ready: true, Terminating: true}},
+			wantStatus: domain.ServiceStatusDeploying,
+		},
+		{
+			name:         "pods refused by the quota",
+			release:      deployed,
+			quotaFailure: "exceeded quota: requests.memory",
+			wantStatus:   domain.ServiceStatusError,
+			wantError: &domain.ServiceError{
+				Reason:  domain.ServiceErrorReasonQuotaExceeded,
+				Message: "exceeded quota: requests.memory",
+			},
+		},
+		{
+			name:         "a pod failing outranks the quota",
+			release:      deployed,
+			pods:         []ports.PodInfo{crashing},
+			quotaFailure: "exceeded quota",
+			wantStatus:   domain.ServiceStatusError,
+			wantError:    &domain.ServiceError{Reason: domain.ServiceErrorReasonCrashLoop, PodName: "crash"},
+		},
+		{
+			name:         "the quota doesn't matter once the pods are up",
+			release:      deployed,
+			pods:         []ports.PodInfo{ready},
+			quotaFailure: "exceeded quota",
+			wantStatus:   domain.ServiceStatusRunning,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, svcErr := deriveStatus(tt.release, tt.pods)
+			status, svcErr := deriveStatus(tt.release, workloads{pods: tt.pods, quotaFailure: tt.quotaFailure})
 			assert.Equal(t, tt.wantStatus, status)
 			assert.Equal(t, tt.wantError, svcErr)
 			// The detail is present exactly when the status is Error.
@@ -75,12 +119,12 @@ func TestDeriveStatus(t *testing.T) {
 	}
 }
 
-func TestNeedsPods(t *testing.T) {
-	assert.False(t, needsPods(ports.ReleaseState{Exists: false}))
-	assert.False(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}))
-	assert.False(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}))
-	assert.True(t, needsPods(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}))
-	assert.True(t, needsPods(ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}))
+func TestNeedsWorkloads(t *testing.T) {
+	assert.True(t, needsWorkloads(ports.ReleaseState{Exists: false}))
+	assert.False(t, needsWorkloads(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusFailed}))
+	assert.False(t, needsWorkloads(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusPending}))
+	assert.True(t, needsWorkloads(ports.ReleaseState{Exists: true, Status: ports.ReleaseStatusDeployed}))
+	assert.True(t, needsWorkloads(ports.ReleaseState{Exists: true, Suspended: true, Status: ports.ReleaseStatusPending}))
 }
 
 func TestGetService_Suspended(t *testing.T) {

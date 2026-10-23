@@ -160,14 +160,7 @@ func (ic *InstallController) InstallService(
 		return nil, err
 	}
 
-	// Success: 202 Accepted + headers/body per ogen schema.
-	return &api.InstallAcceptedHeaders{
-		Location: api.NewOptString(""),
-		Response: api.InstallAccepted{
-			EventsUrl: api.InstallAcceptedEventsUrl{
-				Release:   "",
-				Resources: "",
-			},
-		},
+	return &api.InstallServiceAccepted{
+		Location: api.NewOptString("/api/services/" + params.ReleaseId),
 	}, nil
 }

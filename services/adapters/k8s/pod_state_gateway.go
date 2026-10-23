@@ -40,7 +40,10 @@ func (g *K8sWorkloadStateGateway) GetPodsForRelease(
 	}
 
 	if len(list.Items) == 0 {
-		slog.WarnContext(ctx, "no pods found for release — chart may be missing the standard Helm labels",
+		// Debug only: having no pod is normal while a service starts, once it
+		// is suspended, and for a Ghost. A deployed release that stays without
+		// pods (a chart missing the label) shows as Deploying.
+		slog.DebugContext(ctx, "no pods found for release — chart may be missing the standard Helm labels",
 			slog.String("release", releaseID),
 			slog.String("namespace", namespace),
 			slog.String("label", labelHelmInstance),
