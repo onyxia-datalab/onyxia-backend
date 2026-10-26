@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.23](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.22...v0.1.23) (2026-10-26)
+
+
+### Features
+
+* Enhance Services Catalog ([#50](https://github.com/onyxia-datalab/onyxia-backend/issues/50)) ([fa1e205](https://github.com/onyxia-datalab/onyxia-backend/commit/fa1e205bef10123b97e944123e4e1d7104845b00))
+* **onboarding:** apply admin-defined resources in every namespace ([#69](https://github.com/onyxia-datalab/onyxia-backend/issues/69)) ([acb0ec4](https://github.com/onyxia-datalab/onyxia-backend/commit/acb0ec44854184c597bd41c1e34b3e02bd0c0fa9))
+
+
+### Bug Fixes
+
+* **ci:** exclude test mocks from Sonar analysis ([#71](https://github.com/onyxia-datalab/onyxia-backend/issues/71)) ([92c0a8a](https://github.com/onyxia-datalab/onyxia-backend/commit/92c0a8a7aae51ab1b235b83003984bdbb6f57a4b))
+* **ci:** make the SonarCloud scan actually report coverage ([#70](https://github.com/onyxia-datalab/onyxia-backend/issues/70)) ([f1fdc42](https://github.com/onyxia-datalab/onyxia-backend/commit/f1fdc4252f7e0c24f795b2189c84d0c36d397f05))
+* **deps:** update go minor and patch updates ([#63](https://github.com/onyxia-datalab/onyxia-backend/issues/63)) ([39cbd87](https://github.com/onyxia-datalab/onyxia-backend/commit/39cbd87df7042b003abcae607508b00b8f66ab81))
+* **deps:** update go minor and patch updates ([#68](https://github.com/onyxia-datalab/onyxia-backend/issues/68)) ([8f9b062](https://github.com/onyxia-datalab/onyxia-backend/commit/8f9b0620f0679d5594768b6d74ed5bab063d604c))
+* **services:** align the OpenAPI spec with the implementation ([#65](https://github.com/onyxia-datalab/onyxia-backend/issues/65)) ([255c662](https://github.com/onyxia-datalab/onyxia-backend/commit/255c6627e670b4f9c3f7991e43d0ff9daa9e1587))
+* **services:** derive GetService and ListServices statuses the same way ([#66](https://github.com/onyxia-datalab/onyxia-backend/issues/66)) ([ff51952](https://github.com/onyxia-datalab/onyxia-backend/commit/ff51952f5f33112e440401b39c53edcd2cd74d6c))
+
 ## [0.1.22](https://github.com/onyxia-datalab/onyxia-backend/compare/v0.1.21...v0.1.22) (2026-09-15)
 
 
