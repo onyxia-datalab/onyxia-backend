@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	rn11AllowedHeaders = map[string]string{
+	rn12AllowedHeaders = map[string]string{
 		"GET": "Authorization,X-Onyxia-Project",
 	}
 	rn3AllowedHeaders = map[string]string{
@@ -23,21 +23,21 @@ var (
 	rn10AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn17AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id,X-Onyxia-Project",
-	}
-	rn19AllowedHeaders = map[string]string{
-		"GET": "Authorization,Last-Event-Id,X-Onyxia-Project",
+	rn11AllowedHeaders = map[string]string{
+		"GET": "Authorization,X-Onyxia-Project",
 	}
 	rn2AllowedHeaders = map[string]string{
 		"DELETE": "Authorization,X-Onyxia-Project",
 		"GET":    "Authorization,X-Onyxia-Project",
 		"PUT":    "Authorization,Content-Type,X-Onyxia-Project",
 	}
-	rn12AllowedHeaders = map[string]string{
+	rn17AllowedHeaders = map[string]string{
+		"GET": "Authorization,X-Onyxia-Project",
+	}
+	rn13AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
 	}
-	rn14AllowedHeaders = map[string]string{
+	rn15AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type,X-Onyxia-Project",
 	}
 )
@@ -96,7 +96,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				default:
 					s.notAllowed(w, r, notAllowedParams{
 						allowedMethods: "GET",
-						allowedHeaders: rn11AllowedHeaders,
+						allowedHeaders: rn12AllowedHeaders,
 						acceptPost:     "",
 						acceptPatch:    "",
 					})
@@ -257,95 +257,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					}
 
 					elem = origElem
-				case 'e': // Prefix: "events/"
+				case 'p': // Prefix: "project/quota"
 					origElem := elem
-					if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
+					if l := len("project/quota"); len(elem) >= l && elem[0:l] == "project/quota" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
-					// Param: "releaseId"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
-
 					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/watch-re"
-
-						if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
-							elem = elem[l:]
-						} else {
-							break
+						// Leaf node.
+						switch r.Method {
+						case "GET":
+							s.handleGetProjectQuotaRequest([0]string{}, elemIsEscaped, w, r)
+						default:
+							s.notAllowed(w, r, notAllowedParams{
+								allowedMethods: "GET",
+								allowedHeaders: rn11AllowedHeaders,
+								acceptPost:     "",
+								acceptPatch:    "",
+							})
 						}
 
-						if len(elem) == 0 {
-							break
-						}
-						switch elem[0] {
-						case 'l': // Prefix: "lease"
-
-							if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch r.Method {
-								case "GET":
-									s.handleWatchReleaseRequest([1]string{
-										args[0],
-									}, elemIsEscaped, w, r)
-								default:
-									s.notAllowed(w, r, notAllowedParams{
-										allowedMethods: "GET",
-										allowedHeaders: rn17AllowedHeaders,
-										acceptPost:     "",
-										acceptPatch:    "",
-									})
-								}
-
-								return
-							}
-
-						case 's': // Prefix: "sources"
-
-							if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch r.Method {
-								case "GET":
-									s.handleWatchResourcesRequest([1]string{
-										args[0],
-									}, elemIsEscaped, w, r)
-								default:
-									s.notAllowed(w, r, notAllowedParams{
-										allowedMethods: "GET",
-										allowedHeaders: rn19AllowedHeaders,
-										acceptPost:     "",
-										acceptPatch:    "",
-									})
-								}
-
-								return
-							}
-
-						}
-
+						return
 					}
 
 					elem = origElem
@@ -385,9 +319,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/s"
+				case '/': // Prefix: "/"
 
-					if l := len("/s"); len(elem) >= l && elem[0:l] == "/s" {
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 						elem = elem[l:]
 					} else {
 						break
@@ -397,9 +331,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 					switch elem[0] {
-					case 'h': // Prefix: "hared"
+					case 'e': // Prefix: "events"
 
-						if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+						if l := len("events"); len(elem) >= l && elem[0:l] == "events" {
 							elem = elem[l:]
 						} else {
 							break
@@ -408,14 +342,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						if len(elem) == 0 {
 							// Leaf node.
 							switch r.Method {
-							case "PUT":
-								s.handleSetServiceSharedRequest([1]string{
+							case "GET":
+								s.handleWatchServiceEventsRequest([1]string{
 									args[0],
 								}, elemIsEscaped, w, r)
 							default:
 								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "PUT",
-									allowedHeaders: rn12AllowedHeaders,
+									allowedMethods: "GET",
+									allowedHeaders: rn17AllowedHeaders,
 									acceptPost:     "",
 									acceptPatch:    "",
 								})
@@ -424,31 +358,72 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							return
 						}
 
-					case 'u': // Prefix: "uspended"
+					case 's': // Prefix: "s"
 
-						if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+						if l := len("s"); len(elem) >= l && elem[0:l] == "s" {
 							elem = elem[l:]
 						} else {
 							break
 						}
 
 						if len(elem) == 0 {
-							// Leaf node.
-							switch r.Method {
-							case "PUT":
-								s.handleSetServiceSuspendedRequest([1]string{
-									args[0],
-								}, elemIsEscaped, w, r)
-							default:
-								s.notAllowed(w, r, notAllowedParams{
-									allowedMethods: "PUT",
-									allowedHeaders: rn14AllowedHeaders,
-									acceptPost:     "",
-									acceptPatch:    "",
-								})
+							break
+						}
+						switch elem[0] {
+						case 'h': // Prefix: "hared"
+
+							if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+								elem = elem[l:]
+							} else {
+								break
 							}
 
-							return
+							if len(elem) == 0 {
+								// Leaf node.
+								switch r.Method {
+								case "PUT":
+									s.handleSetServiceSharedRequest([1]string{
+										args[0],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "PUT",
+										allowedHeaders: rn13AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+
+						case 'u': // Prefix: "uspended"
+
+							if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch r.Method {
+								case "PUT":
+									s.handleSetServiceSuspendedRequest([1]string{
+										args[0],
+									}, elemIsEscaped, w, r)
+								default:
+									s.notAllowed(w, r, notAllowedParams{
+										allowedMethods: "PUT",
+										allowedHeaders: rn15AllowedHeaders,
+										acceptPost:     "",
+										acceptPatch:    "",
+									})
+								}
+
+								return
+							}
+
 						}
 
 					}
@@ -712,91 +687,29 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 
 					elem = origElem
-				case 'e': // Prefix: "events/"
+				case 'p': // Prefix: "project/quota"
 					origElem := elem
-					if l := len("events/"); len(elem) >= l && elem[0:l] == "events/" {
+					if l := len("project/quota"); len(elem) >= l && elem[0:l] == "project/quota" {
 						elem = elem[l:]
 					} else {
 						break
 					}
 
-					// Param: "releaseId"
-					// Match until "/"
-					idx := strings.IndexByte(elem, '/')
-					if idx < 0 {
-						idx = len(elem)
-					}
-					args[0] = elem[:idx]
-					elem = elem[idx:]
-
 					if len(elem) == 0 {
-						break
-					}
-					switch elem[0] {
-					case '/': // Prefix: "/watch-re"
-
-						if l := len("/watch-re"); len(elem) >= l && elem[0:l] == "/watch-re" {
-							elem = elem[l:]
-						} else {
-							break
+						// Leaf node.
+						switch method {
+						case "GET":
+							r.name = GetProjectQuotaOperation
+							r.summary = "Get the resource quota of the project and its usage"
+							r.operationID = "getProjectQuota"
+							r.operationGroup = ""
+							r.pathPattern = "/api/services/project/quota"
+							r.args = args
+							r.count = 0
+							return r, true
+						default:
+							return
 						}
-
-						if len(elem) == 0 {
-							break
-						}
-						switch elem[0] {
-						case 'l': // Prefix: "lease"
-
-							if l := len("lease"); len(elem) >= l && elem[0:l] == "lease" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch method {
-								case "GET":
-									r.name = WatchReleaseOperation
-									r.summary = "Release-level status stream (SSE)"
-									r.operationID = "watchRelease"
-									r.operationGroup = ""
-									r.pathPattern = "/api/services/events/{releaseId}/watch-release"
-									r.args = args
-									r.count = 1
-									return r, true
-								default:
-									return
-								}
-							}
-
-						case 's': // Prefix: "sources"
-
-							if l := len("sources"); len(elem) >= l && elem[0:l] == "sources" {
-								elem = elem[l:]
-							} else {
-								break
-							}
-
-							if len(elem) == 0 {
-								// Leaf node.
-								switch method {
-								case "GET":
-									r.name = WatchResourcesOperation
-									r.summary = "Kubernetes resources status stream (SSE)"
-									r.operationID = "watchResources"
-									r.operationGroup = ""
-									r.pathPattern = "/api/services/events/{releaseId}/watch-resources"
-									r.args = args
-									r.count = 1
-									return r, true
-								default:
-									return
-								}
-							}
-
-						}
-
 					}
 
 					elem = origElem
@@ -844,9 +757,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 					}
 				}
 				switch elem[0] {
-				case '/': // Prefix: "/s"
+				case '/': // Prefix: "/"
 
-					if l := len("/s"); len(elem) >= l && elem[0:l] == "/s" {
+					if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
 						elem = elem[l:]
 					} else {
 						break
@@ -856,9 +769,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						break
 					}
 					switch elem[0] {
-					case 'h': // Prefix: "hared"
+					case 'e': // Prefix: "events"
 
-						if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+						if l := len("events"); len(elem) >= l && elem[0:l] == "events" {
 							elem = elem[l:]
 						} else {
 							break
@@ -867,12 +780,12 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						if len(elem) == 0 {
 							// Leaf node.
 							switch method {
-							case "PUT":
-								r.name = SetServiceSharedOperation
-								r.summary = "Share or unshare a service with the project members"
-								r.operationID = "setServiceShared"
+							case "GET":
+								r.name = WatchServiceEventsOperation
+								r.summary = "Follow a service while it changes (SSE)"
+								r.operationID = "watchServiceEvents"
 								r.operationGroup = ""
-								r.pathPattern = "/api/services/{releaseId}/shared"
+								r.pathPattern = "/api/services/{releaseId}/events"
 								r.args = args
 								r.count = 1
 								return r, true
@@ -881,29 +794,68 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							}
 						}
 
-					case 'u': // Prefix: "uspended"
+					case 's': // Prefix: "s"
 
-						if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+						if l := len("s"); len(elem) >= l && elem[0:l] == "s" {
 							elem = elem[l:]
 						} else {
 							break
 						}
 
 						if len(elem) == 0 {
-							// Leaf node.
-							switch method {
-							case "PUT":
-								r.name = SetServiceSuspendedOperation
-								r.summary = "Suspend or resume a service"
-								r.operationID = "setServiceSuspended"
-								r.operationGroup = ""
-								r.pathPattern = "/api/services/{releaseId}/suspended"
-								r.args = args
-								r.count = 1
-								return r, true
-							default:
-								return
+							break
+						}
+						switch elem[0] {
+						case 'h': // Prefix: "hared"
+
+							if l := len("hared"); len(elem) >= l && elem[0:l] == "hared" {
+								elem = elem[l:]
+							} else {
+								break
 							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch method {
+								case "PUT":
+									r.name = SetServiceSharedOperation
+									r.summary = "Share or unshare a service with the project members"
+									r.operationID = "setServiceShared"
+									r.operationGroup = ""
+									r.pathPattern = "/api/services/{releaseId}/shared"
+									r.args = args
+									r.count = 1
+									return r, true
+								default:
+									return
+								}
+							}
+
+						case 'u': // Prefix: "uspended"
+
+							if l := len("uspended"); len(elem) >= l && elem[0:l] == "uspended" {
+								elem = elem[l:]
+							} else {
+								break
+							}
+
+							if len(elem) == 0 {
+								// Leaf node.
+								switch method {
+								case "PUT":
+									r.name = SetServiceSuspendedOperation
+									r.summary = "Suspend or resume a service"
+									r.operationID = "setServiceSuspended"
+									r.operationGroup = ""
+									r.pathPattern = "/api/services/{releaseId}/suspended"
+									r.args = args
+									r.count = 1
+									return r, true
+								default:
+									return
+								}
+							}
+
 						}
 
 					}
