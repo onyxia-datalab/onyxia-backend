@@ -40,13 +40,13 @@ var operationRolesOidc = map[string][]string{
 	GetMyCatalogsOperation:       {},
 	GetMyPackageOperation:        {},
 	GetPackageSchemaOperation:    {},
+	GetProjectQuotaOperation:     {},
 	GetServiceOperation:          {},
 	InstallServiceOperation:      {},
 	ListServicesOperation:        {},
 	SetServiceSharedOperation:    {},
 	SetServiceSuspendedOperation: {},
-	WatchReleaseOperation:        {},
-	WatchResourcesOperation:      {},
+	WatchServiceEventsOperation:  {},
 }
 
 // GetRolesForOidc returns the required roles for the given operation.

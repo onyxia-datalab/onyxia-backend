@@ -122,6 +122,8 @@ func toAPIErrorReason(r domain.ServiceErrorReason) api.ServiceErrorReason {
 	switch r {
 	case domain.ServiceErrorReasonReleaseFailed:
 		return api.ServiceErrorReasonReleaseFailed
+	case domain.ServiceErrorReasonQuotaExceeded:
+		return api.ServiceErrorReasonQuotaExceeded
 	case domain.ServiceErrorReasonCrashLoop:
 		return api.ServiceErrorReasonCrashLoop
 	case domain.ServiceErrorReasonOOMKilled:

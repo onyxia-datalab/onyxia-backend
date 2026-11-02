@@ -223,3 +223,38 @@ func (m *MockWorkloadStateGateway) ListPodsByRelease(
 	}
 	return nil, args.Error(1)
 }
+
+func (m *MockWorkloadStateGateway) ListQuotaFailures(
+	ctx context.Context,
+	namespace string,
+) (map[string]string, error) {
+	args := m.Called(ctx, namespace)
+	if v := args.Get(0); v != nil {
+		return v.(map[string]string), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+type MockProjectQuotaReader struct{ mock.Mock }
+
+var _ ports.ProjectQuotaReader = (*MockProjectQuotaReader)(nil)
+
+func (m *MockProjectQuotaReader) ReadProjectQuota(ctx context.Context, namespace string) (domain.ProjectQuota, error) {
+	args := m.Called(ctx, namespace)
+	return args.Get(0).(domain.ProjectQuota), args.Error(1)
+}
+
+type MockClusterWatcher struct{ mock.Mock }
+
+var _ ports.ClusterWatcher = (*MockClusterWatcher)(nil)
+
+func (m *MockClusterWatcher) Watch(
+	ctx context.Context,
+	namespace, releaseID string,
+) (<-chan ports.ClusterChange, error) {
+	args := m.Called(ctx, namespace, releaseID)
+	if v := args.Get(0); v != nil {
+		return v.(chan ports.ClusterChange), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

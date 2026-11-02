@@ -102,11 +102,45 @@ func (stubCatalog) GetPackageSchema(context.Context, *usercontext.User, string, 
 }
 func (stubCatalog) CheckSharingAllowed(context.Context, *usercontext.User, string) error { return nil }
 
+// stubEvents opens the streams the test feeds through events.
+type stubEvents struct {
+	events  chan domain.ServiceEvent
+	openErr error
+}
+
+func (s *stubEvents) Follow(context.Context, usercontext.User, string, string) (<-chan domain.ServiceEvent, error) {
+	if s.openErr != nil {
+		return nil, s.openErr
+	}
+	return s.events, nil
+}
+
+type stubQuotas struct {
+	quota domain.ProjectQuota
+	err   error
+}
+
+func (s *stubQuotas) GetProjectQuota(context.Context, usercontext.User, string) (domain.ProjectQuota, error) {
+	return s.quota, s.err
+}
+
 // --- test server ---------------------------------------------------------
 
 const testNamespace = "user-alice"
 
 func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *httptest.Server {
+	t.Helper()
+	return newEventsTestServer(t, lifecycle, query, &stubEvents{}, &stubQuotas{})
+}
+
+// newEventsTestServer serves the handler like Setup does.
+func newEventsTestServer(
+	t *testing.T,
+	lifecycle *stubLifecycle,
+	query *stubQuery,
+	events *stubEvents,
+	quotas *stubQuotas,
+) *httptest.Server {
 	t.Helper()
 
 	userReader, userWriter := usercontext.NewUserContext()
@@ -115,9 +149,11 @@ func newTestServer(t *testing.T, lifecycle *stubLifecycle, query *stubQuery) *ht
 		controller.NewInstallController(lifecycle, userReader),
 		controller.NewCatalogController(stubCatalog{}, userReader),
 		controller.NewServiceQueryController(query, userReader),
+		controller.NewServiceEventsController(events, quotas, userReader),
 	)
 
 	srv, err := api.NewServer(
+		h,
 		h,
 		testSecurityHandler{writer: userWriter},
 		api.WithErrorHandler(apperror.OgenHandler),
